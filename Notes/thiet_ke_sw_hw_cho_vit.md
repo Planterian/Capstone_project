@@ -41,7 +41,7 @@ Sơ đồ thể hiện toàn bộ hệ thống trên chip (SoC), ranh giới gi�
   |   |  (Control FSM, N, d_k, Config)   |            |   - MM2S Engine (Read DDR4 -> PL)|                           |
   |   +----------------+-----------------+            |   - S2MM Engine (Write PL -> DDR)|                           |
   |                    |                              +----------------+-----------------+                           |
-  |                    | (Control Signals)                             | (AXI4-Stream 64-bit)                         |
+  |                    | (Control Signals)                             | (AXI4-Stream 64-bit)                        |
   |                    v                                               v                                             |
   |   +----------------------------------------------------------------------------------+                           |
   |   |                        FPGA PL ACCELERATOR CORE (Attention Engine)               |                           |
@@ -70,15 +70,15 @@ Phân tầng kiến trúc phần mềm và phần cứng, thể hiện cách ứ
   +------------------------------------------------------------------------------------------------------------------+
   | APPLICATION LAYER (User Space - Python / C++)                                                                    |
   |   - Host Application (`realtime_vit_inference.py`)                                                               |
-  |   - Image Preprocessing (OpenCV Resize 224x224, Patch Partitioning, INT8 Quantization)                          |
-  |   - Postprocessing & Inference Result Visualization (Bounding Box, Classification Label, FPS Render)            |
+  |   - Image Preprocessing (OpenCV Resize 224x224, Patch Partitioning, INT8 Quantization)                           |
+  |   - Postprocessing & Inference Result Visualization (Bounding Box, Classification Label, FPS Render)             |
   +---------------------------------------------------+--------------------------------------------------------------+
                                                       |
                                                       v
   +------------------------------------------------------------------------------------------------------------------+
   | SW FRAMEWORK & API LAYER (PYNQ Runtime Environment)                                                              |
-  |   - `pynq.Overlay`: Loads Bitstream (`.bit`) & Device Tree Overlay (`.hwh`)                                       |
-  |   - `pynq.allocate`: Allocates Physically Contiguous Memory (CMA - Contiguous Memory Allocator)                   |
+  |   - `pynq.Overlay`: Loads Bitstream (`.bit`) & Device Tree Overlay (`.hwh`)                                      |
+  |   - `pynq.allocate`: Allocates Physically Contiguous Memory (CMA - Contiguous Memory Allocator)                  |
   |   - `pynq.lib.axidma`: Controls AXI DMA Channel Transfer (`sendchannel`, `recvchannel`)                          |
   |   - Register I/O Access API: MMIO Write/Read (`attn_ip.write(offset, val)`)                                      |
   +---------------------------------------------------+--------------------------------------------------------------+
@@ -86,9 +86,9 @@ Phân tầng kiến trúc phần mềm và phần cứng, thể hiện cách ứ
                                                       v
   +------------------------------------------------------------------------------------------------------------------+
   | OS & DRIVER LAYER (Linux Kernel Space)                                                                           |
-  |   - UIO (Userspace I/O) Driver: Direct Register Map Access for AXI-Lite Control Registers                         |
-  |   - Xilinx ZynqMP DMA Driver (`xilinx-axidma`): Handles DMA Ring Buffers & Hardware Interrupts                     |
-  |   - CMA Driver (`/dev/cma`): Guarantees Zero-Copy Buffer Allocation for Direct DMA Access                         |
+  |   - UIO (Userspace I/O) Driver: Direct Register Map Access for AXI-Lite Control Registers                        |
+  |   - Xilinx ZynqMP DMA Driver (`xilinx-axidma`): Handles DMA Ring Buffers & Hardware Interrupts                   |
+  |   - CMA Driver (`/dev/cma`): Guarantees Zero-Copy Buffer Allocation for Direct DMA Access                        |
   +---------------------------------------------------+--------------------------------------------------------------+
                                                       |
                                                       v  (Hardware Boundary: AXI Interconnect / Memory Bus)
@@ -96,7 +96,7 @@ Phân tầng kiến trúc phần mềm và phần cứng, thể hiện cách ứ
                                                       |
   +---------------------------------------------------+--------------------------------------------------------------+
   | HARDWARE LAYER (FPGA PL - Physical Circuits)                                                                     |
-  |   - AXI4-Lite Control Slave Registers (Offsets: 0x00=START/DONE, 0x10=N, 0x18=d_k)                              |
+  |   - AXI4-Lite Control Slave Registers (Offsets: 0x00=START/DONE, 0x10=N, 0x18=d_k)                               |
   |   - AXI DMA IP Core (MM2S & S2MM Stream Channels)                                                                |
   |   - Ping-Pong On-Chip BRAM / LUTRAM Buffers                                                                      |
   |   - Pipelined GEMM & Attention Core (DSP48E2 Packing, ShiftGELU, I-LayerNorm, Softmax LUT)                       |
@@ -119,7 +119,7 @@ Luồng truyền dữ liệu chi tiết qua từng công đoạn xử lý từ C
                v (Raw BGR Image: 640x480x3 @ 30fps)
   +-------------------------------------------------------------------+
   | SW STAGE 1: ARM PS Preprocessing                                  |
-  |   1. OpenCV Resize & Center Crop -> 224x224x3                      |
+  |   1. OpenCV Resize & Center Crop -> 224x224x3                     |
   |   2. Patch Partitioning (P=16) -> N = 196 Patches                 |
   |   3. Linear Projection & Positional Encoding -> FP32 Feature Map  |
   |   4. Uniform Symmetric INT8 Quantization: I_X = Clamp(X / Scale)  |
@@ -134,7 +134,7 @@ Luồng truyền dữ liệu chi tiết qua từng công đoạn xử lý từ C
                                        |
                                        v (AXI4 MM2S Memory Read Burst)
   ===========================================================================================================
-  | BUS BOUNDARY: AXI4 High-Performance (HP) Bus (64-bit Stream)                                           |
+  | BUS BOUNDARY: AXI4 High-Performance (HP) Bus (64-bit Stream)                                            |
   ===========================================================================================================
                                        |
                                        v
@@ -162,7 +162,7 @@ Luồng truyền dữ liệu chi tiết qua từng công đoạn xử lý từ C
                                        |
                                        v (AXI4 S2MM Memory Write Burst)
   ===========================================================================================================
-  | BUS BOUNDARY: AXI4 High-Performance (HP) Bus                                                           |
+  | BUS BOUNDARY: AXI4 High-Performance (HP) Bus                                                            |
   ===========================================================================================================
                                        |
                                        v
@@ -190,7 +190,7 @@ Sơ đồ trình tự thời gian (Sequence Diagram) thể hiện chính xác c�
 
   SW (ARM PS Host Script)                  AXI DMA Controller                  FPGA PL Attention Core FSM
            |                                       |                                       |
-           | 1. pynq.Overlay("vit_core.bit")        |                                       |
+           | 1. pynq.Overlay("vit_core.bit")       |                                      |
            |-------------------------------------->| (Load Bitstream & Program PL Logic)   |
            |                                       |                                       |
            | 2. Allocate CMA Memory Buffers        |                                       |

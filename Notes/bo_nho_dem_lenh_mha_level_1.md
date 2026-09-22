@@ -5,7 +5,7 @@ Phần này tập trung vào vi mạch quản lý luồng dữ liệu liên tụ
 
 ---
 
-### 1. Sub-system Block Diagram (memory_streaming_subsys.sv)
+## 1. Sub-system Block Diagram (memory_streaming_subsys.sv)
 
 Sơ đồ phác thảo chi tiết sự kết hợp giữa **Skid Buffer (chống mất gói AXI-Stream)**, **Bộ phân giải địa chỉ (Address Generator)**, và **Kiến trúc BRAM Ping-Pong Ngân hàng kép (Dual-Bank BRAM)**:
 
@@ -18,7 +18,7 @@ Sơ đồ phác thảo chi tiết sự kết hợp giữa **Skid Buffer (chống
             │                                                                      │
             v                                                                      v
    +-------------------------------------------------------------------------------------------------------------------+
-   | AXI4-STREAM SKID BUFFER ADAPTER (axis_adapter.sv)                                                                |
+   | AXI4-STREAM SKID BUFFER ADAPTER (axis_adapter.sv)                                                                 |
    | - Holds incoming data beat when downstream BRAM writing is stalled                                                |
    | - Guarantees zero bubble cycles and compliant TVALID/TREADY protocol                                              |
    +---------------------------------------------------+---------------------------------------------------------------+
@@ -90,8 +90,10 @@ Sơ đồ điều khiển chuyển đổi con trỏ đệm Ping-Pong đảm bả
                                /                    \                       |
                               v                      +----------------------+
                     (bank_write_free?)
-                      /                              YES           NO
-                    /                                  v                 v
+                      /          \                    
+                    YES           NO
+                    /               \                   
+                   v                 v
          +-------------------+     +-------------------+
          |   ST_WRITE_ACTIVE |     |   ST_WAIT_COMPUTE |
          | Write to active   |     | Hold TREADY = 0   |
@@ -100,8 +102,10 @@ Sơ đồ điều khiển chuyển đổi con trỏ đệm Ping-Pong đảm bả
                    |                         |
                    v                         v
           (tile_write_done?)          (tile_read_done?)
-           /            \               /                  YES             NO           YES          NO
-         /                \           /                     v                  v         v               v
+           /            \               /          \        
+         YES             NO           YES          NO
+         /                \           /             \        
+        v                  v         v               v
   +---------------+   (Keep Write) ST_WRITE_ACTIVE (Keep Wait)
   | ST_SWAP_BANKS |
   | pp_bank_sel <=|

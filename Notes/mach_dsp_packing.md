@@ -125,7 +125,9 @@ endmodule
 ### 2. PHÂN TÍCH & REVIEW CHI TIẾT KIẾN TRÚC MẠCH (CODE REVIEW)
 
 ##### 🔹 1. Bản Chất Toán Học của Phép Đóng Gói (DSP Packing Math)
+
 Khối **DSP48E2** trên chip AMD UltraScale+ có bộ nhân phần cứng rộng $18 \times 27$ bit. Để thực hiện đồng thời hai phép nhân $\text{INT8}$: $Y_1 = A \times B$ và $Y_2 = A \times C$:
+
 1. Toán hạng chung $A$ được đưa vào cổng 18-bit (operand_a_extended).
 2. Toán hạng $B$ và $C$ được ghép vào cổng 27-bit: $$\text{Packed} = B \cdot 2^{18} + C$$
 3. Bộ nhân thực hiện phép tính 45-bit: $$P = A \cdot (B \cdot 2^{18} + C) = (A \cdot B) \cdot 2^{18} + (A \cdot C)$$
@@ -133,8 +135,10 @@ Khối **DSP48E2** trên chip AMD UltraScale+ có bộ nhân phần cứng rộn
 5. Kết quả phép nhân $A \cdot B$ được dịch trái 18 bit, nằm ở các bit cao P[33:18]. Dải bit P[17:16] đóng vai trò là **khoảng đệm Guard Bits** chống tràn giữa 2 kết quả.
 
 ##### 🔹 2. Mạch Bù Dấu Tích Cao (High Product Sign-Correction)
+
 Khi tích $A \cdot C$ âm, bit MSB của $A \cdot C$ (P[15]) bằng 1. Do phép nhân số phức hợp là số bù hai, bit 1 này gây hiện tượng mượn (borrow) ảnh hưởng tới dải bit P[33:18] của tích $A \cdot B$. Mạch `high_corrected = P[33:18] + P[15]` bù lại chính xác 1 đơn vị, đảm bảo $A \cdot B$ hoàn toàn chính xác trong mọi trường hợp dấu.
 
 ##### 🔹 3. Tối Ưu Mức Flip-Flop & Tải Tài Nguyên FPGA
+
 * **Thanh ghi đồng bộ (Synchronous Reset)**: Đoạn mã sử dụng `always_ff @(posedge clk)` với reset đồng bộ `!rst_n` để Vivado có thể **hấp thụ (pack) toàn bộ thanh ghi `dsp_product` vào trực tiếp các thanh ghi nội bộ (Pipeline Registers) của slice DSP48E2**. Điều này tránh việc văng thanh ghi ra ngoài fabric LUT/FF, đạt thời gian truy xuất cực nhanh và tối ưu timing closure ($F_{\max} \ge 200\text{ MHz}$).
 * **Thực thi Đường ống Latency**: Mạch mất đúng **2 chu kỳ clock** kể từ khi `in_valid` bật để cho ra kết quả `result_ab` và `result_ac` hợp lệ.

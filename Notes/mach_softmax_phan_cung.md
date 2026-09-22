@@ -215,13 +215,16 @@ endmodule
 ### 2. PHÂN TÍCH & REVIEW CHI TIẾT MÃ NGUỒN (DETAILED CODE REVIEW)
 
 ##### 🔹 1. Tính Ổn Định Số Học (Numerical Stability & Overflow Prevention)
+
 * **Cơ chế Find-Max (Pass 1 & Pass 2)**: Khối FSM chia tiến trình làm 2 lượt (Pass). Lượt 1 quét qua toàn bộ $N$ phần tử để chốt $S_{\max}$. Lượt 2 thực hiện hiệu số $\Delta S_i = S_i - S_{\max}$.
 * **Bảo chứng toán học**: Vì $S_i \le S_{\max}$ nên $\Delta S_i \le 0 \implies e^{\Delta S_i} \in (0, 1]$. Điều này triệt tiêu hoàn toàn rủi ro tràn số (overflow) khi tính hàm mũ trên số nguyên và đảm bảo địa chỉ `rom_addr` truy xuất BRAM luôn nằm trong miền giới hạn $[0, 255]$.
 
 ##### 🔹 2. Loại Bỏ Bộ Chia Phần Cứng (Zero Hardware Dividers)
+
 * **Dyadic Reciprocal Normalization (Pass 3 & Pass 4)**: Thay vì dùng bộ chia phần cứng tốn hàng ngàn logic LUTs để tính $\frac{\text{Exp}_i}{\sum \text{Exp}}$, mạch tính trước giá trị nghịch đảo mẫu số $I_{\text{inv}} = \frac{2^{24}}{\sum \text{Exp}}$ trong 1 chu kỳ, sau đó chuyển phép chia thành **phép nhân số nguyên + dịch bit phải đại số (`>>> 16`)**.
 
 ##### 🔹 3. Quản Lý Luồng Dữ Liệu & Bắt Tay (Handshake & Pipelining)
+
 * **Giao diện FSMD chuẩn Pong P. Chu**: Sử dụng các tín hiệu `start_row`, `in_valid`, `out_valid`, và `busy` để bắt tay an toàn với khối **Scaler Unit** phía trước và mảng **Score $\times$ V GEMM** phía sau.
 * **Thời gian trễ (Latency Calculation)**: Với $N = 196$ tokens:
   $$\text{Total Latency} = \underbrace{196}_{\text{Pass 1: Find Max}} + \underbrace{196}_{\text{Pass 2: Exp Acc}} + \underbrace{1}_{\text{Calc Reciprocal}} + \underbrace{196}_{\text{Pass 3: Output Prob}} = 589 \text{ clock cycles}$$

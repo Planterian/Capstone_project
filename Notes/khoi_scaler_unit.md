@@ -31,7 +31,7 @@ Khối Scaler Unit bao gồm 2 công đoạn chính: **Barrel Shifter đại s�
     +-----------------------------------------------------------------------------------+
     | Saturating Clamp to 16-bit Signed Range                                           |
     |   if (shifted_score > 32767)       clamped_score = 32767                          |
-    |   else if (shifted_score < -32768)  clamped_score = -32768                         |
+    |   else if (shifted_score < -32768)  clamped_score = -32768                        |
     |   else                             clamped_score = shifted_score[15:0]            |
     +-----------------------------------------┬-----------------------------------------+
                                               │

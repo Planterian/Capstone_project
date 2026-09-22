@@ -21,81 +21,81 @@ Toàn bộ hệ thống tăng tốc **Multi-Head Attention (MHA) Core** được
 ========================================================================================================================
 
        ARM Processing System (PS) / Host                                  AXI DMA Controller (Simple Mode)
-  +-------------------------------------------+                        +------------------------------------+
+  +-------------------------------------------+                        +-------------------------------------+
   | AXI4-Lite Master (Memory-Mapped)          |                        | MM2S (Read DDR4)   S2MM (Write DDR4)|
-  | Regs: 0x00=CTRL, 0x04=NBYTES, 0x10=N, ... |                        | Stream Master      Stream Slave    |
-  +---------------------+---------------------+                        +---------+------------------+---------------+
+  | Regs: 0x00=CTRL, 0x04=NBYTES, 0x10=N, ... |                        | Stream Master      Stream Slave     |
+  +---------------------+---------------------+                        +---------+------------------+--------+
                         |                                                        |                  ^
                         | AXI4-Lite Bus                                          | AXI4-Stream      | AXI4-Stream
                         | (32-bit Control/Status)                                | RX (64-bit)      | TX (64-bit)
                         v                                                        v                  |
   +------------------------------------------------------------------------------------------------------------------+
-  | ATTENTION ACCELERATOR TOP SHELL (attention_core_top.sv)                                                         |
+  | ATTENTION ACCELERATOR TOP SHELL (attention_core_top.sv)                                                          |
   |                                                                                                                  |
   |  +------------------------------------------------------------------------------------------------------------+  |
-  |  | CONTROL PATH: AXI4-Lite Slave Register File & Central ASMD Controller (axi_lite_regs.sv)                |  |
+  |  | CONTROL PATH: AXI4-Lite Slave Register File & Central ASMD Controller (axi_lite_regs.sv)                   |  |
   |  |                                                                                                            |  |
   |  |  Registers (CSR):                 Internal Control Signals:                                                |  |
-  |  |   - 0x00: CTRL/STATUS [START/DONE] - start_pulse  ──► [Start FSM]        - reg_nbytes ──► [Packet Size] |  |
-  |  |   - 0x04: NBYTES                  - clear_buf    ──► [Reset Buffers]    - reg_tokens ──► [Seq Len N]   |  |
-  |  |   - 0x10: SEQ_LEN (N=196)         - core_busy    ◄── [Compute Status]   - reg_hdim   ──► [Head Dim d_k] |  |
-  |  |   - 0x18: HEAD_DIM (d_k=32)       - done_pulse   ◄── [Pipeline Done]    - reg_heads  ──► [Num Heads H] |  |
+  |  |   - 0x00: CTRL/STATUS [START/DONE] - start_pulse  ──► [Start FSM]        - reg_nbytes ──► [Packet Size]    |  |
+  |  |   - 0x04: NBYTES                  - clear_buf    ──► [Reset Buffers]    - reg_tokens ──► [Seq Len N]       |  |
+  |  |   - 0x10: SEQ_LEN (N=196)         - core_busy    ◄── [Compute Status]   - reg_hdim   ──► [Head Dim d_k]    |  |
+  |  |   - 0x18: HEAD_DIM (d_k=32)       - done_pulse   ◄── [Pipeline Done]    - reg_heads  ──► [Num Heads H]     |  |
   |  +-------------------------------------+----------------------------------------------------------------------+  |
   |                                        |                                                                         |
   |                                        | Control & Config Routing (start_tile, mode_sel, ping_pong_sel)          |
   |                                        v                                                                         |
   |  +------------------------------------------------------------------------------------------------------------+  |
-  |  | DATA PATH: PIPELINED MULTI-HEAD ATTENTION ENGINE                                                          |  |
+  |  | DATA PATH: PIPELINED MULTI-HEAD ATTENTION ENGINE                                                           |  |
   |  |                                                                                                            |  |
   |  |   AXI-Stream RX Adapter                                                                                    |  |
   |  |   +-------------------+                                                                                    |  |
-  |  |   | axis_adapter_rx   |====/ (64-bit Internal Data Stream / Handshake Control) ===+                         |  |
-  |  |   +-------------------+   64                                                          |                        |  |
-  |  |                                                                                       v                        |  |
-  |  |                                                                         +----------------------------+         |  |
-  |  |                                                                         | Input Ping-Pong BRAM       |         |  |
-  |  |                                                                         | (ping_pong_bram_buffer.sv) |         |  |
-  |  |                                                                         | [Q_RAM] [K_RAM] [V_RAM]    |         |  |
-  |  |                                                                         +--------------+-------------+         |  |
-  |  |                                                                                        | (INT8 Vector)         |  |
-  |  |                                                                                        v                       |  |
-  |  |                                                                         +----------------------------+         |  |
-  |  |                                                                         | STAGE 1: QK^T GEMM Engine  |         |  |
-  |  |                                                                         | (systolic_mac_array.sv)    |         |  |
-  |  |                                                                         | [2x INT8 DSP Packing]      |         |  |
-  |  |                                                                         +--------------+-------------+         |  |
-  |  |                                                                                        | (INT32 Partial Sum)   |  |
-  |  |                                                                                        v                       |  |
-  |  |                                                                         +----------------------------+         |  |
-  |  |                                                                         | STAGE 2: Scaler Unit       |         |  |
-  |  |                                                                         | (scale_unit.sv)            |         |  |
-  |  |                                                                         | [ASR Shift 1/sqrt(d_k)]    |         |  |
-  |  |                                                                         +--------------+-------------+         |  |
-  |  |                                                                                        | (INT16 Scaled Score)  |  |
-  |  |                                                                                        v                       |  |
-  |  |                                                                         +----------------------------+         |  |
-  |  |                                                                         | STAGE 3: Hardware Softmax  |         |  |
-  |  |                                                                         | (softmax_lut.sv)           |         |  |
-  |  |                                                                         | [Max-Sub + Exp LUT + Div]  |         |  |
-  |  |                                                                         +--------------+-------------+         |  |
-  |  |                                                                                        | (INT8 Probability)    |  |
-  |  |                                                                                        v                       |  |
-  |  |                                                                         +----------------------------+         |  |
-  |  |                                                                         | STAGE 4: Score x V GEMM    |         |  |
-  |  |                                                                         | (systolic_mac_array.sv)    |         |  |
-  |  |                                                                         +--------------+-------------+         |  |
-  |  |                                                                                        | (INT8 Output Tokens)  |  |
-  |  |                                                                                        v                       |  |
-  |  |                                                                         +----------------------------+         |  |
-  |  |                                                                         | Output Ping-Pong Buffer    |         |  |
-  |  |                                                                         +--------------+-------------+         |  |
-  |  |                                                                                        |                       |  |
-  |  |   AXI-Stream TX Adapter                                                                |                       |  |
-  |  |   +-------------------+                                                                |                       |  |
-  |  |   | axis_adapter_tx   |<====/ (64-bit Internal Data / Handshake) =================-----+                       |  |
-  |  |   +-------------------+   64                                                                                   |  |
-  |  +----------------------------------------------------------------------------------------------------------------+  |
-  +----------------------------------------------------------------------------------------------------------------------+
+  |  |   | axis_adapter_rx   |====/ (64-bit Internal Data Stream / Handshake Control) ===+                        |  |
+  |  |   +-------------------+   64                                                      |                        |  |
+  |  |                                                                                   v                        |  |
+  |  |                                                                     +----------------------------+         |  |
+  |  |                                                                     | Input Ping-Pong BRAM       |         |  |
+  |  |                                                                     | (ping_pong_bram_buffer.sv) |         |  |
+  |  |                                                                     | [Q_RAM] [K_RAM] [V_RAM]    |         |  |
+  |  |                                                                     +--------------+-------------+         |  |
+  |  |                                                                                    | (INT8 Vector)         |  |
+  |  |                                                                                    v                       |  |
+  |  |                                                                     +----------------------------+         |  |
+  |  |                                                                     | STAGE 1: QK^T GEMM Engine  |         |  |
+  |  |                                                                     | (systolic_mac_array.sv)    |         |  |
+  |  |                                                                     | [2x INT8 DSP Packing]      |         |  |
+  |  |                                                                     +--------------+-------------+         |  |
+  |  |                                                                                    | (INT32 Partial Sum)   |  |
+  |  |                                                                                    v                       |  |
+  |  |                                                                     +----------------------------+         |  |
+  |  |                                                                     | STAGE 2: Scaler Unit       |         |  |
+  |  |                                                                     | (scale_unit.sv)            |         |  |
+  |  |                                                                     | [ASR Shift 1/sqrt(d_k)]    |         |  |
+  |  |                                                                     +--------------+-------------+         |  |
+  |  |                                                                                    | (INT16 Scaled Score)  |  |
+  |  |                                                                                    v                       |  |
+  |  |                                                                     +----------------------------+         |  |
+  |  |                                                                     | STAGE 3: Hardware Softmax  |         |  |
+  |  |                                                                     | (softmax_lut.sv)           |         |  |
+  |  |                                                                     | [Max-Sub + Exp LUT + Div]  |         |  |
+  |  |                                                                     +--------------+-------------+         |  |
+  |  |                                                                                    | (INT8 Probability)    |  |
+  |  |                                                                                    v                       |  |
+  |  |                                                                     +----------------------------+         |  |
+  |  |                                                                     | STAGE 4: Score x V GEMM    |         |  |
+  |  |                                                                     | (systolic_mac_array.sv)    |         |  |
+  |  |                                                                     +--------------+-------------+         |  |
+  |  |                                                                                    | (INT8 Output Tokens)  |  |
+  |  |                                                                                    v                       |  |
+  |  |                                                                     +----------------------------+         |  |
+  |  |                                                                     | Output Ping-Pong Buffer    |         |  |
+  |  |                                                                     +--------------+-------------+         |  |
+  |  |                                                                                    |                       |  |
+  |  |   AXI-Stream TX Adapter                                                            |                       |  |
+  |  |   +-------------------+                                                            |                       |  |
+  |  |   | axis_adapter_tx   |<====/ (64-bit Internal Data / Handshake) =================-+                       |  |
+  |  |   +-------------------+   64                                                                               |  |
+  |  +------------------------------------------------------------------------------------------------------------+  |
+  +------------------------------------------------------------------------------------------------------------------+
 ```
 
 ### 2. Bảng Mô Tả Tín Hiệu & Định Tuyến (Interface Signal & Routing Table)
@@ -145,8 +145,10 @@ Toàn bộ hệ thống tăng tốc **Multi-Head Attention (MHA) Core** được
                                   /                \                       |
                                  v                  +----------------------+
                        (reg_nbytes Valid?)
-                         /                                 YES           NO
-                       /                                     v                 v
+                         /            \
+                        YES            NO
+                       /                \                    
+                      v                 v
             +-------------------+     +-------------------+
             |     ST_ACTIVE     |     |     ST_ERROR      |
             | busy         = 1  |     | error_flag = 1    |
@@ -155,15 +157,19 @@ Toàn bộ hệ thống tăng tốc **Multi-Head Attention (MHA) Core** được
                       |                         |
                       v                         v
             (Transfer_In Event?)          (Host Clear?)
-             /            \                 /                   YES             NO             YES         NO
-           /                \             /                      v                  v           v              v
+             /            \                 /          \       
+            YES             NO             YES         NO
+           /                \             /              \         
+          v                  v           v               v
     [remaining <=       (Keep Wait)  ST_IDLE        ST_ERROR
      remaining - 8]
           |
           v
     (remaining == 0 || TLAST?)
-     /               YES             NO
-   /                  v                  v
+     /                  \
+     YES                NO
+   /                     \
+  v                       v
 +-------------------+  ST_ACTIVE
 |      ST_DONE      |
 | done_flag  <= 1   |

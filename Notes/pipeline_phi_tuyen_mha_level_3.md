@@ -17,9 +17,9 @@ Phần này đi sâu vào chi tiết các mô-đun xử lý phi tuyến và chu�
             v
   +-----------------------------------------------------------------------------------------------------------------------------+
   | 1. SCALER UNIT (scale_unit.sv)                                                                                              |
-  |    - Receives INT32 Accumulator Output                                                                                     |
+  |    - Receives INT32 Accumulator Output                                                                                      |
   |    - Applies Arithmetic Right-Shift (ASR) via Barrel Shifter: Scaled_Score = Raw_Score >>> shift_val (0 DSPs)               |
-  |    - Clamps Output to INT16 d_k Scaling Range                                                                                |
+  |    - Clamps Output to INT16 d_k Scaling Range                                                                               |
   +--------------------------------------------------------------+--------------------------------------------------------------+
                                                                  │
                                                                  │ INT16 Scaled Scores
@@ -27,10 +27,10 @@ Phần này đi sâu vào chi tiết các mô-đun xử lý phi tuyến và chu�
   +-----------------------------------------------------------------------------------------------------------------------------+
   | 2. HARDWARE SOFTMAX ENGINE (softmax_lut.sv)                                                                                 |
   |                                                                                                                             |
-  |   +-----------------------+     +-----------------------+     +-----------------------+     +-----------------------+   |
-  |   | Row Max Finder        |──►  | Subtraction Unit      |──►  | BRAM Exp LUT ROM      |──►  | Normalization & Div   |   |
-  |   | S_max = Max(S_0..N-1) |     | Shifted = S_ij - S_max|     | Lookup e^(Shifted)    |     | Prob = Exp / Sum_Exp  |   |
-  |   +-----------------------+     +-----------------------+     +-----------------------+     +-----------+-----------+   |
+  |   +-----------------------+     +-----------------------+     +-----------------------+     +-----------------------+       |
+  |   | Row Max Finder        |──►  | Subtraction Unit      |──►  | BRAM Exp LUT ROM      |──►  | Normalization & Div   |       |
+  |   | S_max = Max(S_0..N-1) |     | Shifted = S_ij - S_max|     | Lookup e^(Shifted)    |     | Prob = Exp / Sum_Exp  |       |
+  |   +-----------------------+     +-----------------------+     +-----------------------+     +-----------+-----------+       |
   +---------------------------------------------------------------------------------------------------------│-------------------+
                                                                                                             │
                                                                                                             │ INT8 Probabilities
@@ -40,11 +40,11 @@ Phần này đi sâu vào chi tiết các mô-đun xử lý phi tuyến và chu�
                                                                                                             │ INT8 MSA Output (I_F)
                                                                                                             v
   +-----------------------------------------------------------------------------------------------------------------------------+
-  | 3. RE-QUANTIZATION & RESIDUAL ADDER (requant_residual_add.sv)                                                              |
+  | 3. RE-QUANTIZATION & RESIDUAL ADDER (requant_residual_add.sv)                                                               |
   |                                                                                                                             |
   |   MSA Stream I_F (INT8) ──────► [ Dyadic Rescaler: M_F * 2^(-e_F) ] ──┐                                                     |
   |                                                                      ├──► Full Adder ──► Saturating Clamp ──► Out (INT8)    |
-  |   Shortcut Stream I_X (INT8) ──► [ Dyadic Rescaler: M_X * 2^(-e_X) ] ──┘                   [-128, +127]                    |
+  |   Shortcut Stream I_X (INT8) ──► [ Dyadic Rescaler: M_X * 2^(-e_X) ] ──┘                   [-128, +127]                     |
   +-----------------------------------------------------------------------------------------------------------------------------+
 ```
 
@@ -84,14 +84,14 @@ Mạch dịch bit đại số Barrel Shifter tiêu tốn **0 khối DSP**, chu�
               v                                                     v
     +-----------------------------------------------------------------------------------+
     | Arithmetic Right Barrel Shifter (ASR)                                             |
-    | Shifted_Score = In_Score >>> Shift_Val                                           |
+    | Shifted_Score = In_Score >>> Shift_Val                                            |
     +-----------------------------------------┬-----------------------------------------+
                                               │
                                               v
     +-----------------------------------------------------------------------------------+
     | Saturating Clamp to 16-bit Signed Range                                           |
     |   if (Shifted_Score > 32767)       Clamped_Score = 32767                          |
-    |   else if (Shifted_Score < -32768)  Clamped_Score = -32768                         |
+    |   else if (Shifted_Score < -32768)  Clamped_Score = -32768                        |
     |   else                             Clamped_Score = Shifted_Score[15:0]            |
     +-----------------------------------------┬-----------------------------------------+
                                               │
@@ -140,8 +140,10 @@ Sơ đồ FSMD 4 giai đoạn xử lý Softmax số nguyên bảo toàn độ ch
                                |
                                v
                      (cnt == N - 1?)
-                      /                               YES            NO
-                    /                                   v                  v
+                      /            \                    
+                    YES            NO
+                    /                \                   
+                   v                  v
          +-------------------+   (cnt <= cnt + 1)
          |   ST_EXP_ACC      |
          | addr <= S_i-S_max |
@@ -150,8 +152,10 @@ Sơ đồ FSMD 4 giai đoạn xử lý Softmax số nguyên bảo toàn độ ch
                    |
                    v
          (cnt == N - 1?)
-          /                   YES            NO
-        /                       v                  v
+          /            \       
+        YES            NO
+        /                \      
+       v                  v
  +---------------+   (cnt <= cnt + 1)
  | ST_DYADIC_DIV |
  | Inv <= 2^e/Sum|

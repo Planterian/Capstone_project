@@ -22,7 +22,7 @@ Mảng tính toán GEMM vận hành theo cơ chế **Output-Stationary (OS)**: G
               │                                                   │                                  │
               v                                                   v                                  v
      +----------------------------------+                +----------------------------------+       +----------------------------------+
-     | PE_SLICE                  |                | PE_SLICE                  |  ...  | PE_SLICE[M-1]                |
+     | PE_SLICE                         |                | PE_SLICE                         |  ...  | PE_SLICE[M-1]                    |
      | - DSP48E2 2x INT8 Packing        |──Act_Shift────►| - DSP48E2 2x INT8 Packing        |       | - DSP48E2 2x INT8 Packing        |
      | - Acc_Reg [31:0] (INT32)         |                | - Acc_Reg [31:0] (INT32)         |       | - Acc_Reg [31:0] (INT32)         |
      +----------------+-----------------+                +----------------+-----------------+       +----------------+-----------------+
@@ -30,7 +30,7 @@ Mảng tính toán GEMM vận hành theo cơ chế **Output-Stationary (OS)**: G
                       │ Wt_Shift                                          │ Wt_Shift                         │ Wt_Shift
                       v                                                   v                                  v
      +----------------------------------+                +----------------------------------+       +----------------------------------+
-     | PE_SLICE                  |                | PE_SLICE                  |  ...  | PE_SLICE[M-1]                |
+     | PE_SLICE                         |                | PE_SLICE                         |  ...  | PE_SLICE[M-1]                    |
      | - DSP48E2 2x INT8 Packing        |──Act_Shift────►| - DSP48E2 2x INT8 Packing        |       | - DSP48E2 2x INT8 Packing        |
      | - Acc_Reg [31:0] (INT32)         |                | - Acc_Reg [31:0] (INT32)         |       | - Acc_Reg [31:0] (INT32)         |
      +----------------+-----------------+                +----------------+-----------------+       +----------------+-----------------+
