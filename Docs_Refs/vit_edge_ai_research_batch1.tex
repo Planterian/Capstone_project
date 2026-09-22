@@ -1,0 +1,201 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{utf8}
+\usepackage[vietnamese,english]{babel}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{listings}
+
+\geometry{margin=1in}
+
+% Color definitions for Prism/LaTeX Listings
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{prismstyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=prismstyle}
+
+\title{\textbf{FPGA-Based Edge AI Acceleration for Vision Transformers (ViT):\\ Hardware Datapath Design, Dyadic Quantization, and HW/SW Co-Verification}\\ \large --- Part 1: Algorithmic Foundations \& Integer-Only Quantization ---}
+\author{\textbf{Capstone Technical Knowledge Background Document}}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This research document synthesizes the algorithmic and microarchitectural foundations for accelerating Vision Transformers (ViTs) on resource-constrained Edge FPGA platforms (e.g., AMD Kria KV260, Zynq UltraScale+ MPSoC). Part 1 focuses on the mathematical formulation of self-attention mechanisms, edge hardware bottlenecks, integer-only uniform symmetric quantization ($\text{INT8}$), dyadic arithmetic scaling, and zero-DSP non-linear activations including \texttt{ShiftGELU} and \texttt{I-LayerNorm}. Fully synthesizable SystemVerilog implementations and hardware scheduling workflows are detailed.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% =========================================================================
+% CHAPTER 1: VISION TRANSFORMER FOUNDATIONS & EDGE AI BOTTLENECKS
+% =========================================================================
+\section{Overview of Vision Transformers (ViT) and Edge Hardware Bottlenecks}
+
+\subsection{From Convolutional Neural Networks to Vision Transformers}
+Vision Transformers (Dosovitskiy et al., 2020) apply the standard Transformer encoder architecture directly to sequences of flattened 2D image patches. Given an input image $\mathbf{X} \in \mathbb{R}^{H \times W \times C}$, the image is reshaped into a sequence of $N$ flattened patches $\mathbf{X}_p \in \mathbb{R}^{N \times (P^2 \cdot C)}$, where $(P, P)$ is the patch resolution and $N = \frac{HW}{P^2}$ represents the effective sequence length (token count).
+
+Each flattened patch is projected into a $d_{model}$-dimensional embedding space using a trainable linear projection matrix $\mathbf{E} \in \mathbb{R}^{(P^2 \cdot C) \times d_{model}}$:
+\begin{equation}
+\mathbf{z}_0 = \left[ \mathbf{x}_{class}; \mathbf{x}_p^1 \mathbf{E}; \mathbf{x}_p^2 \mathbf{E}; \dots; \mathbf{x}_p^N \mathbf{E} \right] + \mathbf{E}_{pos}, \quad \mathbf{E}_{pos} \in \mathbb{R}^{(N+1) \times d_{model}}
+\end{equation}
+
+Unlike Convolutional Neural Networks (CNNs) that feature strong spatial inductive bias (locality and translation equivariance), ViTs model global long-range context across all visual tokens starting from the earliest layers.
+
+\subsection{Dataflow Analysis of a Transformer Encoder Layer}
+A standard ViT Encoder layer consists of two main functional blocks: Multi-Head Self-Attention (MSA) and a Multi-Layer Perceptron (MLP) Feed-Forward Network, wrapped with Layer Normalization ($\text{LN}$) and Residual Connections:
+\begin{align}
+\mathbf{\hat{z}}_\ell &= \text{MSA}(\text{LN}(\mathbf{z}_{\ell-1})) + \mathbf{z}_{\ell-1}, \quad \ell = 1 \dots L \\
+\mathbf{z}_\ell &= \text{MLP}(\text{LN}(\mathbf{\hat{z}}_\ell)) + \mathbf{\hat{z}}_\ell, \quad \ell = 1 \dots L
+\end{align}
+
+For each attention head $i \in \{1, \dots, h\}$, linear projections convert input tokens into Queries ($\mathbf{Q}_i$), Keys ($\mathbf{K}_i$), and Values ($\mathbf{V}_i$):
+\begin{equation}
+\mathbf{Q}_i = \mathbf{X} \mathbf{W}_i^Q, \quad \mathbf{K}_i = \mathbf{X} \mathbf{W}_i^K, \quad \mathbf{V}_i = \mathbf{X} \mathbf{W}_i^V
+\end{equation}
+The Scaled Dot-Product Attention is computed as:
+\begin{equation}
+\text{Attention}(\mathbf{Q}_i, \mathbf{K}_i, \mathbf{V}_i) = \text{Softmax}\left( \frac{\mathbf{Q}_i \mathbf{K}_i^T}{\sqrt{d_k}} \right) \mathbf{V}_i
+\end{equation}
+
+\subsection{Edge Hardware Bottlenecks}
+Deploying ViTs on embedded FPGAs presents critical challenges:
+\begin{enumerate}
+    \item \textbf{Quadratic Computational Complexity $\mathcal{O}(N^2)$}: Matrix multiplication $\mathbf{Q} \mathbf{K}^T$ requires $N^2 \cdot d_k$ multiply-accumulate (MAC) operations per head, creating severe execution stalls if unoptimized.
+    \item \textbf{Memory Bandwidth Wall}: Moving intermediate feature maps ($196 \times 768$ INT8 tensors) back and forth to external DRAM consumes immense memory bandwidth ($>70\text{ GB/s}$).
+    \item \textbf{Non-Linear Bottlenecks}: Transcendental functions ($\text{exp}$, $\text{sqrt}$, $\text{div}$) in Softmax, GELU, and LayerNorm cannot be directly synthesized onto fixed-point hardware logic without floating-point units (FPUs) or large ROM lookup tables.
+\end{enumerate}
+
+% =========================================================================
+% CHAPTER 2: INTEGER-ONLY QUANTIZATION & ALGORITHMIC APPROXIMATIONS
+% =========================================================================
+\section{Integer-Only Quantization and Algorithmic Approximations}
+
+\subsection{Uniform Symmetric INT8 Quantization}
+To replace energy-expensive 32-bit floating-point (FP32) arithmetic with fast 8-bit integer logic, symmetric uniform quantization maps an FP32 value $R$ to an INT8 value $I \in [-128, 127]$:
+\begin{equation}
+I = \text{Clamp}_{\text{INT8}} \left( \left\lfloor \frac{R}{S} \right\rceil \right), \quad S = \frac{2 \cdot \max(|R|)}{2^k - 1}
+\end{equation}
+where $S$ is the floating-point scaling factor and $k=8$ bits.
+
+\subsection{Dyadic Rescaling Pipeline ($M \cdot 2^{-e}$)}
+When multiplying two INT8 matrices $\mathbf{Q} \in \mathbb{S}_Q$ and $\mathbf{K} \in \mathbb{S}_K$, the raw integer product produces an INT32 tensor $\mathbf{P} = \mathbf{I}_Q \times \mathbf{I}_K^T$. To requantize $\mathbf{P}$ back to INT8 for downstream layers without dequantizing to FP32, Dyadic Arithmetic converts the scale ratio into a 32-bit positive integer multiplier $M$ and a right-shift exponent $e$:
+\begin{equation}
+\frac{S_Q \cdot S_K}{S_{out}} \approx M \cdot 2^{-e} \implies I_{out} = \left( M \cdot \mathbf{I}_{accum} \right) \ggg e
+\end{equation}
+This replaces all floating-point multipliers with a single INT32 hardware multiplication and an arithmetic right-shift (`\texttt{>>>}`).
+
+\subsection{Zero-DSP Non-Linear Unit 1: ShiftGELU}
+The Gaussian Error Linear Unit (GELU) is approximated via a Sigmoid function:
+\begin{equation}
+\text{GELU}(x) = x \cdot \Phi(x) \approx x \cdot \sigma(1.702 x)
+\end{equation}
+To eliminate DSP usage and FP32 units, \texttt{ShiftGELU} (I-ViT, Li et al., 2022) decomposes $1.702$ into a binary shift-add sequence:
+\begin{equation}
+1.702 \approx (1.1011)_b = 1 + 2^{-1} + 2^{-3} + 2^{-4} \implies I_p = I_x + (I_x \ggg 1) + (I_x \ggg 3) + (I_x \ggg 4)
+\end{equation}
+The input $I_x$ is shifted and multiplied with an integer piecewise approximation of $\sigma(I_p)$ using bit-shifters.
+
+\subsection{Zero-DSP Non-Linear Unit 2: I-LayerNorm}
+LayerNorm normalizes hidden features along the feature dimension $d$:
+\begin{equation}
+\text{LayerNorm}(x) = \frac{x - \mu}{\sqrt{\text{Var}(x) + \epsilon}} \cdot \gamma + \beta
+\end{equation}
+Calculating $\sqrt{\text{Var}(x)}$ in integer logic is accomplished via a 10-iteration Newton-Raphson shift-add sequence:
+\begin{equation}
+I_{i+1} = \left( I_i + \left\lfloor \frac{\text{Var}(I_x)}{I_i} \right\rfloor \right) \ggg 1, \quad \text{initialized at } I_0 = 2^{\lfloor \text{bit}(\text{Var})/2 \rfloor}
+\end{equation}
+Fixing the loop count to exactly 10 iterations guarantees deterministic clock latency on FPGA hardware.
+
+\subsection{Synthesizable SystemVerilog ShiftGELU Implementation}
+\begin{lstlisting}[language=Verilog, caption={Synthesizable Pipelined ShiftGELU Module in SystemVerilog}]
+module shift_gelu_pipeline #(
+    parameter int DATA_WIDTH = 8,
+    parameter int OUT_WIDTH  = 8
+)(
+    input  logic                     clk,
+    input  logic                     rst_n,
+    input  logic                     in_valid,
+    input  logic signed [DATA_WIDTH-1:0] i_in,
+    output logic                     out_valid,
+    output logic signed [OUT_WIDTH-1:0]  i_out
+);
+
+    // Stage 0: 1.702x Shift-Add Unit (LUT-only)
+    logic signed [15:0] ip_stage0;
+    logic               v_stage0;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            ip_stage0 <= '0;
+            v_stage0  <= 1'b0;
+        end else begin
+            ip_stage0 <= $signed(i_in) + 
+                         ($signed(i_in) >>> 1) + 
+                         ($signed(i_in) >>> 3) + 
+                         ($signed(i_in) >>> 4);
+            v_stage0  <= in_valid;
+        end
+    end
+
+    // Stage 1: Piecewise Integer Sigmoid Approximation
+    logic [7:0] i_sigmoid_stage1;
+    logic       v_stage1;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            i_sigmoid_stage1 <= 8'd0;
+            v_stage1         <= 1'b0;
+        end else begin
+            if (ip_stage0 >= 16'sd128)
+                i_sigmoid_stage1 <= 8'd255;
+            else if (ip_stage0 <= -16'sd128)
+                i_sigmoid_stage1 <= 8'd0;
+            else
+                i_sigmoid_stage1 <= 8'((ip_stage0 + 16'sd128) >>> 1);
+            v_stage1 <= v_stage0;
+        end
+    end
+
+    // Stage 2: Output Multiplication & Rescaling
+    logic signed [15:0] prod_stage2;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            i_out     <= '0;
+            out_valid <= 1'b0;
+        end else begin
+            prod_stage2 <= $signed(i_in) * $signed({1'b0, i_sigmoid_stage1});
+            i_out       <= 8'(prod_stage2 >>> 8);
+            out_valid   <= v_stage1;
+        end
+    end
+
+endmodule
+\end{lstlisting}
+
+\end{document}
