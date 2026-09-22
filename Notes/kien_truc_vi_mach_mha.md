@@ -22,9 +22,9 @@ Sơ đồ thể hiện giao diện giữa **Processing System (ARM PS)** và **P
                  | (AWADDR, WDATA, ARADDR, RDATA / AXI-Lite Handshake)
                  v
    +-------------------------------------------------------------------------------------------------------------------+
-   | AXI4-Lite Slave Register File & Control FSM (HW-01 / axi_lite_regs.sv)                                           |
-   |   - Reg 0x00: CONTROL [0: START, 1: DONE, 2: ERROR]      - Reg 0x10: SEQ_LEN (N = 196)                           |
-   |   - Reg 0x0C: CORE_ID (0x56495432)                       - Reg 0x18: HEAD_DIM (d_k = 32)                         |
+   | AXI4-Lite Slave Register File & Control FSM (HW-01 / axi_lite_regs.sv)                                            |
+   |   - Reg 0x00: CONTROL [0: START, 1: DONE, 2: ERROR]      - Reg 0x10: SEQ_LEN (N = 196)                            |
+   |   - Reg 0x0C: CORE_ID (0x56495432)                       - Reg 0x18: HEAD_DIM (d_k = 32)                          |
    +---------------------------------------------------+---------------------------------------------------------------+
                                                        | (Control Signals: start_pulse, tile_config, clear_buffers)
                                                        v
@@ -33,7 +33,7 @@ Sơ đồ thể hiện giao diện giữa **Processing System (ARM PS)** và **P
    |                                                                                                                   |
    |  AXI DMA (MM2S)                                                                                                   |
    |  +-------------------+                                                                                            |
-   |  | AXI4-Stream RX    |=== (64-bit S_AXIS_TDATA / TVALID / TREADY / TLAST) ===+                                        |
+   |  | AXI4-Stream RX    |=== (64-bit S_AXIS_TDATA / TVALID / TREADY / TLAST) ===+                                    |
    |  +-------------------+                                                        |                                   |
    |                                                                               v                                   |
    |                                                           +----------------------------------------+              |
@@ -43,14 +43,14 @@ Sơ đồ thể hiện giao diện giữa **Processing System (ARM PS)** và **P
    |                                                                               |                                   |
    |                                                                               v                                   |
    |                                                           +----------------------------------------+              |
-   |                                                           |  STAGE 1: QK^T GEMM Engine (HW-03)      |              |
+   |                                                           |  STAGE 1: QK^T GEMM Engine (HW-03)      |             |
    |                                                           |  (Systolic MAC Array / DSP Packing)    |              |
    |                                                           +-------------------+--------------------+              |
    |                                                                               | (INT32 Partial Sums)              |
    |                                                                               v                                   |
    |                                                           +----------------------------------------+              |
    |                                                           |  STAGE 2: Scaler Unit (HW-04)          |              |
-   |                                                           |  (Arithmetic Right-Shift ASR 1/sqrt(d_k)|              |
+   |                                                           |  (Arithmetic Right-Shift ASR 1/sqrt(d_k)|             |
    |                                                           +-------------------+--------------------+              |
    |                                                                               | (INT16 Scaled Scores)             |
    |                                                                               v                                   |
@@ -72,7 +72,7 @@ Sơ đồ thể hiện giao diện giữa **Processing System (ARM PS)** và **P
    |                                                                               |                                   |
    |  AXI DMA (S2MM)                                                               v                                   |
    |  +-------------------+                                                        |                                   |
-   |  | AXI4-Stream TX    |<== (64-bit M_AXIS_TDATA / TVALID / TREADY / TLAST) ====+=                                   |
+   |  | AXI4-Stream TX    |<== (64-bit M_AXIS_TDATA / TVALID / TREADY / TLAST) ====+=                                  |
    |  +-------------------+                                                                                            |
    +-------------------------------------------------------------------------------------------------------------------+
 ```
@@ -90,34 +90,34 @@ Sơ đồ chi tiết luồng dữ liệu 5 giai đoạn (5-Stage Execution Pipel
 
   AXI4-Stream RX  
   S_AXIS_TDATA [63:0]  
-  ======/==============================================================================================+  
-        |                                                                                              |  
-        v                                                                                              v  
+  ======/=======================================================================================================+  
+        |                                                                                                       |  
+        v                                                                                                       v  
   +------------------+     +-------------------+     +-------------------+     +-------------------+     +-------------------+
   |   INPUT BRAM     |     |  STAGE 1: QK^T    |     |  STAGE 2: SCALER  |     |  STAGE 3: SOFTMAX |     |  STAGE 4: SCORE*V |
   |   PING-PONG      |     |  MATMUL (MAC)     |     |  (ASR SHIFT)      |     |  ENGINE (LUT/PWL) |     |  AGGREGATION      |
   |                  |     |                   |     |                   |     |                   |     |                   |
   |  +------------+  |     |  +-------------+  |     |  +-------------+  |     |  +-------------+  |     |  +-------------+  |
-  |  | Q_RAM      |  | INT8|  | DSP48E2     |  |INT32|  | ASR Shift   |  |INT16|  | Max-Sub    |  | INT8|  | DSP48E2     |  |
-  |  | (N x d_k)  |==+====>|  | MAC Array   |==+====>|  | Bit-shifter |==+====>|  | Exp LUT    |==+====>|  | MAC Array   |==+===+
-  |  +------------+  | Q,K |  | (Unrolled)  |  |Score|  | (1/sqrt(d_k)|  |Score|  | Div/Inverse|  | Prob|  | (Saturating)|  |   |
+  |  | Q_RAM      |  | INT8|  | DSP48E2     |  |INT32|  | ASR Shift   |  |INT16|  | Max-Sub     |  | INT8|  | DSP48E2     |  |
+  |  | (N x d_k)  |==+====>|  | MAC Array   |==+====>|  | Bit-shifter |==+====>|  | Exp LUT     |==+====>|  | MAC Array   |==+===+
+  |  +------------+  | Q,K |  | (Unrolled)  |  |Score|  | (1/sqrt(d_k)|  |Score|  | Div/Inverse |  | Prob|  | (Saturating)|  |   |
   |  | K_RAM      |  |     |  +-------------+  |     |  +-------------+  |     |  +-------------+  |     |  +-------------+  |   |
   |  | (d_k x N)  |  |     |                   |     |                   |     |                   |     |                   |   |
   |  +------------+  |     |  Reg Stage 1      |     |  Reg Stage 2      |     |  Reg Stage 3      |     |  Reg Stage 4      |   |
   |  | V_RAM      |  |     |  [32-bit Acc]     |     |  [16-bit Scaled]  |     |  [8-bit Prob]     |     |  [8-bit Clamped]  |   |
   |  | (N x d_k)  |  |     +---------+---------+     +---------+---------+     +---------+---------+     +---------+---------+   |
-  |  +------------+  |               |                         |                         |                         |         |
-  +------------------+               |                         |                         |                         |         |
-        |                            v                         v                         v                         v         |
-        |                      +-----------+             +-----------+             +-----------+             +-----------+   |
-        +--------------------->| v_stage1  |------------>| v_stage2  |------------>| v_stage3  |------------>| v_stage4  |   |
-          in_valid             +-----------+             +-----------+             +-----------+             +-----------+   |
-                                                                                                                   |         |
-                                                                                                                   v         |
-                                                                                                             out_valid       |
-                                                                                                                             |
-  AXI4-Stream TX                                                                                                             |
-  M_AXIS_TDATA [63:0] <======================================================================================================+
+  |  +------------+  |               |                         |                         |                         |             |
+  +------------------+               |                         |                         |                         |             |
+        |                            v                         v                         v                         v             |
+        |                      +-----------+             +-----------+             +-----------+             +-----------+       |
+        +--------------------->| v_stage1  |------------>| v_stage2  |------------>| v_stage3  |------------>| v_stage4  |       |
+          in_valid             +-----------+             +-----------+             +-----------+             +-----------+       |
+                                                                                                                   |             |
+                                                                                                                   v             |
+                                                                                                             out_valid           |
+                                                                                                                                 |
+  AXI4-Stream TX                                                                                                                 |
+  M_AXIS_TDATA [63:0] <==========================================================================================================+
 ```
 
 ---
@@ -172,9 +172,9 @@ Kỹ thuật đóng gói 2 phép nhân **INT8** ($A \times B$ và $A \times C$) 
         |                                               |
         v                                               v
   +-----------------------+                        +-----------------------+
-  | Sign-Correction Logic |                        | Direct Output Extraction|
-  | High_Corr = P[33:18]  |                        |  (Guarded by P[17:16])|
-  |          + P[15]      |                        |                       |
+  | Sign-Correction Logic |                        |     Direct Output     |
+  | High_Corr = P[33:18]  |                        |      Extraction       |
+  |          + P[15]      |                        | (Guarded by P[17:16]) |        
   +---------+-------------+                        +-----------+-----------+
             |                                                  |
             v                                                  v
@@ -247,7 +247,7 @@ Mạch GELU thuần số nguyên **0 DSPs**, sử dụng bộ dịch bit Barrel 
     |
     |-----> [ Delay FIFO (5-Stage Delay Line) ] ----------------------------------------------+
     |                                                                                         |
-    v (Stage 0: 1.703125 * I_in via LUT-only Bit-Shifts)                                     |
+    v (Stage 0: 1.703125 * I_in via LUT-only Bit-Shifts)                                      |
   +---------------------------------------------------------+                                 |
   | I_p = I_in + (I_in >>> 1) + (I_in >>> 3) + (I_in >>> 4) |                                 |
   +----------------------------+----------------------------+                                 |
@@ -259,15 +259,15 @@ Mạch GELU thuần số nguyên **0 DSPs**, sử dụng bộ dịch bit Barrel 
                                |                                                              |
                                v (Stage 2: Piecewise INT8 Sigmoid Approx)                     |
   +---------------------------------------------------------+                                 |
-  | if (I_delta >= 0)           Sigmoid = 255               |                                 |
-  | else if (I_delta < -300)   Sigmoid = 0                 |                                 |
-  | else                       Sigmoid = (I_delta+300)*255/300                               |
+  | if (I_delta >= 0)        Sigmoid = 255                  |                                 |
+  | else if (I_delta < -300) Sigmoid = 0                    |                                 |
+  | else                     Sigmoid = (I_delta+300)*255/300|                                 |
   +----------------------------+----------------------------+                                 |
                                |                                                              |
                                v Sigmoid [7:0] (UINT8)                                        v Delayed I_in [7:0]
   +-------------------------------------------------------------------------------------------+----------------+
   | Stage 3: Multiply & Rescale                                                                                |
-  | Prod_16 = Delayed_I_in * Sigmoid  ===>  Clamped_INT8 = Clamp_INT8( Prod_16 >>> 8 )                        |
+  | Prod_16 = Delayed_I_in * Sigmoid  ===>  Clamped_INT8 = Clamp_INT8( Prod_16 >>> 8 )                         |
   +--------------------------------------------+---------------------------------------------------------------+
                                                |
                                                v
@@ -364,7 +364,7 @@ Mạch Softmax phần cứng gồm logic tìm Max, BRAM ROM chứa bảng tra h�
                                          v
    +------------------------------------------------------------------------------+
    | 7. Normalization Multiplier & Quantizer                                      |
-   |    Prob_INT8[i] = Clamp_UINT8( (Exp_Val[i] * Inv_Sum) >>> e )               |
+   |    Prob_INT8[i] = Clamp_UINT8( (Exp_Val[i] * Inv_Sum) >>> e )                |
    +-------------------------------------+----------------------------------------+
                                          |
                                          v
