@@ -1,0 +1,10 @@
+# Ignore dataset cache directories
+cifar10_cache/
+model_notebook/cifar10_cache/
+
+# Python compiled bytecode & cache
+__pycache__/
+*.pyc
+
+# Temporary Word lock files
+~$*.docx

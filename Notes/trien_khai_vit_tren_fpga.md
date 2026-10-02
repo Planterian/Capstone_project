@@ -1,6 +1,6 @@
 # Triển khai ViT trên FPGA
 
-Hoàn toàn **CÓ THỂ** và đây chính là phương pháp chuẩn mực nhất trong thực tế để xây dựng ứng dụng demo **Real-time Edge AI / Hardware-in-the-Loop (HIL)**!
+Xây dựng ứng dụng demo **Real-time Edge AI / Hardware-in-the-Loop (HIL)**!
 Sau khi huấn luyện mô hình ViT trên Google Colab, bạn chỉ cần xuất file trọng số (trọng số đã định lượng INT8 như .pth, .bin hoặc .hex), lưu về máy cục bộ (Laptop hoặc thẻ nhớ SD trên bo mạch Kria/Zynq), sau đó chạy script Python đọc luồng camera từ OpenCV.
 
 ---
