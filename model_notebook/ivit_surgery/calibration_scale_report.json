@@ -1,0 +1,866 @@
+{
+  "mobilevit.encoder.layer.2.transformer.layer.0.qact_input": {
+    "scaling_factor": 0.5344516038894653,
+    "mantissa_M": 1147726080,
+    "exponent_E": 31.0,
+    "bit_width": 8,
+    "min_val": -66.98695373535156,
+    "max_val": 67.87535095214844
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.0.qact1": {
+    "scaling_factor": 0.010715278796851635,
+    "mantissa_M": 1472696704,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.2687063217163086,
+    "max_val": 1.3608404397964478
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.0.qact_res1": {
+    "scaling_factor": 0.0020035149063915014,
+    "mantissa_M": 1101443968,
+    "exponent_E": 39.0,
+    "bit_width": 16,
+    "min_val": -65.649169921875,
+    "max_val": 64.7925796508789
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.0.qact3": {
+    "scaling_factor": 0.01679999567568302,
+    "mantissa_M": 1154486912,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -2.0465660095214844,
+    "max_val": 2.1335995197296143
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.0.qact_res2": {
+    "scaling_factor": 0.0020286806393414736,
+    "mantissa_M": 1115278976,
+    "exponent_E": 39.0,
+    "bit_width": 16,
+    "min_val": -66.4737777709961,
+    "max_val": 65.86222839355469
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.0.attn.qact1": {
+    "scaling_factor": 0.04123043641448021,
+    "mantissa_M": 1416667008,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -4.5871357917785645,
+    "max_val": 5.236265659332275
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.0.attn.qact_attn1": {
+    "scaling_factor": 0.12810185551643372,
+    "mantissa_M": 1100386560,
+    "exponent_E": 33.0,
+    "bit_width": 8,
+    "min_val": -1.9802725315093994,
+    "max_val": 16.268936157226562
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.0.attn.qact2": {
+    "scaling_factor": 0.010295511223375797,
+    "mantissa_M": 1415004288,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.3075299263000488,
+    "max_val": 1.239936113357544
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.0.attn.qact3": {
+    "scaling_factor": 4.808987432625145e-05,
+    "mantissa_M": 1692012032,
+    "exponent_E": 45.0,
+    "bit_width": 16,
+    "min_val": -1.5757609605789185,
+    "max_val": 1.2596590518951416
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.0.mlp.qact_gelu": {
+    "scaling_factor": 0.0354897566139698,
+    "mantissa_M": 1219418752,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -4.507199287414551,
+    "max_val": 3.1476235389709473
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.0.mlp.qact1": {
+    "scaling_factor": 0.02307097427546978,
+    "mantissa_M": 1585425280,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -0.1799176186323166,
+    "max_val": 2.930013656616211
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.0.mlp.qact2": {
+    "scaling_factor": 0.00010604081762721762,
+    "mantissa_M": 1865489792,
+    "exponent_E": 44.0,
+    "bit_width": 16,
+    "min_val": -3.474639415740967,
+    "max_val": 2.7572290897369385
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.qact_input": {
+    "scaling_factor": 0.5232954621315002,
+    "mantissa_M": 1123768448,
+    "exponent_E": 31.0,
+    "bit_width": 8,
+    "min_val": -66.45852661132812,
+    "max_val": 65.8587646484375
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.qact1": {
+    "scaling_factor": 0.015370438806712627,
+    "mantissa_M": 2112497024,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.6391006708145142,
+    "max_val": 1.9520456790924072
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.qact_res1": {
+    "scaling_factor": 0.002014697529375553,
+    "mantissa_M": 1107591680,
+    "exponent_E": 39.0,
+    "bit_width": 16,
+    "min_val": -66.01559448242188,
+    "max_val": 65.0815658569336
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.qact3": {
+    "scaling_factor": 0.017396172508597374,
+    "mantissa_M": 1195455872,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -2.1060028076171875,
+    "max_val": 2.2093138694763184
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.qact_res2": {
+    "scaling_factor": 0.0019444413483142853,
+    "mantissa_M": 2137935872,
+    "exponent_E": 40.0,
+    "bit_width": 16,
+    "min_val": -63.71350860595703,
+    "max_val": 61.99721145629883
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.attn.qact1": {
+    "scaling_factor": 0.04396380856633186,
+    "mantissa_M": 1510584960,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -5.583403587341309,
+    "max_val": 5.440636157989502
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.attn.qact_attn1": {
+    "scaling_factor": 0.15427915751934052,
+    "mantissa_M": 1325247872,
+    "exponent_E": 33.0,
+    "bit_width": 8,
+    "min_val": -1.0227376222610474,
+    "max_val": 19.59345245361328
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.attn.qact2": {
+    "scaling_factor": 0.01631537452340126,
+    "mantissa_M": 1121184000,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -2.0030863285064697,
+    "max_val": 2.072052478790283
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.attn.qact3": {
+    "scaling_factor": 6.133971328381449e-05,
+    "mantissa_M": 1079099648,
+    "exponent_E": 44.0,
+    "bit_width": 16,
+    "min_val": -1.7879412174224854,
+    "max_val": 2.009918451309204
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.mlp.qact_gelu": {
+    "scaling_factor": 0.04107871651649475,
+    "mantissa_M": 1411453952,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -5.216997146606445,
+    "max_val": 3.874715805053711
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.mlp.qact1": {
+    "scaling_factor": 0.030313989147543907,
+    "mantissa_M": 2083161472,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -0.1857513040304184,
+    "max_val": 3.849876642227173
+  },
+  "mobilevit.encoder.layer.2.transformer.layer.1.mlp.qact2": {
+    "scaling_factor": 0.00018694932805374265,
+    "mantissa_M": 1644423680,
+    "exponent_E": 43.0,
+    "bit_width": 16,
+    "min_val": -4.93125581741333,
+    "max_val": 6.125768661499023
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.qact_input": {
+    "scaling_factor": 0.340284138917923,
+    "mantissa_M": 1461509248,
+    "exponent_E": 32.0,
+    "bit_width": 8,
+    "min_val": -39.82384490966797,
+    "max_val": 43.216087341308594
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.qact1": {
+    "scaling_factor": 0.008149207569658756,
+    "mantissa_M": 1120018560,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.0349493026733398,
+    "max_val": 0.8724516034126282
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.qact_res1": {
+    "scaling_factor": 0.0013259431580081582,
+    "mantissa_M": 1457889920,
+    "exponent_E": 40.0,
+    "bit_width": 16,
+    "min_val": -39.858638763427734,
+    "max_val": 43.44717788696289
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.qact3": {
+    "scaling_factor": 0.014888763427734375,
+    "mantissa_M": 2046296064,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.8908729553222656,
+    "max_val": 1.5944007635116577
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.qact_res2": {
+    "scaling_factor": 0.0013101170770823956,
+    "mantissa_M": 1440488960,
+    "exponent_E": 40.0,
+    "bit_width": 16,
+    "min_val": -39.532962799072266,
+    "max_val": 42.92860794067383
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.attn.qact1": {
+    "scaling_factor": 0.03129751235246658,
+    "mantissa_M": 1075374336,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -3.9747838973999023,
+    "max_val": 3.486828088760376
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.attn.qact_attn1": {
+    "scaling_factor": 0.050128426402807236,
+    "mantissa_M": 1722399616,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -3.6299126148223877,
+    "max_val": 6.366310119628906
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.attn.qact2": {
+    "scaling_factor": 0.009626910090446472,
+    "mantissa_M": 1323112448,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.2226176261901855,
+    "max_val": 0.9555573463439941
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.attn.qact3": {
+    "scaling_factor": 3.2144220313057303e-05,
+    "mantissa_M": 1130974208,
+    "exponent_E": 45.0,
+    "bit_width": 16,
+    "min_val": -1.053269624710083,
+    "max_val": 0.9998168349266052
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.mlp.qact_gelu": {
+    "scaling_factor": 0.04159069433808327,
+    "mantissa_M": 1429045376,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -5.282018184661865,
+    "max_val": 1.8217417001724243
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.mlp.qact1": {
+    "scaling_factor": 0.013358262367546558,
+    "mantissa_M": 1835945600,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -0.18509133160114288,
+    "max_val": 1.6964993476867676
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.0.mlp.qact2": {
+    "scaling_factor": 3.521812686813064e-05,
+    "mantissa_M": 1239127680,
+    "exponent_E": 45.0,
+    "bit_width": 16,
+    "min_val": -1.0420992374420166,
+    "max_val": 1.1539924144744873
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.qact_input": {
+    "scaling_factor": 0.33799606561660767,
+    "mantissa_M": 1451682048,
+    "exponent_E": 32.0,
+    "bit_width": 8,
+    "min_val": -39.526607513427734,
+    "max_val": 42.925498962402344
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.qact1": {
+    "scaling_factor": 0.01116591040045023,
+    "mantissa_M": 1534631040,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.418070673942566,
+    "max_val": 1.119144320487976
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.qact_res1": {
+    "scaling_factor": 0.0012971924152225256,
+    "mantissa_M": 1426278144,
+    "exponent_E": 40.0,
+    "bit_width": 16,
+    "min_val": -38.4480094909668,
+    "max_val": 42.505104064941406
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.qact3": {
+    "scaling_factor": 0.014978456310927868,
+    "mantissa_M": 2058623360,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.6012517213821411,
+    "max_val": 1.9022639989852905
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.qact_res2": {
+    "scaling_factor": 0.001302761142142117,
+    "mantissa_M": 1432401024,
+    "exponent_E": 40.0,
+    "bit_width": 16,
+    "min_val": -38.5962028503418,
+    "max_val": 42.68757247924805
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.attn.qact1": {
+    "scaling_factor": 0.04609908536076546,
+    "mantissa_M": 1583952512,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -5.854583740234375,
+    "max_val": 4.6528000831604
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.attn.qact_attn1": {
+    "scaling_factor": 0.08515211939811707,
+    "mantissa_M": 1462902272,
+    "exponent_E": 34.0,
+    "bit_width": 8,
+    "min_val": -1.0508296489715576,
+    "max_val": 10.814319610595703
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.attn.qact2": {
+    "scaling_factor": 0.013607999309897423,
+    "mantissa_M": 1870269184,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.2485841512680054,
+    "max_val": 1.7282159328460693
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.attn.qact3": {
+    "scaling_factor": 9.768892778083682e-05,
+    "mantissa_M": 1718561792,
+    "exponent_E": 44.0,
+    "bit_width": 16,
+    "min_val": -1.8304997682571411,
+    "max_val": 3.2009730339050293
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.mlp.qact_gelu": {
+    "scaling_factor": 0.043420448899269104,
+    "mantissa_M": 1491915264,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -5.514397144317627,
+    "max_val": 1.8510866165161133
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.mlp.qact1": {
+    "scaling_factor": 0.013667365536093712,
+    "mantissa_M": 1878428416,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -0.17422382533550262,
+    "max_val": 1.735755443572998
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.1.mlp.qact2": {
+    "scaling_factor": 3.555348303052597e-05,
+    "mantissa_M": 1250926976,
+    "exponent_E": 45.0,
+    "bit_width": 16,
+    "min_val": -0.9999233484268188,
+    "max_val": 1.1649810075759888
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.qact_input": {
+    "scaling_factor": 0.33592620491981506,
+    "mantissa_M": 1442792064,
+    "exponent_E": 32.0,
+    "bit_width": 8,
+    "min_val": -38.596946716308594,
+    "max_val": 42.662628173828125
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.qact1": {
+    "scaling_factor": 0.011948885396122932,
+    "mantissa_M": 1642242304,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.5175083875656128,
+    "max_val": 1.312229037284851
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.qact_res1": {
+    "scaling_factor": 0.00135040411259979,
+    "mantissa_M": 1484785024,
+    "exponent_E": 40.0,
+    "bit_width": 16,
+    "min_val": -37.66238784790039,
+    "max_val": 44.24869155883789
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.qact3": {
+    "scaling_factor": 0.015602252446115017,
+    "mantissa_M": 2144357248,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.9814860820770264,
+    "max_val": 1.7302968502044678
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.qact_res2": {
+    "scaling_factor": 0.0013583380496129394,
+    "mantissa_M": 1493508480,
+    "exponent_E": 40.0,
+    "bit_width": 16,
+    "min_val": -37.427303314208984,
+    "max_val": 44.508663177490234
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.attn.qact1": {
+    "scaling_factor": 0.029489243403077126,
+    "mantissa_M": 2026485376,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -3.351832628250122,
+    "max_val": 3.745133876800537
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.attn.qact_attn1": {
+    "scaling_factor": 0.04639173299074173,
+    "mantissa_M": 1594007808,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -2.509120464324951,
+    "max_val": 5.891749858856201
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.attn.qact2": {
+    "scaling_factor": 0.019873252138495445,
+    "mantissa_M": 1365679488,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -1.2426618337631226,
+    "max_val": 2.5239031314849854
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.attn.qact3": {
+    "scaling_factor": 8.556132524972782e-05,
+    "mantissa_M": 1505210752,
+    "exponent_E": 44.0,
+    "bit_width": 16,
+    "min_val": -2.8035879135131836,
+    "max_val": 2.4629533290863037
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.mlp.qact_gelu": {
+    "scaling_factor": 0.050491586327552795,
+    "mantissa_M": 1734877696,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -6.412431240081787,
+    "max_val": 2.7064826488494873
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.mlp.qact1": {
+    "scaling_factor": 0.02109004370868206,
+    "mantissa_M": 1449296768,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -0.17747391760349274,
+    "max_val": 2.6784355640411377
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.2.mlp.qact2": {
+    "scaling_factor": 5.226668872637674e-05,
+    "mantissa_M": 1838970624,
+    "exponent_E": 45.0,
+    "bit_width": 16,
+    "min_val": -1.7126226425170898,
+    "max_val": 1.5684860944747925
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.qact_input": {
+    "scaling_factor": 0.35025015473365784,
+    "mantissa_M": 1504312960,
+    "exponent_E": 32.0,
+    "bit_width": 8,
+    "min_val": -37.42723846435547,
+    "max_val": 44.48176956176758
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.qact1": {
+    "scaling_factor": 0.010102875530719757,
+    "mantissa_M": 1388528640,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.2830651998519897,
+    "max_val": 1.1885876655578613
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.qact_res1": {
+    "scaling_factor": 0.0014546987367793918,
+    "mantissa_M": 1599458176,
+    "exponent_E": 40.0,
+    "bit_width": 16,
+    "min_val": -36.91093063354492,
+    "max_val": 47.666114807128906
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.qact3": {
+    "scaling_factor": 0.017681658267974854,
+    "mantissa_M": 1215074304,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -1.9356591701507568,
+    "max_val": 2.245570659637451
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.qact_res2": {
+    "scaling_factor": 0.0014847652055323124,
+    "mantissa_M": 1632516608,
+    "exponent_E": 40.0,
+    "bit_width": 16,
+    "min_val": -37.254852294921875,
+    "max_val": 48.651302337646484
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.attn.qact1": {
+    "scaling_factor": 0.030650906264781952,
+    "mantissa_M": 2106314240,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -3.892665147781372,
+    "max_val": 3.3403680324554443
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.attn.qact_attn1": {
+    "scaling_factor": 0.03928505256772041,
+    "mantissa_M": 1349824128,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -1.940203070640564,
+    "max_val": 4.989201545715332
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.attn.qact2": {
+    "scaling_factor": 0.01488652266561985,
+    "mantissa_M": 2045988096,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.7761781215667725,
+    "max_val": 1.890588402748108
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.attn.qact3": {
+    "scaling_factor": 0.00010232753993477672,
+    "mantissa_M": 1800165120,
+    "exponent_E": 44.0,
+    "bit_width": 16,
+    "min_val": -2.282477617263794,
+    "max_val": 3.352966547012329
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.mlp.qact_gelu": {
+    "scaling_factor": 0.04520001634955406,
+    "mantissa_M": 1553060736,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -5.7404022216796875,
+    "max_val": 3.589390277862549
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.mlp.qact1": {
+    "scaling_factor": 0.027170712128281593,
+    "mantissa_M": 1867157120,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -0.17565451562404633,
+    "max_val": 3.4506804943084717
+  },
+  "mobilevit.encoder.layer.3.transformer.layer.3.mlp.qact2": {
+    "scaling_factor": 0.00021529161313083023,
+    "mantissa_M": 1893725056,
+    "exponent_E": 43.0,
+    "bit_width": 16,
+    "min_val": -4.4341607093811035,
+    "max_val": 7.054460525512695
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.qact_input": {
+    "scaling_factor": 1.0069292783737183,
+    "mantissa_M": 1081182080,
+    "exponent_E": 30.0,
+    "bit_width": 8,
+    "min_val": -117.52066802978516,
+    "max_val": 127.88001251220703
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.qact1": {
+    "scaling_factor": 0.007063005585223436,
+    "mantissa_M": 1941464192,
+    "exponent_E": 38.0,
+    "bit_width": 8,
+    "min_val": -0.7215703129768372,
+    "max_val": 0.8970016837120056
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.qact_res1": {
+    "scaling_factor": 0.0038974196650087833,
+    "mantissa_M": 2142629120,
+    "exponent_E": 39.0,
+    "bit_width": 16,
+    "min_val": -117.1832275390625,
+    "max_val": 127.70674896240234
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.qact3": {
+    "scaling_factor": 0.018349409103393555,
+    "mantissa_M": 1260961792,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -2.3303749561309814,
+    "max_val": 1.7317609786987305
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.qact_res2": {
+    "scaling_factor": 0.003883378580212593,
+    "mantissa_M": 2134909952,
+    "exponent_E": 39.0,
+    "bit_width": 16,
+    "min_val": -117.3433609008789,
+    "max_val": 127.24666595458984
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.attn.qact1": {
+    "scaling_factor": 0.027465712279081345,
+    "mantissa_M": 1887429376,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -3.3608744144439697,
+    "max_val": 3.488145351409912
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.attn.qact_attn1": {
+    "scaling_factor": 0.032063182443380356,
+    "mantissa_M": 1101682560,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -0.5284632444381714,
+    "max_val": 4.072024345397949
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.attn.qact2": {
+    "scaling_factor": 0.009854095056653023,
+    "mantissa_M": 1354336512,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.2514700889587402,
+    "max_val": 1.0807583332061768
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.attn.qact3": {
+    "scaling_factor": 4.733138848678209e-05,
+    "mantissa_M": 1665325184,
+    "exponent_E": 45.0,
+    "bit_width": 16,
+    "min_val": -1.3944604396820068,
+    "max_val": 1.5509076118469238
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.mlp.qact_gelu": {
+    "scaling_factor": 0.06170700863003731,
+    "mantissa_M": 2120236672,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -7.836790084838867,
+    "max_val": 1.9240962266921997
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.mlp.qact1": {
+    "scaling_factor": 0.014401615597307682,
+    "mantissa_M": 1979342976,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -0.1854483187198639,
+    "max_val": 1.8290051221847534
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.0.mlp.qact2": {
+    "scaling_factor": 4.909812560072169e-05,
+    "mantissa_M": 1727486720,
+    "exponent_E": 45.0,
+    "bit_width": 16,
+    "min_val": -1.2989932298660278,
+    "max_val": 1.6087982654571533
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.qact_input": {
+    "scaling_factor": 1.0019135475158691,
+    "mantissa_M": 1075796480,
+    "exponent_E": 30.0,
+    "bit_width": 8,
+    "min_val": -117.3427734375,
+    "max_val": 127.2430191040039
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.qact1": {
+    "scaling_factor": 0.010068421252071857,
+    "mantissa_M": 1383793280,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.1008745431900024,
+    "max_val": 1.2786895036697388
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.qact_res1": {
+    "scaling_factor": 0.0039009691681712866,
+    "mantissa_M": 2144580480,
+    "exponent_E": 39.0,
+    "bit_width": 16,
+    "min_val": -117.00923919677734,
+    "max_val": 127.82305908203125
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.qact3": {
+    "scaling_factor": 0.01840578205883503,
+    "mantissa_M": 1264835712,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -2.1941258907318115,
+    "max_val": 2.3375344276428223
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.qact_res2": {
+    "scaling_factor": 0.0038819555193185806,
+    "mantissa_M": 2134127616,
+    "exponent_E": 39.0,
+    "bit_width": 16,
+    "min_val": -116.21674346923828,
+    "max_val": 127.20003509521484
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.attn.qact1": {
+    "scaling_factor": 0.02983836829662323,
+    "mantissa_M": 2050477056,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -3.3324434757232666,
+    "max_val": 3.789472818374634
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.attn.qact_attn1": {
+    "scaling_factor": 0.035514574497938156,
+    "mantissa_M": 1220271488,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -0.35646477341651917,
+    "max_val": 4.510351181030273
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.attn.qact2": {
+    "scaling_factor": 0.014282367192208767,
+    "mantissa_M": 1962953600,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.8138606548309326,
+    "max_val": 1.7462996244430542
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.attn.qact3": {
+    "scaling_factor": 0.00011949943291256204,
+    "mantissa_M": 2102256256,
+    "exponent_E": 44.0,
+    "bit_width": 16,
+    "min_val": -3.915637969970703,
+    "max_val": 2.2490952014923096
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.mlp.qact_gelu": {
+    "scaling_factor": 0.05903929844498634,
+    "mantissa_M": 2028574848,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -7.49799108505249,
+    "max_val": 3.2217719554901123
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.mlp.qact1": {
+    "scaling_factor": 0.02482711710035801,
+    "mantissa_M": 1706106496,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -0.17379549145698547,
+    "max_val": 3.1530439853668213
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.1.mlp.qact2": {
+    "scaling_factor": 0.0001599902898306027,
+    "mantissa_M": 1407289472,
+    "exponent_E": 43.0,
+    "bit_width": 16,
+    "min_val": -5.242401599884033,
+    "max_val": 2.7547597885131836
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.qact_input": {
+    "scaling_factor": 1.0015265941619873,
+    "mantissa_M": 1075380992,
+    "exponent_E": 30.0,
+    "bit_width": 8,
+    "min_val": -116.21871948242188,
+    "max_val": 127.1938705444336
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.qact1": {
+    "scaling_factor": 0.011018379591405392,
+    "mantissa_M": 1514354560,
+    "exponent_E": 37.0,
+    "bit_width": 8,
+    "min_val": -1.32973313331604,
+    "max_val": 1.399334192276001
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.qact_res1": {
+    "scaling_factor": 0.003875934984534979,
+    "mantissa_M": 2130817792,
+    "exponent_E": 39.0,
+    "bit_width": 16,
+    "min_val": -116.56453704833984,
+    "max_val": 127.00276184082031
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.qact3": {
+    "scaling_factor": 0.018498528748750687,
+    "mantissa_M": 1271209216,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -2.145009756088257,
+    "max_val": 2.349313259124756
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.qact_res2": {
+    "scaling_factor": 0.003843858605250716,
+    "mantissa_M": 2113183616,
+    "exponent_E": 39.0,
+    "bit_width": 16,
+    "min_val": -113.8951187133789,
+    "max_val": 125.95171356201172
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.attn.qact1": {
+    "scaling_factor": 0.03933098167181015,
+    "mantissa_M": 1351402240,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -4.995034694671631,
+    "max_val": 4.341465473175049
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.attn.qact_attn1": {
+    "scaling_factor": 0.02766975574195385,
+    "mantissa_M": 1901451136,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -3.514059066772461,
+    "max_val": 2.809992790222168
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.attn.qact2": {
+    "scaling_factor": 0.0213181059807539,
+    "mantissa_M": 1464969088,
+    "exponent_E": 36.0,
+    "bit_width": 8,
+    "min_val": -2.704148292541504,
+    "max_val": 2.707399368286133
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.attn.qact3": {
+    "scaling_factor": 0.00027000432601198554,
+    "mantissa_M": 1187491584,
+    "exponent_E": 42.0,
+    "bit_width": 16,
+    "min_val": -8.8472318649292,
+    "max_val": 3.6931755542755127
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.mlp.qact_gelu": {
+    "scaling_factor": 0.060835108160972595,
+    "mantissa_M": 2090278400,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -7.7260589599609375,
+    "max_val": 5.985319137573242
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.mlp.qact1": {
+    "scaling_factor": 0.04585276544094086,
+    "mantissa_M": 1575489024,
+    "exponent_E": 35.0,
+    "bit_width": 8,
+    "min_val": -0.1779966950416565,
+    "max_val": 5.823301315307617
+  },
+  "mobilevit.encoder.layer.4.transformer.layer.2.mlp.qact2": {
+    "scaling_factor": 0.00038618987309746444,
+    "mantissa_M": 1698481024,
+    "exponent_E": 42.0,
+    "bit_width": 16,
+    "min_val": -12.65428352355957,
+    "max_val": 9.454568862915039
+  }
+}
