@@ -110,7 +110,7 @@ DEFAULT_HEAD_LR = 1e-4
 DEFAULT_WEIGHT_DECAY = 1e-4
 DEFAULT_WARMUP_EPOCHS = 3
 DEFAULT_MIN_LR_RATIO = 0.01
-DEFAULT_LABEL_SMOOTHING = 0.1
+DEFAULT_LABEL_SMOOTHING = 0.0
 DEFAULT_GRAD_CLIP = 1.0
 DEFAULT_FREEZE_CNN = False   # If True: freeze CNN stem parameters completely
 
@@ -268,11 +268,11 @@ def enable_qat_mode(
     # Step 3: Put model into training mode
     model.train()
 
-    # If CNN is frozen, keep CNN BatchNorm in eval mode
-    if freeze_cnn:
-        for name, module in model.named_modules():
-            if "transformer" not in name and isinstance(module, (nn.BatchNorm2d, nn.BatchNorm1d)):
-                module.eval()
+    # CRITICAL: Always keep CNN BatchNorm in eval mode to prevent destroying
+    # Apple's pre-trained running statistics on mini-datasets!
+    for name, module in model.named_modules():
+        if "transformer" not in name and isinstance(module, (nn.BatchNorm2d, nn.BatchNorm1d)):
+            module.eval()
 
     trainable_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total_count = sum(p.numel() for p in model.parameters())
@@ -307,11 +307,11 @@ def enforce_qat_training_state(model: nn.Module, freeze_cnn: bool = False) -> No
         if isinstance(module, QuantAct):
             module.fix()
 
-    # Keep CNN BatchNorm in eval mode if CNN is frozen
-    if freeze_cnn:
-        for name, module in model.named_modules():
-            if "transformer" not in name and isinstance(module, (nn.BatchNorm2d, nn.BatchNorm1d)):
-                module.eval()
+    # CRITICAL: Always keep CNN BatchNorm in eval mode to prevent destroying
+    # Apple's pre-trained running statistics on mini-datasets!
+    for name, module in model.named_modules():
+        if "transformer" not in name and isinstance(module, (nn.BatchNorm2d, nn.BatchNorm1d)):
+            module.eval()
 
 
 # ===================================================================
@@ -457,37 +457,38 @@ class SyntheticQATDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         g = torch.Generator()
         g.manual_seed(idx)
-        image = torch.randn(3, self.image_size, self.image_size, generator=g)
+        # Scaled [0, 1] uniform distribution matching MobileViT inputs
+        image = torch.rand(3, self.image_size, self.image_size, generator=g)
         label = torch.tensor(idx % self.num_classes, dtype=torch.long)
         return image, label
 
 
 def get_mobilevit_transforms(image_size: int = 256):
     """
-    Standard MobileViT data augmentations:
-      Train: RandomResizedCrop(256) + RandomHorizontalFlip + Normalize
-      Val:   Resize(288) + CenterCrop(256) + Normalize
+    Standard Apple MobileViT data preprocessing pipeline:
+      - Raw [0, 1] scaling (ToTensor)
+      - Channel flip from RGB to BGR (do_flip_channel_order = True)
+      - NO ImageNet mean/std normalization! (Apple MobileViT operates on raw [0, 1] BGR)
     """
     if not HAS_TORCHVISION:
         return None, None
 
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225],
-    )
+    # Apple MobileViT was trained on raw [0, 1] BGR tensors.
+    # We flip RGB -> BGR via lambda x: x[[2, 1, 0], :, :]
+    flip_bgr = transforms.Lambda(lambda x: x[[2, 1, 0], :, :])
 
     train_transform = transforms.Compose([
         transforms.RandomResizedCrop(image_size, scale=(0.08, 1.0), interpolation=transforms.InterpolationMode.BILINEAR),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        normalize,
+        flip_bgr,
     ])
 
     val_transform = transforms.Compose([
         transforms.Resize(int(image_size * 288 / 256), interpolation=transforms.InterpolationMode.BILINEAR),
         transforms.CenterCrop(image_size),
         transforms.ToTensor(),
-        normalize,
+        flip_bgr,
     ])
 
     return train_transform, val_transform

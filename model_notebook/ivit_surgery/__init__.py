@@ -23,6 +23,7 @@ from .mobilevit_ivit_ptq_calibration import (
 )
 
 from .mobilevit_ivit_qat import (
+    build_surgered_mobilevit,
     enable_qat_mode,
     load_calibrated_weights,
     build_qat_dataloaders,
@@ -50,6 +51,7 @@ __all__ = [
     "build_calibration_loader",
     "save_calibrated_model",
     # Phase 3 — QAT Fine-Tuning
+    "build_surgered_mobilevit",
     "enable_qat_mode",
     "load_calibrated_weights",
     "build_qat_dataloaders",

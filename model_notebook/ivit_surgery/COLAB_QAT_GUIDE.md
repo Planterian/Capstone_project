@@ -100,10 +100,16 @@ print("✓ Calibrated checkpoint verified.")
 ImageNet-Mini contains all 1,000 ImageNet classes with 34,745 training images and 3,923 validation images. It downloads in ~2 minutes and fits easily on Colab's local disk.
 
 ```bash
-# 1. Upload your kaggle.json to /content/
+# Method 1: If you uploaded kaggle.json to /content/
 !mkdir -p ~/.kaggle && cp /content/kaggle.json ~/.kaggle/ && chmod 600 ~/.kaggle/kaggle.json
 
-# 2. Download and extract directly to Colab local SSD (/content)
+# Method 2: Or enter credentials directly via Python environment:
+# import os, getpass
+# os.environ['KAGGLE_USERNAME'] = input("Kaggle Username: ")
+# os.environ['KAGGLE_KEY'] = getpass.getpass("Kaggle API Key: ")
+
+# Download and extract directly to Colab local SSD (/content/dataset)
+!pip install -q kaggle
 !kaggle datasets download -d ifigotin/imagenetmini-1000 -p /content/dataset --unzip
 
 # Dataset path:
@@ -140,15 +146,18 @@ The recommended hyperparameters for single-GPU QAT fine-tuning on Colab:
 
 | Parameter | Recommended Value | Rationale |
 |---|---|---|
-| **Epochs** | `30` | Sufficient for integer boundary adaptation |
-| **Batch Size** | `64` | Fits easily in 16GB T4 VRAM (use `128` for A100) |
-| **Transformer LR** | `1e-4` | Standard fine-tuning rate for integer layers |
+| **Epochs** | `40` | Sufficient for integer boundary adaptation and convergence |
+| **Batch Size** | `64` | Fits easily in 16GB T4 VRAM |
+| **Transformer LR** | `2e-4` (or `1e-4`) | Standard fine-tuning rate for integer layers |
 | **CNN Stem LR** | `1e-6` | Microscopic rate to preserve inverted residual features |
-| **Classifier Head LR** | `1e-4` | Aligned with Transformer blocks |
+| **CNN BatchNorm** | **Strictly `eval()`** | **CỰC KỲ QUAN TRỌNG:** Giữ nguyên running stats đã huấn luyện của Apple, chống nát phân phối trên tập mini! |
+| **Transforms** | **BGR `[0, 1]`** | **CỰC KỲ QUAN TRỌNG:** Apple MobileViT nhận ảnh BGR tỉ lệ [0, 1], TUYỆT ĐỐI KHÔNG dùng ImageNet Normalize! |
+| **Classifier Head LR** | `2e-4` | Aligned with Transformer blocks |
 | **Warmup Epochs** | `3` | Linear warmup to stabilize integer bounds |
-| **Label Smoothing** | `0.1` | Prevents overconfident predictions on quantized logits |
-| **Gradient Clipping** | `1.0` | Prevents STE gradient spikes |
-| **DataLoader Workers** | `4` | Optimal for Colab 2-core / 4-core virtual CPUs |
+| **Label Smoothing** | `0.0` | Cung cấp tín hiệu gradient nhãn thực rõ ràng nhất |
+| **Gradient Clipping** | `1.0` | Cho phép STE gradient cập nhật thông thoáng |
+| **DataLoader Workers** | `2` | Optimal for Colab 2-core virtual CPUs (tránh cảnh báo quá tải workers) |
+| **Fast PTQ Calib** | `True` | Tự động chạy định cỡ 15 giây trên 1,024 ảnh thực BGR nếu có dataset |
 
 ---
 

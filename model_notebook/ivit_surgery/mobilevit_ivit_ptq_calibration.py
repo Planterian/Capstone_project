@@ -184,15 +184,13 @@ class ImageFolderCalibrationDataset(Dataset):
         print(f"  [DATA] Found {len(all_images)} images, "
               f"using {len(self.image_paths)} for calibration.")
 
-        # Build the transform pipeline matching MobileViTImageProcessor
+        # Build the transform pipeline matching Apple MobileViTImageProcessor:
+        # Scale to [0, 1] and flip RGB -> BGR (NO ImageNet normalization!)
         self.transform = transforms.Compose([
             transforms.Resize(self.RESIZE_SIZE),
             transforms.CenterCrop(self.CROP_SIZE),
             transforms.ToTensor(),               # -> [C, H, W] float32 in [0, 1]
-            transforms.Normalize(
-                mean=self.IMAGENET_MEAN,
-                std=self.IMAGENET_STD,
-            ),
+            transforms.Lambda(lambda x: x[[2, 1, 0], :, :]),  # RGB -> BGR expected by Apple MobileViT
         ])
 
     def __len__(self):
@@ -226,8 +224,8 @@ class SyntheticCalibrationDataset(Dataset):
         return self.num_images
 
     def __getitem__(self, idx):
-        # Approximate ImageNet-normalised distribution: N(0, 1)
-        return torch.randn(3, 256, 256)
+        # Uniform [0, 1] distribution matching raw image tensors
+        return torch.rand(3, 256, 256)
 
 
 def build_calibration_loader(data_dir: str | None,
