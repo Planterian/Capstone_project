@@ -25,11 +25,11 @@ module requant_residual_add (
 );
 
     logic signed [23:0] prod_f, prod_x;
-    logic signed [23:0] scaled_f, scaled_x;
     logic signed [24:0] sum_full;
     logic signed [7:0]  clamped_out;
-    logic [1:0]         valid_pipe;
+    logic [2:0]         valid_pipe;
 
+    // Pipeline Stage 1: Multiplication
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             prod_f <= '0;
@@ -40,18 +40,16 @@ module requant_residual_add (
         end
     end
 
+    // Pipeline Stage 2: Dyadic shift and addition
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            scaled_f <= '0;
-            scaled_x <= '0;
             sum_full <= '0;
         end else begin
-            scaled_f <= prod_f >>> e_f;
-            scaled_x <= prod_x >>> e_x;
-            sum_full <= 25'(scaled_f) + 25'(scaled_x);
+            sum_full <= 25'(prod_f >>> e_f) + 25'(prod_x >>> e_x);
         end
     end
 
+    // Pipeline Stage 3: Saturated clamping and registered output
     always_comb begin
         if (sum_full > 25'sd127)
             clamped_out = 8'sd127;
@@ -66,11 +64,11 @@ module requant_residual_add (
             valid_pipe <= '0;
             res_out    <= '0;
         end else begin
-            valid_pipe <= {valid_pipe[0], in_valid};
+            valid_pipe <= {valid_pipe[1:0], in_valid};
             res_out    <= clamped_out;
         end
     end
 
-    assign out_valid = valid_pipe[1];
+    assign out_valid = valid_pipe[2];
 
 endmodule

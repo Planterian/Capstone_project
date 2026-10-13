@@ -3,11 +3,12 @@
 // Module Name:   tb_attention_core
 // Description:  Full Verification Testbench for Attention Core Top (rtl_ver02).
 //               Loads Golden Test Vectors (.hex) extracted from PyTorch I-ViT QAT,
-//               configures dyadic scale parameters (M=23480, E=26), streams inputs,
-//               and compares PL outputs against golden reference data.
+//               configures dyadic scale parameters (M=27640, E=22), streams inputs
+//               (Q, K, V = 1536 beats total), and verifies PL outputs against
+//               PyTorch golden reference data (golden_context_out.hex).
 // Standard:     IEEE 1800-2012 SystemVerilog
 // Target:       Vivado Simulator (xsim) / ModelSim / Icarus Verilog
-// Version:      v2.0 (Bit Correction Aligned)
+// Version:      v3.0 (Step 3 Top Integration Verified)
 // ============================================================================
 
 `include "hw_scale_params.svh"
@@ -45,55 +46,73 @@ module tb_attention_core;
     logic                          s_axi_rready;
 
     // AXI4-Stream Ingress RX
-    logic [C_AXIS_DATA_WIDTH-1:0]  s_axis_tdata;
+    logic [C_AXIS_DATA_WIDTH-1:0]     s_axis_tdata;
     logic [(C_AXIS_DATA_WIDTH/8)-1:0] s_axis_tkeep;
-    logic                          s_axis_tlast;
-    logic                          s_axis_tvalid;
-    logic                          s_axis_tready;
+    logic                             s_axis_tlast;
+    logic                             s_axis_tvalid;
+    logic                             s_axis_tready;
 
     // AXI4-Stream Egress TX
-    logic [C_AXIS_DATA_WIDTH-1:0]  m_axis_tdata;
+    logic [C_AXIS_DATA_WIDTH-1:0]     m_axis_tdata;
     logic [(C_AXIS_DATA_WIDTH/8)-1:0] m_axis_tkeep;
-    logic                          m_axis_tlast;
-    logic                          m_axis_tvalid;
-    logic                          m_axis_tready;
+    logic                             m_axis_tlast;
+    logic                             m_axis_tvalid;
+    logic                             m_axis_tready;
 
     // Golden Vector Memories
-    logic signed [7:0] q_mem            [0:(TEST_TOKENS * TEST_HEAD_DIM)-1];
-    logic signed [7:0] k_mem            [0:(TEST_TOKENS * TEST_HEAD_DIM)-1];
-    logic signed [7:0] v_mem            [0:(TEST_TOKENS * TEST_HEAD_DIM)-1];
-    logic signed [7:0] gold_context_mem [0:(TEST_TOKENS * TEST_HEAD_DIM)-1];
+    logic [7:0] q_mem            [0:(TEST_TOKENS * TEST_HEAD_DIM)-1];
+    logic [7:0] k_mem            [0:(TEST_TOKENS * TEST_HEAD_DIM)-1];
+    logic [7:0] v_mem            [0:(TEST_TOKENS * TEST_HEAD_DIM)-1];
+    logic [7:0] gold_context_mem [0:(TEST_TOKENS * TEST_HEAD_DIM)-1];
 
-    int pass_count  = 0;
-    int error_count = 0;
-    int egress_cnt  = 0;
+    int pass_count   = 0;
+    int error_count  = 0;
+    int egress_cnt   = 0;
+    int tlast_errors = 0;
 
     // Monitor Output Egress Stream (Verifying Context Out = Softmax * V)
     always @(posedge clk) begin
-        if (m_axis_tvalid && m_axis_tready) begin
+        if (rst_n && m_axis_tvalid && m_axis_tready) begin
             // 64-bit beat unpacks 8 INT8 context values
             for (int b = 0; b < 8; b++) begin
                 logic signed [7:0] dut_ctx;
                 logic signed [7:0] exp_ctx;
-                int diff;
 
                 dut_ctx = $signed(m_axis_tdata[b*8 +: 8]);
                 if (egress_cnt < (TEST_TOKENS * TEST_HEAD_DIM)) begin
-                    exp_ctx = gold_context_mem[egress_cnt];
-                    diff    = (dut_ctx >= exp_ctx) ? (dut_ctx - exp_ctx) : (exp_ctx - dut_ctx);
+                    exp_ctx = $signed(gold_context_mem[egress_cnt]);
 
-                    if (diff <= 1) begin
+                    if (dut_ctx === exp_ctx) begin
                         pass_count++;
                     end else begin
+                        if (error_count < 10) begin
+                            $display("[ERROR @ Egress %0d]: DUT = 0x%02h (%0d) | Golden = 0x%02h (%0d)",
+                                     egress_cnt, dut_ctx, dut_ctx, exp_ctx, exp_ctx);
+                        end
                         error_count++;
                     end
 
-                    if (egress_cnt < 8 || egress_cnt % 256 == 0) begin
-                        $display("[CONTEXT EGRESS #%04d]: DUT = %0d | Golden = %0d (Diff = %0d)", 
-                                 egress_cnt, dut_ctx, exp_ctx, diff);
+                    if (egress_cnt < 16 || egress_cnt == 511 || egress_cnt == 4095) begin
+                        $display("[CONTEXT EGRESS #%04d]: DUT = %0d | Golden = %0d (%s)", 
+                                 egress_cnt, dut_ctx, exp_ctx, (dut_ctx === exp_ctx) ? "MATCH" : "MISMATCH");
                     end
 
                     egress_cnt++;
+                end
+            end
+
+            // Check tlast on the final beat (beat 511 = byte 4088..4095)
+            if (egress_cnt == (TEST_TOKENS * TEST_HEAD_DIM)) begin
+                if (!m_axis_tlast) begin
+                    $display("[ERROR]: m_axis_tlast is 0 on beat 511, expected 1!");
+                    tlast_errors++;
+                end else begin
+                    $display("[TB INFO]: m_axis_tlast correctly asserted on beat 511!");
+                end
+            end else begin
+                if (m_axis_tlast) begin
+                    $display("[ERROR]: m_axis_tlast is 1 unexpectedly at egress_cnt = %0d!", egress_cnt);
+                    tlast_errors++;
                 end
             end
         end
@@ -101,42 +120,42 @@ module tb_attention_core;
 
     // DUT Instantiation
     attention_core_top #(
-        .C_S_AXI_DATA_WIDTH(C_S_AXI_DATA_WIDTH),
-        .C_S_AXI_ADDR_WIDTH(C_S_AXI_ADDR_WIDTH),
-        .C_AXIS_DATA_WIDTH(C_AXIS_DATA_WIDTH),
-        .ARRAY_SIZE(ARRAY_SIZE),
-        .MAX_TOKENS(TEST_TOKENS),
-        .MAX_HEAD_DIM(TEST_HEAD_DIM)
+        .C_S_AXI_DATA_WIDTH (C_S_AXI_DATA_WIDTH),
+        .C_S_AXI_ADDR_WIDTH (C_S_AXI_ADDR_WIDTH),
+        .C_AXIS_DATA_WIDTH  (C_AXIS_DATA_WIDTH),
+        .ARRAY_SIZE         (ARRAY_SIZE),
+        .MAX_TOKENS         (TEST_TOKENS),
+        .MAX_HEAD_DIM       (TEST_HEAD_DIM)
     ) u_dut (
-        .clk(clk),
-        .rst_n(rst_n),
-        .s_axi_awaddr(s_axi_awaddr),
-        .s_axi_awvalid(s_axi_awvalid),
-        .s_axi_awready(s_axi_awready),
-        .s_axi_wdata(s_axi_wdata),
-        .s_axi_wstrb(s_axi_wstrb),
-        .s_axi_wvalid(s_axi_wvalid),
-        .s_axi_wready(s_axi_wready),
-        .s_axi_bresp(s_axi_bresp),
-        .s_axi_bvalid(s_axi_bvalid),
-        .s_axi_bready(s_axi_bready),
-        .s_axi_araddr(s_axi_araddr),
-        .s_axi_arvalid(s_axi_arvalid),
-        .s_axi_arready(s_axi_arready),
-        .s_axi_rdata(s_axi_rdata),
-        .s_axi_rresp(s_axi_rresp),
-        .s_axi_rvalid(s_axi_rvalid),
-        .s_axi_rready(s_axi_rready),
-        .s_axis_tdata(s_axis_tdata),
-        .s_axis_tkeep(s_axis_tkeep),
-        .s_axis_tlast(s_axis_tlast),
-        .s_axis_tvalid(s_axis_tvalid),
-        .s_axis_tready(s_axis_tready),
-        .m_axis_tdata(m_axis_tdata),
-        .m_axis_tkeep(m_axis_tkeep),
-        .m_axis_tlast(m_axis_tlast),
-        .m_axis_tvalid(m_axis_tvalid),
-        .m_axis_tready(m_axis_tready)
+        .clk           (clk),
+        .rst_n         (rst_n),
+        .s_axi_awaddr  (s_axi_awaddr),
+        .s_axi_awvalid (s_axi_awvalid),
+        .s_axi_awready (s_axi_awready),
+        .s_axi_wdata   (s_axi_wdata),
+        .s_axi_wstrb   (s_axi_wstrb),
+        .s_axi_wvalid  (s_axi_wvalid),
+        .s_axi_wready  (s_axi_wready),
+        .s_axi_bresp   (s_axi_bresp),
+        .s_axi_bvalid  (s_axi_bvalid),
+        .s_axi_bready  (s_axi_bready),
+        .s_axi_araddr  (s_axi_araddr),
+        .s_axi_arvalid (s_axi_arvalid),
+        .s_axi_arready (s_axi_arready),
+        .s_axi_rdata   (s_axi_rdata),
+        .s_axi_rresp   (s_axi_rresp),
+        .s_axi_rvalid  (s_axi_rvalid),
+        .s_axi_rready  (s_axi_rready),
+        .s_axis_tdata  (s_axis_tdata),
+        .s_axis_tkeep  (s_axis_tkeep),
+        .s_axis_tlast  (s_axis_tlast),
+        .s_axis_tvalid (s_axis_tvalid),
+        .s_axis_tready (s_axis_tready),
+        .m_axis_tdata  (m_axis_tdata),
+        .m_axis_tkeep  (m_axis_tkeep),
+        .m_axis_tlast  (m_axis_tlast),
+        .m_axis_tvalid (m_axis_tvalid),
+        .m_axis_tready (m_axis_tready)
     );
 
     // 200 MHz Clock Generator
@@ -145,10 +164,103 @@ module tb_attention_core;
         forever #(CLK_PERIOD / 2.0) clk = ~clk;
     end
 
+    task stream_q;
+        for (int i = 0; i < TEST_TOKENS; i++) begin
+            @(posedge clk);
+            s_axis_tvalid <= 1'b1;
+            s_axis_tdata  <= {q_mem[i*TEST_HEAD_DIM + 7],
+                              q_mem[i*TEST_HEAD_DIM + 6],
+                              q_mem[i*TEST_HEAD_DIM + 5],
+                              q_mem[i*TEST_HEAD_DIM + 4],
+                              q_mem[i*TEST_HEAD_DIM + 3],
+                              q_mem[i*TEST_HEAD_DIM + 2],
+                              q_mem[i*TEST_HEAD_DIM + 1],
+                              q_mem[i*TEST_HEAD_DIM + 0]};
+            s_axis_tlast  <= 1'b0;
+
+            @(posedge clk);
+            s_axis_tvalid <= 1'b1;
+            s_axis_tdata  <= {q_mem[i*TEST_HEAD_DIM + 15],
+                              q_mem[i*TEST_HEAD_DIM + 14],
+                              q_mem[i*TEST_HEAD_DIM + 13],
+                              q_mem[i*TEST_HEAD_DIM + 12],
+                              q_mem[i*TEST_HEAD_DIM + 11],
+                              q_mem[i*TEST_HEAD_DIM + 10],
+                              q_mem[i*TEST_HEAD_DIM + 9],
+                              q_mem[i*TEST_HEAD_DIM + 8]};
+            s_axis_tlast  <= 1'b0;
+        end
+        @(posedge clk);
+        s_axis_tvalid <= 1'b0;
+    endtask
+
+    task stream_k;
+        for (int i = 0; i < TEST_TOKENS; i++) begin
+            @(posedge clk);
+            s_axis_tvalid <= 1'b1;
+            s_axis_tdata  <= {k_mem[i*TEST_HEAD_DIM + 7],
+                              k_mem[i*TEST_HEAD_DIM + 6],
+                              k_mem[i*TEST_HEAD_DIM + 5],
+                              k_mem[i*TEST_HEAD_DIM + 4],
+                              k_mem[i*TEST_HEAD_DIM + 3],
+                              k_mem[i*TEST_HEAD_DIM + 2],
+                              k_mem[i*TEST_HEAD_DIM + 1],
+                              k_mem[i*TEST_HEAD_DIM + 0]};
+            s_axis_tlast  <= 1'b0;
+
+            @(posedge clk);
+            s_axis_tvalid <= 1'b1;
+            s_axis_tdata  <= {k_mem[i*TEST_HEAD_DIM + 15],
+                              k_mem[i*TEST_HEAD_DIM + 14],
+                              k_mem[i*TEST_HEAD_DIM + 13],
+                              k_mem[i*TEST_HEAD_DIM + 12],
+                              k_mem[i*TEST_HEAD_DIM + 11],
+                              k_mem[i*TEST_HEAD_DIM + 10],
+                              k_mem[i*TEST_HEAD_DIM + 9],
+                              k_mem[i*TEST_HEAD_DIM + 8]};
+            s_axis_tlast  <= 1'b0;
+        end
+        @(posedge clk);
+        s_axis_tvalid <= 1'b0;
+    endtask
+
+    task stream_v;
+        for (int i = 0; i < TEST_TOKENS; i++) begin
+            @(posedge clk);
+            s_axis_tvalid <= 1'b1;
+            s_axis_tdata  <= {v_mem[i*TEST_HEAD_DIM + 7],
+                              v_mem[i*TEST_HEAD_DIM + 6],
+                              v_mem[i*TEST_HEAD_DIM + 5],
+                              v_mem[i*TEST_HEAD_DIM + 4],
+                              v_mem[i*TEST_HEAD_DIM + 3],
+                              v_mem[i*TEST_HEAD_DIM + 2],
+                              v_mem[i*TEST_HEAD_DIM + 1],
+                              v_mem[i*TEST_HEAD_DIM + 0]};
+            s_axis_tlast  <= 1'b0;
+
+            @(posedge clk);
+            s_axis_tvalid <= 1'b1;
+            s_axis_tdata  <= {v_mem[i*TEST_HEAD_DIM + 15],
+                              v_mem[i*TEST_HEAD_DIM + 14],
+                              v_mem[i*TEST_HEAD_DIM + 13],
+                              v_mem[i*TEST_HEAD_DIM + 12],
+                              v_mem[i*TEST_HEAD_DIM + 11],
+                              v_mem[i*TEST_HEAD_DIM + 10],
+                              v_mem[i*TEST_HEAD_DIM + 9],
+                              v_mem[i*TEST_HEAD_DIM + 8]};
+            s_axis_tlast  <= (i == TEST_TOKENS - 1);
+        end
+        @(posedge clk);
+        s_axis_tvalid <= 1'b0;
+        s_axis_tlast  <= 1'b0;
+    endtask
+
     // Test Sequence
+    int timeout_cycles;
+
     initial begin
         $display("=======================================================================");
-        $display("   STARTING BIT-CORRECTED ATTENTION CORE VERIFICATION (rtl_ver02)");
+        $display("   STARTING INTEGRATED ATTENTION CORE VERIFICATION (rtl_ver02)");
         $display("=======================================================================");
 
         rst_n         = 1'b0;
@@ -182,63 +294,52 @@ module tb_attention_core;
         $display("[TB INFO]: Reset Released.");
 
         // Step 2: Configure CSR Registers via AXI4-Lite
-        $display("[TB INFO]: Step 2 - Configuring CSR (N=256, dk=16, H=1, M=23480, E=26)...");
+        $display("[TB INFO]: Step 2 - Configuring CSR (N=256, dk=16, H=1, M=27640, E=22)...");
         axi_write_csr(8'h10, 32'd256);                   // CSR_SEQ_LEN = 256
         axi_write_csr(8'h14, 32'd16);                    // CSR_HEAD_DIM = 16
         axi_write_csr(8'h18, 32'd1);                     // CSR_NUM_HEADS = 1 (Single Head Test)
-        axi_write_csr(8'h20, 32'd23480);                 // CSR_SCALE_M = 23480
-        axi_write_csr(8'h24, 32'd26);                    // CSR_SCALE_E = 26
+        axi_write_csr(8'h20, 32'd27640);                 // CSR_SCALE_M = 27640 (Step 1 Standardized)
+        axi_write_csr(8'h24, 32'd22);                    // CSR_SCALE_E = 22 (Step 1 Standardized)
 
-        // Step 3: Trigger START pulse
-        $display("[TB INFO]: Step 3 - Triggering START Pulse via AXI-Lite (0x00 <= 1)...");
+        // Step 3: Stream Token Vectors into AXI-Stream Ingress (Q, K, V = 1536 beats)
+        $display("[TB INFO]: Step 3 - Streaming Q, K, V matrices into AXI-Stream Ingress...");
+        stream_q();
+        stream_k();
+        stream_v();
+        $display("[TB INFO]: Finished Streaming 1,536 beats into Ingress BRAM.");
+
+        // Step 4: Trigger START pulse via AXI-Lite
+        $display("[TB INFO]: Step 4 - Triggering START Pulse via AXI-Lite (0x00 <= 1)...");
         axi_write_csr(8'h00, 32'd1);
 
-        // Step 4: Stream Token Vectors into AXI-Stream Ingress
-        $display("[TB INFO]: Step 4 - Streaming Token Vectors into AXI-Stream...");
-        for (int i = 0; i < TEST_TOKENS; i++) begin
-            @(posedge clk);
-            s_axis_tvalid <= 1'b1;
-            // Pack 8 INT8 tokens into 64-bit word
-            s_axis_tdata  <= {q_mem[i*TEST_HEAD_DIM + 7],
-                              q_mem[i*TEST_HEAD_DIM + 6],
-                              q_mem[i*TEST_HEAD_DIM + 5],
-                              q_mem[i*TEST_HEAD_DIM + 4],
-                              q_mem[i*TEST_HEAD_DIM + 3],
-                              q_mem[i*TEST_HEAD_DIM + 2],
-                              q_mem[i*TEST_HEAD_DIM + 1],
-                              q_mem[i*TEST_HEAD_DIM + 0]};
-            if (i == TEST_TOKENS - 1) s_axis_tlast <= 1'b1;
-        end
-        @(posedge clk);
-        s_axis_tvalid <= 1'b0;
-        s_axis_tlast  <= 1'b0;
-
         // Step 5: Wait for Computation Pipeline Completion
-        $display("[TB INFO]: Step 5 - Waiting for Core Pipeline Execution...");
-        begin : wait_egress
-            automatic int timeout_cycles = 0;
-            while (egress_cnt == 0 && timeout_cycles < 1500) begin
-                @(posedge clk);
-                timeout_cycles++;
-            end
-            if (egress_cnt > 0) begin
-                repeat (100) @(posedge clk);
+        $display("[TB INFO]: Step 5 - Waiting for Core Pipeline Execution (256 rows)...");
+        timeout_cycles = 0;
+        while (egress_cnt < (TEST_TOKENS * TEST_HEAD_DIM) && timeout_cycles < 400000) begin
+            @(posedge clk);
+            timeout_cycles++;
+            if (timeout_cycles % 50000 == 0) begin
+                $display("[TB INFO]: Running... Cycle %0d, Egress Samples: %0d / 4096", timeout_cycles, egress_cnt);
             end
         end
+
+        // Wait a few trailing cycles
+        repeat (20) @(posedge clk);
 
         // Step 6: Final Verification Report
         $display("\n=======================================================================");
-        $display("   FINAL VERIFICATION REPORT: ATTENTION CORE (rtl_ver02)");
+        $display("   FINAL VERIFICATION REPORT: ATTENTION CORE TOP INTEGRATION (rtl_ver02)");
         $display("=======================================================================");
-        $display("   Total Egress Samples Monitored : %0d", egress_cnt);
-        $display("   Matched Samples (<= 1 LSB)     : %0d", pass_count);
+        $display("   Total Egress Samples Monitored : %0d / 4096", egress_cnt);
+        $display("   Exact Matched Samples          : %0d", pass_count);
         $display("   Mismatched Samples             : %0d", error_count);
-        if (error_count == 0 && egress_cnt > 0) begin
-            $display("   >>> STATUS: ALL GOLDEN VECTORS MATCHED SUCCESSFULLY! [PASS] <<<");
-        end else if (egress_cnt == 0) begin
-            $display("   >>> STATUS: PIPELINE COMPLETED [PASS - ZERO TIMING/DEADLOCK FAULTS] <<<");
+        $display("   TLAST Assertion Errors         : %0d", tlast_errors);
+        $display("   Total Execution Clock Cycles   : %0d", timeout_cycles);
+
+        if (error_count == 0 && tlast_errors == 0 && egress_cnt == 4096 && pass_count == 4096) begin
+            $display("   >>> STATUS: 100%% BIT-EXACT MATCH ACHIEVED! [PASS] <<<");
         end else begin
-            $display("   >>> STATUS: %0d ERRORS DETECTED [FAIL] <<<", error_count);
+            $display("   >>> STATUS: VERIFICATION FAILED! [FAIL] <<<");
         end
         $display("=======================================================================\n");
 

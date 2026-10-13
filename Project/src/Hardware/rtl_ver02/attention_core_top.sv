@@ -1,14 +1,16 @@
 `timescale 1ns / 1ps
 // ============================================================================
 // Module Name:   attention_core_top
-// Description:  Top-Level Shell for Multi-Head Attention (MHA) Accelerator.
+// Description:  Top-Level Integration Shell for Multi-Head Attention (MHA) Accelerator.
 //               Integrates AXI4-Lite Control Slave, AXI4-Stream Ingress/Egress,
-//               Skid Buffer, Ping-Pong BRAM Buffer, Output-Stationary Systolic
-//               MAC Array, Dyadic Scaler Unit, Hardware Softmax, and Re-quantization.
-//               Supports Sequential Heads Processing Loop (Single-Head PL Core).
+//               Skid Buffer, Multi-Bank Ping-Pong BRAM Buffer, Output-Stationary
+//               Systolic MAC Array, Dyadic Scaler Unit, Reconfigurable Hardware Softmax
+//               (Step 2.5 Reloadable LUT), and Stage 4 Score-V GEMM Engine.
+//               Fully Synthesizable on AMD Kria KV260 (Zero Mock Code, Zero $readmemh).
+//               Supports Sequential Heads Processing Loop (Single-Head PL Core, H=4).
 // Standard:     IEEE 1800-2012 SystemVerilog
 // Target:       AMD Kria KV260 / Zynq UltraScale+ MPSoC
-// Version:      v2.0 (Bit Correction Aligned)
+// Version:      v3.0 (Full Synthesizable Dataflow Pipeline Integration)
 // ============================================================================
 
 `include "hw_scale_params.svh"
@@ -49,89 +51,53 @@ module attention_core_top #(
     // ------------------------------------------------------------------------
     // 2. AXI4-Stream RX Ingress Interface (Read DDR4 -> PL)
     // ------------------------------------------------------------------------
-    input  logic [C_AXIS_DATA_WIDTH-1:0]  s_axis_tdata,
+    input  logic [C_AXIS_DATA_WIDTH-1:0]     s_axis_tdata,
     input  logic [(C_AXIS_DATA_WIDTH/8)-1:0] s_axis_tkeep,
-    input  logic                          s_axis_tlast,
-    input  logic                          s_axis_tvalid,
-    output logic                          s_axis_tready,
+    input  logic                             s_axis_tlast,
+    input  logic                             s_axis_tvalid,
+    output logic                             s_axis_tready,
 
     // ------------------------------------------------------------------------
     // 3. AXI4-Stream TX Egress Interface (PL -> Write DDR4)
     // ------------------------------------------------------------------------
-    output logic [C_AXIS_DATA_WIDTH-1:0]  m_axis_tdata,
+    output logic [C_AXIS_DATA_WIDTH-1:0]     m_axis_tdata,
     output logic [(C_AXIS_DATA_WIDTH/8)-1:0] m_axis_tkeep,
-    output logic                          m_axis_tlast,
-    output logic                          m_axis_tvalid,
-    input  logic                          m_axis_tready
+    output logic                             m_axis_tlast,
+    output logic                             m_axis_tvalid,
+    input  logic                             m_axis_tready
 );
 
     // ------------------------------------------------------------------------
     // CSR REGISTER WIRES & CONTROL SIGNALS
     // ------------------------------------------------------------------------
-    logic        start_pulse;
-    logic        clear_buf_pulse;
-    logic        soft_reset;
-    logic [31:0] reg_nbytes;
-    logic [31:0] reg_seq_len;
-    logic [31:0] reg_head_dim;
-    logic [31:0] reg_num_heads;
+    logic               start_pulse;
+    logic               clear_buf_pulse;
+    logic               soft_reset;
+    logic [31:0]        reg_nbytes;
+    logic [31:0]        reg_seq_len;
+    logic [31:0]        reg_head_dim;
+    logic [31:0]        reg_num_heads;
     logic signed [15:0] reg_scale_m;
-    logic [4:0]  reg_scale_e;
-    logic [3:0]  reg_shift_val;
+    logic [4:0]         reg_scale_e;
+    logic [3:0]         reg_shift_val;
     logic signed [15:0] reg_out_m;
-    logic [4:0]  reg_out_e;
+    logic [4:0]         reg_out_e;
 
-    logic        core_busy;
-    logic        core_done;
-    logic        core_error;
-    logic        pp_bank_sel;
-    logic [3:0]  current_head_idx;
+    // Step 2.5: BRAM LUT Reload Ports (from AXI-Lite CSR to softmax_lut Port B)
+    logic               cfg_lut_we;
+    logic [9:0]         cfg_lut_addr;
+    logic [19:0]        cfg_lut_wdata;
 
-    // ------------------------------------------------------------------------
-    // INTERMEDIATE STREAMING & PIPELINE WIRES
-    // ------------------------------------------------------------------------
-    // Skid Buffer Egress Stream
-    logic [C_AXIS_DATA_WIDTH-1:0] skid_tdata;
-    logic                         skid_tvalid, skid_tready, skid_tlast;
-
-    // Ping-Pong BRAM Egress to Compute Engines
-    logic [31:0] rdata_q_vec, rdata_k_vec, rdata_v_vec;
-    logic        bram_read_en;
-    logic [10:0] raddr_q, raddr_k, raddr_v;
-    logic        tile_read_done, tile_write_done;
-
-    // Systolic MAC Array Outputs
-    logic signed [31:0] dot_product_out [0:ARRAY_SIZE-1];
-    logic               systolic_out_valid;
-
-    // Scaler Unit Outputs
-    logic signed [15:0] scaled_score_out;
-    logic               scaler_out_valid;
-
-    // Softmax Engine Outputs
-    logic [7:0]         softmax_prob_out;
-    logic               softmax_out_valid;
-    logic               softmax_busy;
-
-    // Sequential Head Processing FSM
-    typedef enum logic [2:0] {
-        MHA_IDLE       = 3'b000,
-        MHA_LOAD_HEAD  = 3'b001,
-        MHA_RUN_ATTN   = 3'b010,
-        MHA_WAIT_EGRESS= 3'b011,
-        MHA_NEXT_HEAD  = 3'b100,
-        MHA_DONE       = 3'b101
-    } mha_fsm_t;
-
-    mha_fsm_t mha_state;
-    logic [3:0] head_cnt;
-    logic [15:0] out_token_cnt;
+    // Core Status Signals
+    logic               core_busy;
+    logic               core_done;
+    logic               core_error;
+    logic               pp_bank_sel;
+    logic [3:0]         head_cnt;
 
     // ------------------------------------------------------------------------
-    // MODULE INSTANTIATIONS
+    // 1. AXI4-Lite Register File (CSR Slave)
     // ------------------------------------------------------------------------
-
-    // 1. AXI4-Lite Register File (CSR)
     axi_lite_regs #(
         .C_S_AXI_DATA_WIDTH (C_S_AXI_DATA_WIDTH),
         .C_S_AXI_ADDR_WIDTH (C_S_AXI_ADDR_WIDTH)
@@ -167,6 +133,9 @@ module attention_core_top #(
         .reg_shift_val    (reg_shift_val),
         .reg_out_m        (reg_out_m),
         .reg_out_e        (reg_out_e),
+        .cfg_lut_we       (cfg_lut_we),
+        .cfg_lut_addr     (cfg_lut_addr),
+        .cfg_lut_wdata    (cfg_lut_wdata),
         .core_busy        (core_busy),
         .core_done        (core_done),
         .core_error       (core_error),
@@ -174,7 +143,12 @@ module attention_core_top #(
         .current_head_idx (head_cnt)
     );
 
+    // ------------------------------------------------------------------------
     // 2. AXI4-Stream Ingress Skid Buffer
+    // ------------------------------------------------------------------------
+    logic [C_AXIS_DATA_WIDTH-1:0] skid_tdata;
+    logic                         skid_tvalid, skid_tready, skid_tlast;
+
     axis_adapter #(
         .DATA_WIDTH (C_AXIS_DATA_WIDTH)
     ) u_skid_buffer_rx (
@@ -190,7 +164,14 @@ module attention_core_top #(
         .m_axis_tlast  (skid_tlast)
     );
 
-    // 3. Ping-Pong BRAM Buffer Subsystem (Sized for 256 tokens)
+    // ------------------------------------------------------------------------
+    // 3. Ping-Pong BRAM Buffer Subsystem
+    // ------------------------------------------------------------------------
+    logic [31:0] rdata_q_vec, rdata_k_vec, rdata_v_vec;
+    logic        bram_read_en;
+    logic [10:0] raddr_q, raddr_k, raddr_v;
+    logic        tile_read_done, tile_write_done;
+
     ping_pong_bram_buffer #(
         .DATA_WIDTH (C_AXIS_DATA_WIDTH),
         .RAM_WIDTH  (32),
@@ -218,6 +199,94 @@ module attention_core_top #(
         .pp_bank_sel     (pp_bank_sel)
     );
 
+    // ------------------------------------------------------------------------
+    // 4. ON-CHIP Q, K, V STORAGE FOR ACTIVE HEAD (Synthesizable Block RAM)
+    //    Loaded dynamically from Ingress AXI-Stream.
+    //    Provides instant multi-dimension access for Stage 1 GEMM and Stage 4 Score-V.
+    // ------------------------------------------------------------------------
+    // 256 tokens x 32 dimensions (INT8) per matrix for active head
+    (* ram_style = "block" *) logic signed [7:0] q_mem [0:MAX_TOKENS-1][0:MAX_HEAD_DIM-1];
+    (* ram_style = "block" *) logic signed [7:0] k_mem [0:MAX_TOKENS-1][0:MAX_HEAD_DIM-1];
+    (* ram_style = "block" *) logic signed [7:0] v_mem [0:MAX_TOKENS-1][0:MAX_HEAD_DIM-1];
+
+    typedef enum logic [1:0] {
+        ING_Q = 2'b00,
+        ING_K = 2'b01,
+        ING_V = 2'b10,
+        ING_READY = 2'b11
+    } ing_load_state_t;
+
+    ing_load_state_t ing_load_state;
+    logic [15:0] ing_beat_cnt;
+    logic [7:0]  ing_tok_idx;
+    logic [1:0]  ing_slice_idx;
+    logic        head_data_ready;
+
+    // Beats per matrix = (seq_len * head_dim) / 8
+    logic [15:0] beats_per_mat;
+    assign beats_per_mat = (reg_seq_len[8:0] * reg_head_dim[5:0]) >> 3;
+
+    always_comb begin
+        if (reg_head_dim <= 16'd16) begin
+            ing_tok_idx   = 8'(ing_beat_cnt >> 1);
+            ing_slice_idx = 2'(ing_beat_cnt & 16'd1);
+        end else if (reg_head_dim <= 16'd24) begin
+            ing_tok_idx   = 8'(ing_beat_cnt / 3);
+            ing_slice_idx = 2'(ing_beat_cnt % 3);
+        end else begin
+            ing_tok_idx   = 8'(ing_beat_cnt >> 2);
+            ing_slice_idx = 2'(ing_beat_cnt & 16'd3);
+        end
+    end
+
+    // Ingress write into active head on-chip storage
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            ing_load_state  <= ING_Q;
+            ing_beat_cnt    <= '0;
+            head_data_ready <= 1'b0;
+        end else begin
+            if (clear_buf_pulse || soft_reset) begin
+                ing_load_state  <= ING_Q;
+                ing_beat_cnt    <= '0;
+                head_data_ready <= 1'b0;
+            end else if (skid_tvalid && skid_tready) begin
+                // Unpack 8 INT8 bytes into target matrix memory
+                for (int b = 0; b < 8; b++) begin
+                    int dim_idx;
+                    dim_idx = ing_slice_idx * 8 + b;
+                    if (dim_idx < MAX_HEAD_DIM) begin
+                        case (ing_load_state)
+                            ING_Q: q_mem[ing_tok_idx][dim_idx] <= $signed(skid_tdata[b*8 +: 8]);
+                            ING_K: k_mem[ing_tok_idx][dim_idx] <= $signed(skid_tdata[b*8 +: 8]);
+                            ING_V: v_mem[ing_tok_idx][dim_idx] <= $signed(skid_tdata[b*8 +: 8]);
+                            default: ;
+                        endcase
+                    end
+                end
+
+                if (ing_beat_cnt == beats_per_mat - 1 || skid_tlast) begin
+                    ing_beat_cnt <= '0;
+                    case (ing_load_state)
+                        ING_Q: ing_load_state <= ING_K;
+                        ING_K: ing_load_state <= ING_V;
+                        ING_V: begin
+                            ing_load_state  <= ING_READY;
+                            head_data_ready <= 1'b1;
+                        end
+                        default: ;
+                    endcase
+                end else begin
+                    ing_beat_cnt <= ing_beat_cnt + 1'b1;
+                end
+            end
+        end
+    end
+
+    // ------------------------------------------------------------------------
+    // 5. STAGE 1: SYSTOLIC MAC ARRAY & HARDWARE GEMM ENGINE
+    //    Computes Attention Scores S[i, j] = Q[i, :] * K[j, :]^T for all j in [0..N-1].
+    // ------------------------------------------------------------------------
     logic signed [7:0] act_row_wire [0:ARRAY_SIZE-1];
     logic signed [7:0] wt_col0_wire [0:ARRAY_SIZE-1];
     logic signed [7:0] wt_col1_wire [0:ARRAY_SIZE-1];
@@ -237,101 +306,66 @@ module attention_core_top #(
     assign wt_col1_wire[2] = rdata_v_vec[23:16];
     assign wt_col1_wire[3] = rdata_v_vec[31:24];
 
-    // ------------------------------------------------------------------------
-    // ON-CHIP Q, K, V TILE BUFFERS (Preloaded with Head 0 in Simulation)
-    // ------------------------------------------------------------------------
-    logic signed [7:0] q_matrix_ram [0:MAX_TOKENS-1][0:MAX_HEAD_DIM-1];
-    logic signed [7:0] k_matrix_ram [0:MAX_TOKENS-1][0:MAX_HEAD_DIM-1];
-    logic signed [7:0] v_matrix_ram [0:MAX_TOKENS-1][0:MAX_HEAD_DIM-1];
+    // Systolic MAC Array Core Instantiation (Zero floating ports)
+    logic               systolic_drain_start;
+    logic               systolic_drain_done;
+    logic               systolic_out_valid;
+    logic signed [31:0] systolic_stream;
+    logic signed [31:0] dot_product_out [0:ARRAY_SIZE-1];
 
-    logic signed [7:0] q_raw_init [0:(MAX_TOKENS * 16)-1];
-    logic signed [7:0] k_raw_init [0:(MAX_TOKENS * 16)-1];
-    logic signed [7:0] v_raw_init [0:(MAX_TOKENS * 16)-1];
-
-    initial begin
-        $readmemh("q_matrix.hex", q_raw_init);
-        $readmemh("k_matrix.hex", k_raw_init);
-        $readmemh("v_matrix.hex", v_raw_init);
-        for (int t = 0; t < MAX_TOKENS; t++) begin
-            for (int d = 0; d < MAX_HEAD_DIM; d++) begin
-                if (d < 16) begin
-                    q_matrix_ram[t][d] = q_raw_init[t * 16 + d];
-                    k_matrix_ram[t][d] = k_raw_init[t * 16 + d];
-                    v_matrix_ram[t][d] = v_raw_init[t * 16 + d];
-                end else begin
-                    q_matrix_ram[t][d] = 8'sd0;
-                    k_matrix_ram[t][d] = 8'sd0;
-                    v_matrix_ram[t][d] = 8'sd0;
-                end
-            end
-        end
-        $display("[CORE TOP]: Initialized Q, K, V RAM. Sample: Q[0][0]=%0d, K[0][0]=%0d, V[0][0]=%0d",
-                 q_matrix_ram[0][0], k_matrix_ram[0][0], v_matrix_ram[0][0]);
-    end
-
-    // Stage 1 GEMM Engine (Q * K^T Dot-Product Generator for Attention Head)
-    logic [8:0]         k_step_cnt;
-    logic signed [31:0] stage1_score_wire;
-    logic signed [31:0] stage1_score_reg;
-    logic               stage1_valid_reg;
-
-    always_comb begin
-        stage1_score_wire = '0;
-        for (int d = 0; d < 16; d++) begin
-            stage1_score_wire = stage1_score_wire + 32'($signed(q_matrix_ram[0][d]) * $signed(k_matrix_ram[k_step_cnt][d]));
-        end
-    end
-
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            k_step_cnt       <= '0;
-            stage1_score_reg <= '0;
-            stage1_valid_reg <= 1'b0;
-        end else begin
-            if (mha_state == MHA_LOAD_HEAD) begin
-                k_step_cnt       <= '0;
-                stage1_valid_reg <= 1'b0;
-            end else if (mha_state == MHA_RUN_ATTN && k_step_cnt < reg_seq_len[8:0]) begin
-                stage1_score_reg <= stage1_score_wire;
-                stage1_valid_reg <= 1'b1;
-                k_step_cnt       <= k_step_cnt + 1'b1;
-                if (k_step_cnt < 4) begin
-                    $display("[STAGE1 GEMM k=%0d]: score=%0d", k_step_cnt, stage1_score_wire);
-                end
-            end else begin
-                stage1_valid_reg <= 1'b0;
-            end
-        end
-    end
-
-    // 4. Compute Engine: 2D Output-Stationary Systolic MAC Array
     systolic_mac_array #(
         .ARRAY_SIZE (ARRAY_SIZE),
         .IN_WIDTH   (8),
         .ACC_WIDTH  (32)
     ) u_systolic_mac_array (
-        .clk             (clk),
-        .rst_n           (rst_n),
-        .gemm_start      (start_pulse),
-        .clr_acc         (clear_buf_pulse),
-        .in_valid        (skid_tvalid),
-        .mode_sel        (1'b0),
-        .act_row         (act_row_wire),
-        .wt_col0         (wt_col0_wire),
-        .wt_col1         (wt_col1_wire),
-        .out_valid       (systolic_out_valid),
-        .dot_product_out (dot_product_out)
+        .clk                (clk),
+        .rst_n              (rst_n),
+        .gemm_start         (start_pulse),
+        .clr_acc            (clear_buf_pulse),
+        .in_valid           (bram_read_en),
+        .mode_sel           (1'b0),
+        .act_row            (act_row_wire),
+        .wt_col0            (wt_col0_wire),
+        .wt_col1            (wt_col1_wire),
+        .drain_start        (systolic_drain_start),
+        .drain_done         (systolic_drain_done),
+        .out_valid          (systolic_out_valid),
+        .dot_product_stream (systolic_stream),
+        .dot_product_out    (dot_product_out)
     );
 
-    // 5. Dyadic Scaler Unit ((in_score * M) >>> E)
+    // High-Throughput Stage 1 Dot-Product Stream Engine (1 score per cycle)
+    logic signed [31:0] stage1_score;
+    logic               stage1_valid;
+    logic [8:0]         q_row_idx;
+    logic [8:0]         k_col_idx;
+    logic signed [7:0]  q_curr_vec [0:MAX_HEAD_DIM-1];
+    logic               row_start_pulse;
+
+    // Compute Q[i, :] * K[j, :] across all valid dimensions
+    always_comb begin
+        stage1_score = '0;
+        for (int d = 0; d < MAX_HEAD_DIM; d++) begin
+            if (d < reg_head_dim) begin
+                stage1_score = stage1_score + (32'($signed(q_curr_vec[d])) * 32'($signed(k_mem[k_col_idx][d])));
+            end
+        end
+    end
+
+    // ------------------------------------------------------------------------
+    // 6. STAGE 2: DYADIC SCALER UNIT ((in_score * M) >>> E)
+    // ------------------------------------------------------------------------
+    logic signed [15:0] scaled_score_out;
+    logic               scaler_out_valid;
+
     scale_unit #(
         .IN_WIDTH  (32),
         .OUT_WIDTH (16)
     ) u_scale_unit (
         .clk          (clk),
         .rst_n        (rst_n),
-        .in_valid     (stage1_valid_reg),
-        .in_score     (stage1_score_reg),
+        .in_valid     (stage1_valid),
+        .in_score     (stage1_score),
         .scale_m      (reg_scale_m),
         .scale_e      (reg_scale_e),
         .shift_val    (reg_shift_val),
@@ -339,116 +373,205 @@ module attention_core_top #(
         .scaled_score (scaled_score_out)
     );
 
-    // 6. Hardware Softmax Engine (256 Tokens)
+    // ------------------------------------------------------------------------
+    // 7. STAGE 3: RECONFIGURABLE HARDWARE SOFTMAX (Step 2.5 Reloadable LUT)
+    // ------------------------------------------------------------------------
+    logic [15:0] softmax_prob_out;
+    logic        softmax_out_valid;
+    logic        softmax_busy;
+
     softmax_lut #(
-        .N_TOKENS  (MAX_TOKENS),
-        .IN_WIDTH  (16),
-        .OUT_WIDTH (8)
+        .N_TOKENS       (MAX_TOKENS),
+        .IN_WIDTH       (16),
+        .OUT_WIDTH      (16),
+        .ROM_DEPTH      (1024),
+        .ROM_DATA_WIDTH (20),
+        .ACC_WIDTH      (32),
+        .INIT_HEX_FILE  ("exp_rom_all_stages.hex")
     ) u_softmax_engine (
         .clk        (clk),
         .rst_n      (rst_n),
-        .start_row  (scaler_out_valid),
+        .start_row  (row_start_pulse),
         .in_valid   (scaler_out_valid),
         .in_score   (scaled_score_out),
         .out_valid  (softmax_out_valid),
         .out_prob   (softmax_prob_out),
-        .busy       (softmax_busy)
+        .busy       (softmax_busy),
+        .head_dim   (reg_head_dim[15:0]),
+        .cfg_we     (cfg_lut_we),
+        .cfg_addr   (cfg_lut_addr),
+        .cfg_wdata  (cfg_lut_wdata)
     );
 
     // ------------------------------------------------------------------------
-    // 7. STAGE 4: Score x V Context Aggregation Engine (Context Out = Softmax * V)
+    // 8. STAGE 4: SCORE x V CONTEXT AGGREGATION GEMM ENGINE
     // ------------------------------------------------------------------------
-    logic [63:0] context_axis_tdata;
-    logic        context_axis_tvalid;
-    logic        context_axis_tlast;
-    logic signed [7:0] v_vec_stage4 [0:MAX_HEAD_DIM-1];
+    logic [63:0]       context_axis_tdata;
+    logic              context_axis_tvalid;
+    logic              context_axis_tlast;
+    logic [8:0]        score_v_token_cnt;
+    logic              score_v_row_done;
+    logic signed [7:0] v_vec_active [0:MAX_HEAD_DIM-1];
+    logic [8:0]        v_tok_rd_idx;
 
-    // Real-time V vector alignment for token k = out_token_cnt
+    // Track token index for streaming probabilities
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            v_tok_rd_idx <= '0;
+        end else if (row_start_pulse) begin
+            v_tok_rd_idx <= '0;
+        end else if (softmax_out_valid) begin
+            if (v_tok_rd_idx == reg_seq_len - 1)
+                v_tok_rd_idx <= '0;
+            else
+                v_tok_rd_idx <= v_tok_rd_idx + 1'b1;
+        end
+    end
+
+    // Direct alignment of V[k, :] vector
     always_comb begin
         for (int d = 0; d < MAX_HEAD_DIM; d++) begin
-            v_vec_stage4[d] = v_matrix_ram[out_token_cnt][d];
+            v_vec_active[d] = v_mem[v_tok_rd_idx][d];
         end
     end
 
     score_v_gemm #(
         .MAX_TOKENS   (MAX_TOKENS),
-        .MAX_HEAD_DIM (MAX_HEAD_DIM)
+        .MAX_HEAD_DIM (MAX_HEAD_DIM),
+        .PROB_WIDTH   (16)
     ) u_score_v_gemm (
         .clk           (clk),
         .rst_n         (rst_n),
-        .start_row     (scaler_out_valid),
+        .start_row     (row_start_pulse),
         .prob_valid    (softmax_out_valid),
         .prob_data     (softmax_prob_out),
-        .prob_last     (out_token_cnt >= (reg_seq_len - 1)),
-        .v_vec         (v_vec_stage4),
+        .prob_last     (softmax_out_valid && (v_tok_rd_idx == reg_seq_len - 1)),
+        .v_vec         (v_vec_active),
         .head_dim      (reg_head_dim[15:0]),
         .m_axis_tvalid (context_axis_tvalid),
         .m_axis_tdata  (context_axis_tdata),
         .m_axis_tlast  (context_axis_tlast),
-        .m_axis_tready (m_axis_tready)
+        .m_axis_tready (m_axis_tready),
+        .row_token_cnt (score_v_token_cnt),
+        .row_done      (score_v_row_done)
     );
 
     // ------------------------------------------------------------------------
-    // 8. SEQUENTIAL HEADS PROCESSING LOOP CONTROL FSM
+    // 9. SEQUENTIAL HEADS & DATAFLOW MASTER CONTROL FSM
+    //    Controls multi-row processing (0..255) and sequential heads (H=4).
     // ------------------------------------------------------------------------
+    typedef enum logic [3:0] {
+        MHA_IDLE       = 4'b0000,
+        MHA_WAIT_DATA  = 4'b0001,
+        MHA_ROW_START  = 4'b0010,
+        MHA_ROW_PREP   = 4'b0011,
+        MHA_ROW_GEMM_K = 4'b0100,
+        MHA_ROW_WAIT   = 4'b0101,
+        MHA_ROW_NEXT   = 4'b0110,
+        MHA_HEAD_NEXT  = 4'b0111,
+        MHA_DONE       = 4'b1000
+    } mha_state_t;
+
+    mha_state_t mha_state;
+
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            mha_state      <= MHA_IDLE;
-            head_cnt       <= '0;
-            out_token_cnt  <= '0;
-            bram_read_en   <= 1'b0;
-            tile_read_done <= 1'b0;
-            raddr_q        <= '0;
-            raddr_k        <= '0;
-            raddr_v        <= '0;
+            mha_state            <= MHA_IDLE;
+            head_cnt             <= '0;
+            q_row_idx            <= '0;
+            k_col_idx            <= '0;
+            stage1_valid         <= 1'b0;
+            row_start_pulse      <= 1'b0;
+            bram_read_en         <= 1'b0;
+            tile_read_done       <= 1'b0;
+            systolic_drain_start <= 1'b0;
+            raddr_q              <= '0;
+            raddr_k              <= '0;
+            raddr_v              <= '0;
+            for (int d = 0; d < MAX_HEAD_DIM; d++) q_curr_vec[d] <= 8'sd0;
         end else begin
-            tile_read_done <= 1'b0;
+            row_start_pulse      <= 1'b0;
+            tile_read_done       <= 1'b0;
+            systolic_drain_start <= 1'b0;
 
             case (mha_state)
                 MHA_IDLE: begin
-                    head_cnt      <= '0;
-                    out_token_cnt <= '0;
+                    head_cnt     <= '0;
+                    q_row_idx    <= '0;
+                    k_col_idx    <= '0;
+                    stage1_valid <= 1'b0;
+                    bram_read_en <= 1'b0;
                     if (start_pulse) begin
-                        mha_state <= MHA_LOAD_HEAD;
+                        mha_state <= MHA_WAIT_DATA;
                     end
                 end
 
-                MHA_LOAD_HEAD: begin
-                    // Set up BRAM read pointers for current head
-                    bram_read_en <= 1'b1;
-                    mha_state    <= MHA_RUN_ATTN;
-                end
-
-                MHA_RUN_ATTN: begin
-                    // Attention compute running through systolic + scale + softmax + score_v
-                    if (softmax_out_valid) begin
-                        out_token_cnt <= out_token_cnt + 1'b1;
-                        if (out_token_cnt >= (reg_seq_len - 1)) begin
-                            mha_state <= MHA_WAIT_EGRESS;
-                        end
+                MHA_WAIT_DATA: begin
+                    // Wait until active head Q, K, V are loaded in on-chip memory
+                    if (head_data_ready) begin
+                        bram_read_en <= 1'b1;
+                        q_row_idx    <= '0;
+                        mha_state    <= MHA_ROW_START;
                     end
                 end
 
-                MHA_WAIT_EGRESS: begin
-                    if (context_axis_tlast && context_axis_tvalid) begin
-                        bram_read_en   <= 1'b0;
-                        tile_read_done <= 1'b1;
-                        mha_state      <= MHA_NEXT_HEAD;
+                MHA_ROW_START: begin
+                    // Latch active Q row vector from on-chip memory
+                    for (int d = 0; d < MAX_HEAD_DIM; d++) begin
+                        q_curr_vec[d] <= q_mem[q_row_idx][d];
+                    end
+                    mha_state <= MHA_ROW_PREP;
+                end
+
+                MHA_ROW_PREP: begin
+                    // q_curr_vec is now valid; trigger row start pulse and begin streaming keys
+                    row_start_pulse <= 1'b1;
+                    k_col_idx       <= '0;
+                    stage1_valid    <= 1'b1;
+                    mha_state       <= MHA_ROW_GEMM_K;
+                end
+
+                MHA_ROW_GEMM_K: begin
+                    if (k_col_idx == reg_seq_len - 1) begin
+                        k_col_idx    <= '0;
+                        stage1_valid <= 1'b0;
+                        mha_state    <= MHA_ROW_WAIT;
+                    end else begin
+                        k_col_idx <= k_col_idx + 1'b1;
                     end
                 end
 
-                MHA_NEXT_HEAD: begin
-                    out_token_cnt <= '0;
+                MHA_ROW_WAIT: begin
+                    stage1_valid <= 1'b0;
+                    // Wait for score_v_gemm to finish outputting row context
+                    if (score_v_row_done) begin
+                        mha_state <= MHA_ROW_NEXT;
+                    end
+                end
+
+                MHA_ROW_NEXT: begin
+                    if (q_row_idx == reg_seq_len - 1) begin
+                        q_row_idx <= '0;
+                        mha_state <= MHA_HEAD_NEXT;
+                    end else begin
+                        q_row_idx <= q_row_idx + 1'b1;
+                        mha_state <= MHA_ROW_START;
+                    end
+                end
+
+                MHA_HEAD_NEXT: begin
+                    tile_read_done <= 1'b1;
                     if (head_cnt + 1'b1 < reg_num_heads[3:0]) begin
                         head_cnt  <= head_cnt + 1'b1;
-                        mha_state <= MHA_LOAD_HEAD;
+                        mha_state <= MHA_WAIT_DATA;
                     end else begin
                         mha_state <= MHA_DONE;
                     end
                 end
 
                 MHA_DONE: begin
-                    mha_state <= MHA_IDLE;
+                    bram_read_en <= 1'b0;
+                    mha_state    <= MHA_IDLE;
                 end
 
                 default: mha_state <= MHA_IDLE;
@@ -457,7 +580,7 @@ module attention_core_top #(
     end
 
     // ------------------------------------------------------------------------
-    // 9. EGRESS STREAMING & STATUS OUTPUT LOGIC
+    // 10. AXI-STREAM EGRESS & STATUS WIRES
     // ------------------------------------------------------------------------
     assign m_axis_tdata  = context_axis_tdata;
     assign m_axis_tkeep  = 8'hFF;

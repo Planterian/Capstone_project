@@ -4,7 +4,7 @@
 // Description:  Bit-Exact Verification Testbench for softmax_lut (rtl_ver02)
 //               against PyTorch I-ViT Golden Vectors:
 //               Input:  golden_scaled_score.hex (256 rows x 256 INT16 elements)
-//               Golden: golden_softmax_prob.hex (256 rows x 256 UINT8 elements)
+//               Golden: golden_softmax_prob.hex (256 rows x 256 UINT16 elements)
 // ============================================================================
 
 module tb_golden_softmax_lut;
@@ -20,24 +20,26 @@ module tb_golden_softmax_lut;
     logic signed [15:0]        in_score;
 
     logic                      out_valid;
-    logic [7:0]                out_prob;
+    logic [15:0]               out_prob;
     logic                      busy;
 
     // Golden Vector Memories
     logic signed [15:0]        gold_scaled_mem [0:(NUM_TEST_ROWS * N_TOKENS)-1];
-    logic [7:0]                gold_prob_mem   [0:(NUM_TEST_ROWS * N_TOKENS)-1];
+    logic [15:0]               gold_prob_mem   [0:(NUM_TEST_ROWS * N_TOKENS)-1];
 
     int pass_count  = 0;
     int error_count = 0;
     int egress_idx  = 0;
 
-    // DUT Instantiation
+    // DUT Instantiation (Step 2.5 Reconfigurable Multi-Stage BRAM)
     softmax_lut #(
-        .N_TOKENS(N_TOKENS),
-        .IN_WIDTH(16),
-        .OUT_WIDTH(8),
-        .ROM_DEPTH(256),
-        .ACC_WIDTH(32)
+        .N_TOKENS       (N_TOKENS),
+        .IN_WIDTH       (16),
+        .OUT_WIDTH      (16),
+        .ROM_DEPTH      (1024),
+        .ROM_DATA_WIDTH (20),
+        .ACC_WIDTH      (32),
+        .INIT_HEX_FILE  ("exp_rom_all_stages.hex")
     ) u_dut (
         .clk       (clk),
         .rst_n     (rst_n),
@@ -46,7 +48,11 @@ module tb_golden_softmax_lut;
         .in_score  (in_score),
         .out_valid (out_valid),
         .out_prob  (out_prob),
-        .busy      (busy)
+        .busy      (busy),
+        .head_dim  (16'd16),    // Stage 2 (dk=16) partition offset 0x000
+        .cfg_we    (1'b0),
+        .cfg_addr  (10'd0),
+        .cfg_wdata (20'd0)
     );
 
     // 200 MHz Clock Generator
@@ -58,12 +64,12 @@ module tb_golden_softmax_lut;
     // Monitor Output Egress Probabilities
     always @(posedge clk) begin
         if (out_valid) begin
-            logic [7:0] exp_prob;
+            logic [15:0] exp_prob;
             int diff;
             exp_prob = gold_prob_mem[egress_idx];
             diff = (out_prob >= exp_prob) ? (out_prob - exp_prob) : (exp_prob - out_prob);
 
-            if (diff <= 1) begin
+            if (diff == 0) begin
                 pass_count++;
             end else begin
                 error_count++;
@@ -73,8 +79,8 @@ module tb_golden_softmax_lut;
                 end
             end
 
-            if (egress_idx < 8 || egress_idx % 256 == 0) begin
-                $display("[ROW %0d TOKEN %03d]: DUT Prob = %0d/255 | Golden = %0d/255 (Diff = %0d)", 
+            if (egress_idx < 16 || egress_idx % 256 == 0) begin
+                $display("[ROW %0d TOKEN %03d]: DUT Prob = %0d/32768 | Golden = %0d/32768 (Diff = %0d)", 
                          egress_idx / 256, egress_idx % 256, out_prob, exp_prob, diff);
             end
 
@@ -134,10 +140,10 @@ module tb_golden_softmax_lut;
         $display("   FINAL VERIFICATION REPORT: SOFTMAX_LUT vs GOLDEN MODEL");
         $display("=======================================================================");
         $display("   Total Softmax Tokens Tested : %0d", egress_idx);
-        $display("   Matched Tokens (<= 1 LSB)   : %0d", pass_count);
-        $display("   Mismatched Tokens (> 1 LSB) : %0d", error_count);
+        $display("   Matched Tokens (0 LSB Error) : %0d", pass_count);
+        $display("   Mismatched Tokens (> 0 LSB) : %0d", error_count);
         if (error_count == 0 && egress_idx == NUM_TEST_ROWS * N_TOKENS) begin
-            $display("   >>> STATUS: 100%% BIT-EXACT MATCH (<= 1 LSB Tolerance)! [PASS] <<<");
+            $display("   >>> STATUS: 100%% BIT-EXACT MATCH (Zero Error)! [PASS] <<<");
         end else begin
             $display("   >>> STATUS: SOFTMAX VERIFICATION FAILED! [FAIL] <<<");
         end

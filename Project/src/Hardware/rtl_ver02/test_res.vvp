@@ -1,0 +1,163 @@
+#! /c/Source/iverilog-install/bin/vvp
+:ivl_version "12.0 (devel)" "(s20150603-1110-g18392a46)";
+:ivl_delay_selection "TYPICAL";
+:vpi_time_precision - 12;
+:vpi_module "C:\iverilog\lib\ivl\system.vpi";
+:vpi_module "C:\iverilog\lib\ivl\vhdl_sys.vpi";
+:vpi_module "C:\iverilog\lib\ivl\vhdl_textio.vpi";
+:vpi_module "C:\iverilog\lib\ivl\v2005_math.vpi";
+:vpi_module "C:\iverilog\lib\ivl\va_math.vpi";
+:vpi_module "C:\iverilog\lib\ivl\v2009.vpi";
+S_000002332c54bce0 .scope package, "$unit" "$unit" 2 1;
+ .timescale 0 0;
+S_000002332c562b50 .scope module, "requant_residual_add" "requant_residual_add" 3 10;
+ .timescale -9 -12;
+    .port_info 0 /INPUT 1 "clk";
+    .port_info 1 /INPUT 1 "rst_n";
+    .port_info 2 /INPUT 1 "in_valid";
+    .port_info 3 /INPUT 8 "i_f_data";
+    .port_info 4 /INPUT 8 "i_x_data";
+    .port_info 5 /INPUT 16 "m_f";
+    .port_info 6 /INPUT 5 "e_f";
+    .port_info 7 /INPUT 16 "m_x";
+    .port_info 8 /INPUT 5 "e_x";
+    .port_info 9 /OUTPUT 1 "out_valid";
+    .port_info 10 /OUTPUT 8 "res_out";
+v000002332c563290_0 .var/s "clamped_out", 7 0;
+o000002332c59cfe8 .functor BUFZ 1, C4<z>; HiZ drive
+v000002332c54bf30_0 .net "clk", 0 0, o000002332c59cfe8;  0 drivers
+o000002332c59d018 .functor BUFZ 5, C4<zzzzz>; HiZ drive
+v000002332c562ce0_0 .net "e_f", 4 0, o000002332c59d018;  0 drivers
+o000002332c59d048 .functor BUFZ 5, C4<zzzzz>; HiZ drive
+v000002332c562d80_0 .net "e_x", 4 0, o000002332c59d048;  0 drivers
+o000002332c59d078 .functor BUFZ 8, C4<zzzzzzzz>; HiZ drive
+v000002332c562e20_0 .net/s "i_f_data", 7 0, o000002332c59d078;  0 drivers
+o000002332c59d0a8 .functor BUFZ 8, C4<zzzzzzzz>; HiZ drive
+v000002332c562ec0_0 .net/s "i_x_data", 7 0, o000002332c59d0a8;  0 drivers
+o000002332c59d0d8 .functor BUFZ 1, C4<z>; HiZ drive
+v000002332c562f60_0 .net "in_valid", 0 0, o000002332c59d0d8;  0 drivers
+o000002332c59d108 .functor BUFZ 16, C4<zzzzzzzzzzzzzzzz>; HiZ drive
+v000002332c593bd0_0 .net/s "m_f", 15 0, o000002332c59d108;  0 drivers
+o000002332c59d138 .functor BUFZ 16, C4<zzzzzzzzzzzzzzzz>; HiZ drive
+v000002332c593c70_0 .net/s "m_x", 15 0, o000002332c59d138;  0 drivers
+v000002332c593d10_0 .net "out_valid", 0 0, L_000002332c5e3e60;  1 drivers
+v000002332c593db0_0 .var/s "prod_f", 23 0;
+v000002332c593e50_0 .var/s "prod_x", 23 0;
+v000002332c5e3d20_0 .var/s "res_out", 7 0;
+o000002332c59d228 .functor BUFZ 1, C4<z>; HiZ drive
+v000002332c5e4a40_0 .net "rst_n", 0 0, o000002332c59d228;  0 drivers
+v000002332c5e3f00_0 .var/s "sum_full", 24 0;
+v000002332c5e3dc0_0 .var "valid_pipe", 2 0;
+E_000002332c549e70/0 .event negedge, v000002332c5e4a40_0;
+E_000002332c549e70/1 .event posedge, v000002332c54bf30_0;
+E_000002332c549e70 .event/or E_000002332c549e70/0, E_000002332c549e70/1;
+E_000002332c549d30 .event anyedge, v000002332c5e3f00_0;
+L_000002332c5e3e60 .part v000002332c5e3dc0_0, 2, 1;
+    .scope S_000002332c562b50;
+T_0 ;
+    %wait E_000002332c549e70;
+    %load/vec4 v000002332c5e4a40_0;
+    %nor/r;
+    %flag_set/vec4 8;
+    %jmp/0xz  T_0.0, 8;
+    %pushi/vec4 0, 0, 24;
+    %assign/vec4 v000002332c593db0_0, 0;
+    %pushi/vec4 0, 0, 24;
+    %assign/vec4 v000002332c593e50_0, 0;
+    %jmp T_0.1;
+T_0.0 ;
+    %load/vec4 v000002332c562e20_0;
+    %pad/s 24;
+    %load/vec4 v000002332c593bd0_0;
+    %pad/s 24;
+    %mul;
+    %assign/vec4 v000002332c593db0_0, 0;
+    %load/vec4 v000002332c562ec0_0;
+    %pad/s 24;
+    %load/vec4 v000002332c593c70_0;
+    %pad/s 24;
+    %mul;
+    %assign/vec4 v000002332c593e50_0, 0;
+T_0.1 ;
+    %jmp T_0;
+    .thread T_0;
+    .scope S_000002332c562b50;
+T_1 ;
+    %wait E_000002332c549e70;
+    %load/vec4 v000002332c5e4a40_0;
+    %nor/r;
+    %flag_set/vec4 8;
+    %jmp/0xz  T_1.0, 8;
+    %pushi/vec4 0, 0, 25;
+    %assign/vec4 v000002332c5e3f00_0, 0;
+    %jmp T_1.1;
+T_1.0 ;
+    %load/vec4 v000002332c593db0_0;
+    %pad/s 25;
+    %ix/getv 4, v000002332c562ce0_0;
+    %shiftr/s 4;
+    %load/vec4 v000002332c593e50_0;
+    %pad/s 25;
+    %ix/getv 4, v000002332c562d80_0;
+    %shiftr/s 4;
+    %add;
+    %assign/vec4 v000002332c5e3f00_0, 0;
+T_1.1 ;
+    %jmp T_1;
+    .thread T_1;
+    .scope S_000002332c562b50;
+T_2 ;
+Ewait_0 .event/or E_000002332c549d30, E_0x0;
+    %wait Ewait_0;
+    %load/vec4 v000002332c5e3f00_0;
+    %cmpi/s 127, 0, 25;
+    %flag_or 5, 4; GT is !LE
+    %flag_inv 5;
+    %jmp/0xz  T_2.0, 5;
+    %pushi/vec4 127, 0, 8;
+    %store/vec4 v000002332c563290_0, 0, 8;
+    %jmp T_2.1;
+T_2.0 ;
+    %load/vec4 v000002332c5e3f00_0;
+    %cmpi/s 33554304, 0, 25;
+    %jmp/0xz  T_2.2, 5;
+    %pushi/vec4 128, 0, 8;
+    %store/vec4 v000002332c563290_0, 0, 8;
+    %jmp T_2.3;
+T_2.2 ;
+    %load/vec4 v000002332c5e3f00_0;
+    %pad/s 8;
+    %store/vec4 v000002332c563290_0, 0, 8;
+T_2.3 ;
+T_2.1 ;
+    %jmp T_2;
+    .thread T_2, $push;
+    .scope S_000002332c562b50;
+T_3 ;
+    %wait E_000002332c549e70;
+    %load/vec4 v000002332c5e4a40_0;
+    %nor/r;
+    %flag_set/vec4 8;
+    %jmp/0xz  T_3.0, 8;
+    %pushi/vec4 0, 0, 3;
+    %assign/vec4 v000002332c5e3dc0_0, 0;
+    %pushi/vec4 0, 0, 8;
+    %assign/vec4 v000002332c5e3d20_0, 0;
+    %jmp T_3.1;
+T_3.0 ;
+    %load/vec4 v000002332c5e3dc0_0;
+    %parti/s 2, 0, 2;
+    %load/vec4 v000002332c562f60_0;
+    %concat/vec4; draw_concat_vec4
+    %assign/vec4 v000002332c5e3dc0_0, 0;
+    %load/vec4 v000002332c563290_0;
+    %assign/vec4 v000002332c5e3d20_0, 0;
+T_3.1 ;
+    %jmp T_3;
+    .thread T_3;
+# The file index is used to find the file name in the following table.
+:file_names 4;
+    "N/A";
+    "<interactive>";
+    "-";
+    "requant_residual_add.sv";

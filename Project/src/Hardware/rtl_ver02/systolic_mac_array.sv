@@ -24,7 +24,10 @@ module systolic_mac_array #(
     input  logic signed [IN_WIDTH-1:0]  wt_col0 [0:ARRAY_SIZE-1],
     input  logic signed [IN_WIDTH-1:0]  wt_col1 [0:ARRAY_SIZE-1],
 
+    input  logic                        drain_start,
+    output logic                        drain_done,
     output logic                        out_valid,
+    output logic signed [ACC_WIDTH-1:0] dot_product_stream,
     output logic signed [ACC_WIDTH-1:0] dot_product_out [0:ARRAY_SIZE-1]
 );
 
@@ -36,7 +39,10 @@ module systolic_mac_array #(
     // Wavefront valid propagation
     localparam int WAVE_LEN = 2 * ARRAY_SIZE + 4;
     logic [WAVE_LEN-1:0]         valid_wave;
-    logic signed [ACC_WIDTH-1:0] pe_acc_matrix [0:ARRAY_SIZE-1][0:ARRAY_SIZE-1];
+
+    // FL-03 FIX: Separate 32-bit accumulators for Column 0 (even) and Column 1 (odd)
+    logic signed [ACC_WIDTH-1:0] pe_acc_col0 [0:ARRAY_SIZE-1][0:ARRAY_SIZE-1];
+    logic signed [ACC_WIDTH-1:0] pe_acc_col1 [0:ARRAY_SIZE-1][0:ARRAY_SIZE-1];
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -99,14 +105,17 @@ module systolic_mac_array #(
                     .result_ac  (pe_prod_ac)
                 );
 
-                // 32-bit Accumulator per PE
+                // FL-03 FIX: Independent accumulation per PE - No cross-column crosstalk
                 always_ff @(posedge clk or negedge rst_n) begin
                     if (!rst_n) begin
-                        pe_acc_matrix[r][c] <= '0;
+                        pe_acc_col0[r][c] <= '0;
+                        pe_acc_col1[r][c] <= '0;
                     end else if (clr_acc) begin
-                        pe_acc_matrix[r][c] <= '0;
+                        pe_acc_col0[r][c] <= '0;
+                        pe_acc_col1[r][c] <= '0;
                     end else if (pe_out_valid) begin
-                        pe_acc_matrix[r][c] <= pe_acc_matrix[r][c] + 32'(pe_prod_ab) + 32'(pe_prod_ac);
+                        pe_acc_col0[r][c] <= pe_acc_col0[r][c] + 32'($signed(pe_prod_ab)); // Col 2c
+                        pe_acc_col1[r][c] <= pe_acc_col1[r][c] + 32'($signed(pe_prod_ac)); // Col 2c + 1
                     end
                 end
 
@@ -114,35 +123,74 @@ module systolic_mac_array #(
         end
     endgenerate
 
-    // Pipelined Row Reduction Tree - Full 32-Bit Precision Preserved
+    // ------------------------------------------------------------------------
+    // FL-04 FIX: Drain / Unload Shift-Out Logic
+    // Replaces horizontal pipelined_adder_tree with true sequential tile drain.
+    // Drains 2 * ARRAY_SIZE * ARRAY_SIZE dot product items to scale_unit.
+    // ------------------------------------------------------------------------
+    localparam int TOTAL_DRAIN_ITEMS = 2 * ARRAY_SIZE * ARRAY_SIZE;
+
+    typedef enum logic [1:0] {
+        DRAIN_IDLE = 2'b00,
+        DRAIN_RUN  = 2'b01,
+        DRAIN_LAST = 2'b10
+    } drain_state_t;
+
+    drain_state_t drain_state;
+    logic [5:0]   drain_item_cnt;
+    logic [3:0]   drain_r, drain_c;
+    logic         drain_subcol; // 0: col0, 1: col1
+
+    assign drain_r      = drain_item_cnt / (2 * ARRAY_SIZE);
+    assign drain_c      = (drain_item_cnt % (2 * ARRAY_SIZE)) / 2;
+    assign drain_subcol = drain_item_cnt % 2;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            drain_state        <= DRAIN_IDLE;
+            drain_item_cnt     <= '0;
+            out_valid          <= 1'b0;
+            drain_done         <= 1'b0;
+            dot_product_stream <= '0;
+        end else begin
+            drain_done <= 1'b0;
+
+            case (drain_state)
+                DRAIN_IDLE: begin
+                    out_valid      <= 1'b0;
+                    drain_item_cnt <= '0;
+                    if (drain_start) begin
+                        drain_state <= DRAIN_RUN;
+                    end
+                end
+
+                DRAIN_RUN: begin
+                    out_valid <= 1'b1;
+                    if (!drain_subcol) begin
+                        dot_product_stream <= pe_acc_col0[drain_r][drain_c];
+                    end else begin
+                        dot_product_stream <= pe_acc_col1[drain_r][drain_c];
+                    end
+
+                    if (drain_item_cnt == TOTAL_DRAIN_ITEMS - 1) begin
+                        drain_item_cnt <= '0;
+                        drain_done     <= 1'b1;
+                        drain_state    <= DRAIN_IDLE;
+                    end else begin
+                        drain_item_cnt <= drain_item_cnt + 1'b1;
+                    end
+                end
+
+                default: drain_state <= DRAIN_IDLE;
+            endcase
+        end
+    end
+
+    // Parallel row export for backwards compatibility
     generate
-        for (r = 0; r < ARRAY_SIZE; r++) begin : gen_adder_tree_row
-            logic signed [ACC_WIDTH-1:0] tree_in_a [0:ARRAY_SIZE-1];
-            logic signed [ACC_WIDTH-1:0] tree_dummy_b [0:ARRAY_SIZE-1];
-
-            for (c = 0; c < ARRAY_SIZE; c++) begin : gen_tree_assign
-                // Bit Correction: Keep full 32-bit accumulator without any truncation
-                assign tree_in_a[c]    = pe_acc_matrix[r][c];
-                assign tree_dummy_b[c] = '0;
-            end
-
-            pipelined_adder_tree #(
-                .N          (ARRAY_SIZE),
-                .IN_WIDTH   (ACC_WIDTH),
-                .OUT_WIDTH  (ACC_WIDTH),
-                .HAS_MULT   (1'b0)
-            ) u_adder_tree (
-                .clk         (clk),
-                .rst_n       (rst_n),
-                .in_valid    (valid_wave[ARRAY_SIZE + 2]),
-                .a           (tree_in_a),
-                .b           (tree_dummy_b),
-                .out_valid   (),
-                .dot_product (dot_product_out[r])
-            );
+        for (r = 0; r < ARRAY_SIZE; r++) begin : gen_row_out
+            assign dot_product_out[r] = (r == 0) ? dot_product_stream : pe_acc_col0[r][0];
         end
     endgenerate
-
-    assign out_valid = valid_wave[WAVE_LEN-1];
 
 endmodule

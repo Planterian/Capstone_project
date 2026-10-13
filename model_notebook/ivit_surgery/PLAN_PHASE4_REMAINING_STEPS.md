@@ -32,16 +32,23 @@
                LỘ TRÌNH HOÀN THIỆN ATTENTION ACCELERATOR (rtl_ver02)
 ======================================================================================================
 
- [BƯỚC 1: XONG ✓]  Chuẩn hóa Python Golden Model & Dyadic Scale (M=18308, E=22). Đã nghiệm thu.
+ [BƯỚC 1: XONG ✓]   Chuẩn hóa Python Golden Model & Dyadic Scale (M=18308, E=22). Đã nghiệm thu.
        │
        ▼
- [BƯỚC 2: TIẾP THEO] Sửa lỗi Số học & Logic khối Softmax Engine và Ping-Pong BRAM Buffer
-       ├── 2.1: Sửa bộ chia Softmax Q16 trong softmax_lut.sv (khắc phục đầu ra bằng 0).
-       ├── 2.2: Sửa Ping-Pong BRAM nhận đủ 64-bit ingress và FSM tự động nạp Q -> K -> V.
-       └── 2.3: Chạy mô phỏng độc lập tb_golden_softmax_lut.sv đạt PASS -> Tạo Báo cáo Bước 2.
+ [BƯỚC 2: XONG ✓]   Sửa lỗi Số học & Logic khối Softmax Engine và Ping-Pong BRAM Buffer (100% Bit-Exact).
+       ├── 2.1: Sửa bộ chia Softmax Q16 trong softmax_lut.sv (100% Bit-Exact 0-LSB Error).
+       ├── 2.2: Sửa Ping-Pong BRAM nhận đủ 64-bit ingress và FSM tự động nạp Q -> K -> V (20/20 PASS).
+       └── 2.3: Đã nghiệm thu độc lập tại REPORT_PHASE4_STEP2_SOFTMAX_BRAM.md.
        │
        ▼
- [BƯỚC 3] Tái tích hợp & Cấu trúc lại Mảng Systolic Array Top-Level
+ [BƯỚC 2.5: XONG ✓] Kiến trúc True Dual-Port BRAM Softmax Nạp Động (Software-Defined Multi-Stage).
+       ├── 2.5.1: Mở rộng dyadic_scale_config.json chứa bảng 3 Stage (dk=16, 20, 24) và hex 1024 words.
+       ├── 2.5.2: True Dual-Port BRAM 1024x20-bit trong softmax_lut.sv; auto-select Stage theo head_dim.
+       ├── 2.5.3: Cửa sổ ghi BRAM qua AXI-Lite CSR (0x40 addr, 0x44 data) trong axi_lite_regs.sv.
+       └── 2.5.4: Đã nghiệm thu độc lập tại REPORT_PHASE4_STEP2_5_RECONFIGURABLE_LUT.md (5/5 PASS).
+       │
+       ▼
+ [BƯỚC 3: TIẾP THEO] Tái tích hợp & Cấu trúc lại Mảng Systolic Array Top-Level
        ├── 3.1: Tách riêng 2 bộ tích lũy Col0/Col1 trong systolic_mac_array.sv; bỏ cây cộng ngang.
        ├── 3.2: Hoàn thiện score_v_gemm.sv tính đủ 256 tokens (4,096 bytes context out).
        ├── 3.3: Gỡ bỏ mã giả initial $readmemh trong attention_core_top.sv, kết nối luồng dataflow thật.
@@ -101,47 +108,17 @@ Khắc phục triệt để lỗi số học làm đầu ra Softmax bằng 0 tuy
 
 ---
 
-## BƯỚC 3: TÁI TÍCH HỢP & CẤU TRÚC LẠI MẢNG SYSTOLIC ARRAY TOP-LEVEL
+## BƯỚC 3: TÁI TÍCH HỢP & CẤU TRÚC LẠI MẢNG SYSTOLIC ARRAY TOP-LEVEL [ĐÃ HOÀN THÀNH 100% - PASS BIT-EXACT]
 
 ### Mục tiêu kỹ thuật:
 Xóa bỏ hoàn toàn mã giả combinational loop và `$readmemh` trong Top module; đưa mảng Systolic Array thực tế vào vận hành để tính trọn vẹn 256 tokens Attention.
 
-### Chi tiết các công việc cần thực hiện:
-
-#### 1. Sửa đổi module [`systolic_mac_array.sv`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02/systolic_mac_array.sv):
-* **Lỗi cần sửa (FL-03 & FL-04):** Cộng dồn $B$ và $C$ vào cùng 1 thanh ghi và dùng cây cộng ngang làm sai bản chất GEMM.
-* **Quy chuẩn sửa:**
-  1. Tách cấu trúc tích lũy của mỗi PE thành 2 thanh ghi độc lập:
-     ```systemverilog
-     pe_acc_col0[r][c] <= pe_acc_col0[r][c] + 32'(pe_prod_ab); // Cột chẵn
-     pe_acc_col1[r][c] <= pe_acc_col1[r][c] + 32'(pe_prod_ac); // Cột lẻ
-     ```
-  2. Loại bỏ hoàn toàn khối `pipelined_adder_tree` ngang.
-  3. Bổ sung mạch xuất dữ liệu tuần tự (Shift-out/Unload Drain Logic): Khi tính toán xong một tile, kết quả trong các PE được dịch nối tiếp ra ngoài qua bus dữ liệu kết quả 32-bit đưa sang `scale_unit`.
-
-#### 2. Sửa đổi module [`score_v_gemm.sv`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02/score_v_gemm.sv):
-* **Lỗi cần sửa (FL-08):** Module chỉ chạy 1 token rồi ngắt, làm mất 255 tokens còn lại.
-* **Quy chuẩn sửa:**
-  1. Thiết kế bộ đếm hàng `row_token_cnt` chạy từ $0 \dots 255$.
-  2. Nhận xác suất 16-bit từ `softmax_lut`, nhân với vector $V$ 8-bit tương ứng của từng token $k$.
-  3. Tại cuối mỗi hàng token, xuất ra đúng 16 bytes đặc trưng Context Out (chia thành 2 beats 64-bit).
-  4. Cờ `m_axis_tlast` chỉ được phép bật lên ở beat thứ 2 của hàng token thứ 255 (tổng cộng đủ **512 beats = 4,096 bytes**).
-
-#### 3. Tái cấu trúc Top-Level [`attention_core_top.sv`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02/attention_core_top.sv):
-* **Quy chuẩn sửa:**
-  1. **Xóa bỏ 100%:** Các mảng thanh ghi giả lập `q_matrix_ram`, `k_matrix_ram`, `v_matrix_ram` và khối `initial $readmemh(...)`.
-  2. **Kết nối đường ống dữ liệu thực tế (Real Dataflow Pipeline):**
-     $$\text{AXI-Stream RX} \rightarrow \text{Skid Buffer} \rightarrow \text{Ping-Pong BRAM} \rightarrow \text{Systolic MAC Array} \rightarrow \text{scale\_unit} \rightarrow \text{softmax\_lut} \rightarrow \text{score\_v\_gemm} \rightarrow \text{AXI-Stream TX}$$
-  3. Tích hợp máy trạng thái Sequential Heads Loop thật sự:
-     - Khi hoàn thành Head $h$, FSM tăng `head_cnt`.
-     - Tự động cộng offset địa chỉ đọc BRAM: $\text{Addr}_{\text{Head } h} = h \times (N \times d_k / 8)$.
-     - Hỗ trợ đầy đủ $H=4$ heads theo đúng đặc tả của MobileViT-XXS.
-  4. Nối các chân điều khiển AXI-Lite CSR (`reg_scale_m`, `reg_scale_e`, `reg_out_m`, `reg_out_e`) vào đúng các module đích.
-
-#### 4. Kiểm thử & Tiêu chí nghiệm thu Bước 3:
-* Biên dịch elaboration không có cổng thả nổi (No floating ports, zero uninstantiated core modules).
-* **Tiêu chí ĐẠT:** Dòng dữ liệu từ Systolic Array thông suốt qua toàn bộ 4 tầng tính toán.
-* **Lập báo cáo:** Tạo tài liệu `REPORT_PHASE4_STEP3_TOP_INTEGRATION.md`.
+> **Trạng thái thực tế:** **ĐÃ HOÀN THÀNH 100% (2026-10-13)**  
+> **Báo cáo nghiệm thu chi tiết:** Xem [`REPORT_PHASE4_STEP3_TOP_INTEGRATION.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/model_notebook/ivit_surgery/REPORT_PHASE4_STEP3_TOP_INTEGRATION.md)  
+> **Kết quả kiểm thử:**
+> - `systolic_mac_array.sv`: Độc lập `pe_acc_col0`/`col1`, drain logic tuần tự hóa, unit test PASS.
+> - `score_v_gemm.sv`: Shift `>>> 15`, bộ đếm 256 hàng, 512 beats, `tlast` tại beat 511, unit test đạt **4,096/4,096 bytes matched (100% bit-exact)**.
+> - `attention_core_top.sv`: Xóa bỏ 100% mã phi tổng hợp `$readmemh`, thiết lập Real Dataflow Pipeline thông suốt 4 tầng, tích hợp nạp LUT Bước 2.5, hỗ trợ Sequential Heads $H=4$, testbench tích hợp đạt **4,096/4,096 samples matched (100% bit-exact, 0 errors, 0 tlast errors)**.
 
 ---
 

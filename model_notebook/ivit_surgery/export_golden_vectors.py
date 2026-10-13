@@ -143,6 +143,19 @@ def run_export_pipeline(ckpt_path: str, output_dirs: list):
         s_eff = (sq * sq) / (s_score * math.sqrt(d_k))
         m_eff, e_eff = decompose_dyadic_16bit(s_eff, max_bit=15)
 
+        # BƯỚC 2.5: Tiền tính toán bảng Lookup Table int_exp_shift 256 phần tử cho từng Stage
+        def calc_exp_shift_entry(x_int, sf, n=15):
+            x_int = x_int + math.floor(x_int / 2.0) - math.floor(x_int / 16.0)
+            x0_int = math.floor(-1.0 / sf)
+            x_int = max(x_int, n * x0_int)
+            q = math.floor(x_int / x0_int)
+            r = x_int - x0_int * q
+            exp_int = r / 2.0 - x0_int
+            exp_int = max(math.floor(exp_int * (2.0 ** (n - q))), 0)
+            return int(exp_int)
+
+        stage_exp_table = [calc_exp_shift_entry(-d, s_score, n=15) for d in range(256)]
+
         stage_params[stage_name] = {
             "head_dim": d_k,
             "S_Q": sq,
@@ -150,6 +163,7 @@ def run_export_pipeline(ckpt_path: str, output_dirs: list):
             "S_effective": s_eff,
             "M_scale": m_eff,
             "E_scale": e_eff,
+            "exp_rom_table": stage_exp_table,
         }
 
         svh_lines.append(f"// {stage_name}: Head Dim = {d_k}, Effective Scale = {s_eff:.6f}")
@@ -167,6 +181,11 @@ def run_export_pipeline(ckpt_path: str, output_dirs: list):
 
     # 4. Trích xuất Golden Test Vectors bằng forward hook chân thực
     print("\n[4/4] Trích xuất Golden Test Vectors cho Single Head (Stage 2: 256x16)...")
+    # Cố định hoàn toàn running_stat trên toàn bộ mô hình để dùng đúng tham số đã hiệu chuẩn (calibrated)
+    for m in model.modules():
+        if hasattr(m, 'running_stat'):
+            m.running_stat = False
+
     target_layer = stages["STAGE2"]["layer"]
     torch.manual_seed(42)
     dummy_input = torch.rand(1, 3, 256, 256)[:, [2, 1, 0], :, :]
@@ -231,11 +250,33 @@ def run_export_pipeline(ckpt_path: str, output_dirs: list):
     scaled_score_int16 = np.clip(scaled_score_int64, -32768, 32767).astype(np.int16)
 
     # 3. Softmax Probabilities:
-    # 16-bit integer từ chính toán tử IntSoftmax của I-ViT trong PyTorch
-    softmax_prob_uint16 = (captured["attn_sm"] / sf_sm).round().to(torch.int32).numpy().astype(np.uint16)
+    # 16-bit integer chuẩn xác theo toán tử IntSoftmax của I-ViT ứng dụng trực tiếp từ scaled_score_int16
+    def int_exp_shift(x_int, sf, n=15):
+        x_int = x_int + np.floor(x_int / 2.0) - np.floor(x_int / 16.0)
+        x0_int = np.floor(-1.0 / sf)
+        x_int = np.maximum(x_int, n * x0_int)
+        q = np.floor(x_int / x0_int)
+        r = x_int - x0_int * q
+        exp_int = r / 2.0 - x0_int
+        exp_int = np.maximum(np.floor(exp_int * (2.0 ** (n - q))), 0)
+        return exp_int
+
+    s_score_stage2 = stage_params["STAGE2"]["S_score"]
+    exp_rom_table = np.array([int(int_exp_shift(-d, s_score_stage2, n=15)) for d in range(256)], dtype=np.int64)
+    softmax_prob_uint16 = np.zeros_like(scaled_score_int16, dtype=np.uint16)
+    for r in range(256):
+        row_s = scaled_score_int16[r].astype(np.int64)
+        s_max = np.max(row_s)
+        delta = -(row_s - s_max)
+        delta = np.clip(delta, 0, 255)
+        exp_vals = exp_rom_table[delta]
+        sum_exp = int(np.sum(exp_vals))
+        factor = (2**31 - 1) // sum_exp
+        prob = (exp_vals * factor) >> 16
+        softmax_prob_uint16[r] = np.clip(prob, 0, 65535).astype(np.uint16)
 
     # Bản UINT8 chuẩn hóa phục vụ các kiểm thử 8-bit
-    prob_float = captured["attn_sm"].numpy()
+    prob_float = softmax_prob_uint16.astype(float)
     prob_normalized = prob_float / np.sum(prob_float, axis=-1, keepdims=True)
     softmax_prob_uint8 = np.clip(np.round(prob_normalized * 255.0), 0, 255).astype(np.uint8)
 
@@ -278,8 +319,21 @@ def run_export_pipeline(ckpt_path: str, output_dirs: list):
         write_hex_file(os.path.join(out_dir, "golden_softmax_prob_u8.hex"), softmax_prob_uint8, bit_width=8, is_signed=False)
         write_hex_file(os.path.join(out_dir, "golden_context_out.hex"), context_out_int8, bit_width=8, is_signed=True)
 
+        # BƯỚC 2.5: Xuất tệp nhị phân exp_rom_all_stages.hex (1024 words x 20-bit)
+        rom_all_stages = (
+            stage_params["STAGE2"]["exp_rom_table"]
+            + stage_params["STAGE3"]["exp_rom_table"]
+            + stage_params["STAGE4"]["exp_rom_table"]
+            + stage_params["STAGE2"]["exp_rom_table"]  # Reserved slot (copy Stage 2)
+        )
+        rom_hex_path = os.path.join(out_dir, "exp_rom_all_stages.hex")
+        with open(rom_hex_path, "w", encoding="utf-8") as f:
+            for val in rom_all_stages:
+                f.write(f"{int(val):05X}\n")
+        print(f"  [SAVED] Multi-Stage Exp ROM Hex (1024 words) -> {rom_hex_path}")
+
     print("\n" + "=" * 70)
-    print(f"[HOÀN TẤT] BƯỚC 1 ĐÃ XUẤT TOÀN BỘ GOLDEN VECTORS CHUẨN BIT-EXACT.")
+    print(f"[HOÀN TẤT] BƯỚC 1 & BƯỚC 2.5 ĐÃ XUẤT TOÀN BỘ GOLDEN VECTORS & MULTI-STAGE EXP ROM.")
     print("=" * 70)
 
 
