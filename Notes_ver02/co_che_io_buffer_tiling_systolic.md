@@ -478,24 +478,31 @@ Xét bước $k = 0$, phần tử thứ nhất của chiều $k$ ($k_{\text{idx}
 - Trọng số cột 0 của $B_{0,0}$ (cột chẵn): $B[0, 0] = \mathbf{5}$ (INT8).
 - Trọng số cột 0 của $B_{0,1}$ (cột lẻ, tương ứng cột 1 toàn cục): $B[0, 1] = \mathbf{-2}$ (INT8).
 
-**Cách khối DSP48E2 đóng gói và thực thi trong 1 chu kỳ clock:**
-1. **Đóng gói cổng $D$ (27 bits):** Trọng số cột chẵn $B$ được dịch lên 18 bits, cộng với trọng số cột lẻ $C$:
-   $$D = (B[0, 0] \ll 18) + (B[0, 1] \ \& \ \text{0x3FFFF})$$
-   $$D = (5 \times 262,144) + (-2 \ \& \ \text{0x3FFFF}) = 1,310,720 + 262,142 = \mathbf{1,572,862}$$
+**Cách khối DSP48E2 đóng gói và thực thi trong 1 chu kỳ clock (Dựa theo RTL `pe_slice_dsp_packing.sv`):**
+
+1. **Đóng gói cổng $D$ (27 bits):** Trọng số cột chẵn $B$ được dịch trái 18 bits, cộng đại số có dấu với trọng số cột lẻ $C$:
+   $$D = (B[0, 0] \ll 18) + B[0, 1]$$
+   $$D = (5 \times 262,144) + (-2) = 1,310,720 - 2 = \mathbf{1,310,718}$$
 
 2. **Nhân với kích hoạt $A$ (18 bits):**
-   $$P = D \times A[0, 0] = 1,572,862 \times 3 = \mathbf{4,718,586}$$
+   $$P = D \times A[0, 0] = 1,310,718 \times 3 = \mathbf{3,932,154}$$
+   *(Dạng nhị phân của $3,932,154$ là `0x3BFFFA`, tức là `0011 1011 1111 1111 1111 1010`)*
 
-3. **Tách kết quả tại đầu ra tích lũy (48-bit Accumulator Output):**
+3. **Tách kết quả và Hiệu chỉnh dấu (Sign Correction) tại đầu ra:**
    - **Nửa thấp (Cột lẻ $C[0, 1]$):**
-     $$P[17:0] = 4,718,586 \pmod{262,144} = 262,138 \implies \text{Sign-extend INT18} = \mathbf{-6}$$
+     Phần cứng lấy 16 bit thấp `P[15:0]` của `0x3BFFFA` là `0xFFFA`.
+     Ép kiểu có dấu (Signed INT16) `0xFFFA` tương đương với **-6**.
      Kiểm tra toán học: $A[0, 0] \times B[0, 1] = 3 \times (-2) = \mathbf{-6}$ $\implies$ **CHÍNH XÁC TUYỆT ĐỐI!**
+     *(Vì tích số là -6, bit dấu thứ 15 của nửa dưới là `1`, báo hiệu phép toán đã "mượn" 1 bit từ nửa trên)*.
+
    - **Nửa cao (Cột chẵn $C[0, 0]$):**
-     $$P[47:18] = \lfloor 4,718,586 / 262,144 \rfloor = 17.999 \dots \approx 18$$
-     Bù phần mượn bit từ số âm: $18 + (-1) = \mathbf{15}$
+     Phần cứng dịch phải 18 bit (cắt bỏ 18 bit thấp, tương đương chia lấy nguyên làm tròn xuống):
+     $$P_{upper\_raw} = P \gg 18 = \lfloor 3,932,154 / 262,144 \rfloor = \mathbf{14}$$
+     Vì nửa thấp là số âm (bit 15 = 1), phần cứng tự động cộng bù phần mượn để phục hồi giá trị thực tế:
+     $$P_{upper\_corrected} = 14 + 1 = \mathbf{15}$$
      Kiểm tra toán học: $A[0, 0] \times B[0, 0] = 3 \times 5 = \mathbf{15}$ $\implies$ **CHÍNH XÁC TUYỆT ĐỐI!**
 
-Trong cùng một chu kỳ clock, **PE[0][0] hoàn thành đồng thời 2 phép nhân của 2 khối $4 \times 4$ khác nhau ($C_{0,0}$ và $C_{0,1}$)**!
+Trong cùng một chu kỳ clock, **PE[0][0] hoàn thành đồng thời 2 phép nhân của 2 khối $4 \times 4$ khác nhau ($C_{0,0}$ và $C_{0,1}$)** với độ chính xác bit-exact tuyệt đối nhờ mạch cộng bù!
 
 ---
 
