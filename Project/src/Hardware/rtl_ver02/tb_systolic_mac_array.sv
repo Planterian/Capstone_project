@@ -53,6 +53,11 @@ module tb_systolic_mac_array;
         .dot_product_out    (dot_product_out)
     );
 
+    initial begin
+        $dumpfile("tb_systolic_mac_array.vcd"); 
+        $dumpvars(0, tb_systolic_mac_array); 
+    end
+
     always #(CLK_PERIOD / 2.0) clk = ~clk;
 
     int drained_count = 0;
