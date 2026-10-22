@@ -1,14 +1,15 @@
 `timescale 1ns / 1ps
 // ============================================================================
 // Module Name:   tb_pipelined_adder_tree_1A
-// Description:  Unit verification for 16-element Pipelined Adder Tree against
+// Description:  Unit verification for 32-element Pipelined Adder Tree against
 //               PyTorch golden QK^T matrix products (golden_gemm_qk.hex).
-//               Tests all 256 x 256 = 65,536 dot products.
+//               Tests all 256 x 256 = 65,536 dot products with N=32.
 // ============================================================================
 
 module tb_pipelined_adder_tree_1A;
 
-    localparam int N          = 16;
+    localparam int N          = 32;
+    localparam int HEAD_DIM   = 16;
     localparam int IN_WIDTH   = 8;
     localparam int OUT_WIDTH  = 32;
     localparam int NUM_TOKENS = 256;
@@ -23,8 +24,8 @@ module tb_pipelined_adder_tree_1A;
     logic signed [OUT_WIDTH-1:0]   dot_product;
 
     // Golden memory buffers
-    logic [7:0]          q_mem [0:(NUM_TOKENS * N)-1];
-    logic [7:0]          k_mem [0:(NUM_TOKENS * N)-1];
+    logic [7:0]          q_mem [0:(NUM_TOKENS * HEAD_DIM)-1];
+    logic [7:0]          k_mem [0:(NUM_TOKENS * HEAD_DIM)-1];
     logic signed [31:0]  gold_gemm_mem [0:(NUM_TOKENS * NUM_TOKENS)-1];
 
     int pass_count  = 0;
@@ -79,7 +80,7 @@ module tb_pipelined_adder_tree_1A;
 
     initial begin
         $display("=======================================================================");
-        $display("   RUNNING UNIT VERIFICATION: PIPELINED ADDER TREE 1A (65,536 SCORES)");
+        $display("   RUNNING UNIT VERIFICATION: PIPELINED ADDER TREE 1A (N=32, 65,536 SCORES)");
         $display("=======================================================================");
 
         rst_n    = 0;
@@ -102,29 +103,35 @@ module tb_pipelined_adder_tree_1A;
         for (int row = 0; row < NUM_TOKENS; row++) begin
             // Latch Query row for this row
             for (int d = 0; d < N; d++) begin
-                a[d] <= $signed(q_mem[row * N + d]);
+                if (d < HEAD_DIM)
+                    a[d] <= $signed(q_mem[row * HEAD_DIM + d]);
+                else
+                    a[d] <= 8'sd0;
             end
 
             for (int col = 0; col < NUM_TOKENS; col++) begin
                 @(posedge clk);
                 in_valid <= 1'b1;
                 for (int d = 0; d < N; d++) begin
-                    b[d] <= $signed(k_mem[col * N + d]);
+                    if (d < HEAD_DIM)
+                        b[d] <= $signed(k_mem[col * HEAD_DIM + d]);
+                    else
+                        b[d] <= 8'sd0;
                 end
             end
 
             @(posedge clk);
             in_valid <= 1'b0;
 
-            // Wait 5 pipeline flush cycles before changing Query row `a`
-            repeat (5) @(posedge clk);
+            // Wait 8 pipeline flush cycles before changing Query row `a`
+            repeat (8) @(posedge clk);
         end
 
         // Wait a few trailing cycles for final score
         repeat (10) @(posedge clk);
 
         $display("\n=======================================================================");
-        $display("   FINAL REPORT: PIPELINED ADDER TREE 1A VERIFICATION");
+        $display("   FINAL REPORT: PIPELINED ADDER TREE 1A VERIFICATION (N=32)");
         $display("=======================================================================");
         $display("   Total Scores Verified : %0d / 65536", sample_idx);
         $display("   Exact Matches         : %0d", pass_count);

@@ -9,7 +9,7 @@
 // ============================================================================
 
 module axis_adapter #(
-    parameter int DATA_WIDTH = 64
+    parameter int DATA_WIDTH = 128
 )(
     input  logic                  clk,
     input  logic                  rst_n,

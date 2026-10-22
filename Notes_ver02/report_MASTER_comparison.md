@@ -165,3 +165,20 @@ Tất cả các tài liệu chi tiết đã được biên soạn và lưu trữ
 3. [📄 **Báo Cáo Phương Án 3B — 2D Systolic MAC Array (OS + DSP Pack)**](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes_ver02/report_variant_3B_systolic_array.md)
 4. [📄 **Báo Cáo Phương Án 4C — General Configurable Attention Top Module**](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes_ver02/report_variant_4C_general_module.md)
 5. [📊 **Báo Cáo Tổng Hợp MASTER — So Sánh Đối Định Lượng 4 Phương Án**](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes_ver02/report_MASTER_comparison.md)
+
+---
+
+## 8. Nhật Ký Nâng Cấp Hệ Thống: Chuẩn Hóa Bus AXI4-Stream 128-Bit & Thích Ứng Đa Tầng 3 Stages (Hoàn Tất 22/10/2026)
+
+Hệ thống đã hoàn tất nâng cấp đồng bộ lên **chuẩn Bus AXI4-Stream 128-Bit Native (16 bytes/beat)** và hỗ trợ linh hoạt **cả 3 Stages của MobileViT-XXS** ($d_k \in \{16, 20, 24\}$):
+
+### Bảng Kết Quả Thực Đo Trên Testbench Tích Hợp Đầy Đủ 128-Bit (Full Top Verification)
+
+| Biến Thể Phần Cứng | Chuẩn Bus AXI-Stream | Cấu Trúc GEMM 1 Mới | Số Beat Ingress DMA ($Q,K,V$) | Số Beat Egress ($d_k=16$) | Tổng Chu Kỳ Xung Nhịp (@ 200MHz) | Trạng Thái Bit-Exact |
+| :--- | :---: | :--- | :---: | :---: | :---: | :---: |
+| **Phương Án 1A (Pure LUT)** | **128-bit Native** | Cây cộng $N=32$ (5 tầng nhị phân, 0 DSP) | **768 beats** ($\downarrow 50\%$) | **256 beats** | **209,663 chu kỳ** (~1.05 ms) | **100% Khớp 0-LSB [PASS]** |
+| **Phương Án 2A (8 DSP)** | **128-bit Native** | 8 DSP Packing + Bộ tích lũy 2/3 beats | **768 beats** ($\downarrow 50\%$) | **256 beats** | **209,919 chu kỳ** (~1.05 ms) | **100% Khớp 0-LSB [PASS]** |
+| **Phương Án 3B (16 DSP)** | **128-bit Native** | Mảng $4 \times 4$ PE quét $d_k$ động theo thời gian | **768 beats** ($\downarrow 50\%$) | **256 beats** | **337,216 chu kỳ** (~1.69 ms) | **100% Khớp 0-LSB [PASS]** |
+
+> **Ghi chú**: Tín hiệu `m_axis_tlast` trên cả 3 biến thể đều được xác minh khẳng định chính xác tại beat 255. Thời gian truyền nạp DMA từ PS sang PL được rút ngắn 50%, tương thích hoàn hảo với cổng `S_AXI_HP_FPD` 128-bit của Kria KV260.
+

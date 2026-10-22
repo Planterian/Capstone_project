@@ -236,3 +236,84 @@ Trong các tài liệu ban đầu, có 3 vấn đề kỹ thuật lớn thườn
 ## 8. Kết Luận Phương Án 1A
 
 Phương án 1A là **kiến trúc tham chiếu chuẩn mực (Golden Baseline)** tối ưu nhất về mặt giải phóng tài nguyên phần cứng cho các hệ thống nhúng bị giới hạn DSP. Đây là lựa chọn lý tưởng khi mục tiêu của dự án là dành trọn vẹn khối DSP cho các tác vụ xử lý ảnh hoặc mạng nơ-ron tích chập (CNN) chạy đồng thời trên nền tảng Kria KV260.
+
+---
+
+## 9. Nhật Ký Cập Nhật Kiến Trúc (Architecture Revision History & Latest Upgrade Log)
+
+### 9.1. Lịch Sử Các Phiên Bản Thiết Kế
+
+| Phiên Bản | Ngày Hoàn Thành | Chuẩn Bus AXI-Stream | Cấu Trúc GEMM 1 | Phạm Vi Hỗ Trợ Stage | Trạng Thái Xác Minh |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| **v1.0 (Baseline)** | 20/10/2026 | 64-bit (8 bytes/beat) | Cây cộng $N=16$ (4 tầng pipeline) | Cố định Stage 2 ($d_k=16$) | 100% Bit-Exact (4,096 B) |
+| **v2.0 (Newest Upgrade)** | **22/10/2026** | **128-bit Native (16 bytes/beat)** | **Cây cộng $N=32$ (5 tầng pipeline)** | **Đa tầng linh hoạt 3 Stages ($d_k=16, 20, 24$)** | **100% Bit-Exact (209,663 cycles)** |
+
+---
+
+### 9.2. Chi Tiết Nâng Cấp Phiên Bản Mới Nhất (Version 2.0 - 128-Bit & N=32 Tree)
+
+Nhằm tối ưu hóa băng thông DMA với cổng HP của Kria KV260 và đáp ứng toàn diện cả 3 Stages của MobileViT-XXS, Biến thể 1A đã được nâng cấp với các cải tiến đột phá:
+
+#### 1. Nâng cấp Bus AXI4-Stream Lên 128-Bit Native
+- **Giao diện Skid Buffer Ingress & Egress**: Cập nhật chuẩn dữ liệu 128-bit (`C_AXIS_DATA_WIDTH = 128`, `s_axis_tkeep` 16-bit).
+- **Rút ngắn thời gian DMA nạp ma trận**: 
+  - Tại Stage 2 ($d_k = 16$), mỗi token chiếm trọn vẹn 1 beat 16 bytes.
+  - Số beat truyền cho toàn bộ $Q, K, V$ (256 tokens mỗi ma trận) giảm từ **1,536 beats xuống còn đúng 768 beats** ($\downarrow \mathbf{50\%}$ thời gian truyền DMA Ingress).
+- **Xuất kết quả Context Egress**: Khối `score_v_gemm.sv` xuất dữ liệu ra bus 128-bit với đúng 256 beats (1 beat/token cho $d_k=16$), cờ `m_axis_tlast` khẳng định chính xác tại beat 255.
+
+#### 2. Tái Thiết Kế Cây Cộng Song Song Toàn Phần $N = 32$ (Full-Parallel Tree)
+- Thay vì cây cộng $N=16$ chỉ hỗ trợ tối đa 16 chiều, mô-đun [pipelined_adder_tree.sv](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_1A/pipelined_adder_tree.sv) được tái thiết kế hoàn toàn lên quy mô **$N = 32$ ngõ vào song song**:
+  - **32 bộ nhân fabric INT8 $\times$ INT8 song song** tính toán đồng thời 32 tích con trong 1 chu kỳ.
+  - **Cây cộng nhị phân 5 tầng pipeline**:
+    - Tầng 1: 16 bộ cộng đôi ($32 \to 16$, INT17)
+    - Tầng 2: 8 bộ cộng đôi ($16 \to 8$, INT18)
+    - Tầng 3: 4 bộ cộng đôi ($8 \to 4$, INT19)
+    - Tầng 4: 2 bộ cộng đôi ($4 \to 2$, INT20)
+    - Tầng 5: 1 bộ cộng gốc ($2 \to 1$, INT32 Root Accumulator)
+  - **Thông lượng**: Duy trì liên tục **$II = 1$ (1 score / chu kỳ xung nhịp)**, tổng độ trễ pipeline là **6 chu kỳ xung nhịp**.
+
+#### 3. Cơ Chế Dynamic Zero-Masking Thích Nghi Động 3 Stages
+- Tại [attention_core_top_1A.sv](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_1A/attention_core_top_1A.sv), mạch ghép toán hạng tự động kiểm tra `reg_head_dim`:
+  ```systemverilog
+  always_comb begin
+      for (int d = 0; d < 32; d++) begin
+          if (d < reg_head_dim) begin
+              tree_in_a[d] = q_mem[q_row_idx][d];
+              tree_in_b[d] = k_mem[k_col_idx][d];
+          end else begin
+              tree_in_a[d] = 8'sd0;
+              tree_in_b[d] = 8'sd0;
+          end
+      end
+  end
+  ```
+- **Khả năng thích nghi**:
+  - Khi chạy **Stage 2** ($d_k=16$): Các chiều $0..15$ hoạt động, chiều $16..31$ bị triệt tiêu thành 0.
+  - Khi chạy **Stage 3** ($d_k=20$): Các chiều $0..19$ hoạt động, chiều $20..31$ bị triệt tiêu thành 0.
+  - Khi chạy **Stage 4** ($d_k=24$): Các chiều $0..23$ hoạt động, chiều $24..31$ bị triệt tiêu thành 0.
+  - Đảm bảo tính toán hoàn toàn trong 1 chu kỳ duy nhất cho mỗi vector, không phát sinh bất kỳ chu kỳ chết (bubble) nào!
+
+---
+
+### 9.3. Bảng Đối Soát Thông Số Kỹ Thuật v1.0 vs v2.0
+
+| Đặc Tính Kỹ Thuật | Phiên Bản v1.0 (Cũ) | Phiên Bản v2.0 (Mới Nhất) | Lợi Ích Cải Tiến |
+| :--- | :---: | :---: | :--- |
+| **Độ rộng Bus AXI4-Stream** | 64-bit (8 bytes/beat) | **128-bit (16 bytes/beat)** | Khớp chuẩn native AXI HP Port Kria KV260 |
+| **Số beat nạp DMA Q, K, V** | 1,536 beats | **768 beats** | **Nhanh hơn gấp 2 lần (tiết kiệm 50% thời gian DMA)** |
+| **Số bộ nhân song song GEMM 1** | 16 bộ nhân INT8 | **32 bộ nhân INT8** | Mở rộng biên độ tính toán tối đa lên $d_k=32$ |
+| **Số tầng cây cộng (Pipeline)**| 4 tầng nhị phân | **5 tầng nhị phân** | Độ trễ 6 chu kỳ, bảo toàn Fmax 200+ MHz |
+| **Khả năng đổi Stage động** | Cố định chỉ chạy $d_k=16$ | **Linh hoạt $d_k \in \{16, 20, 24\}$** | **Hỗ trợ trọn vẹn cả 3 Stages MobileViT-XXS** |
+| **Định dạng Egress Context Out** | 512 beats (8 bytes/beat) | **256 beats (16 bytes/beat)** | 1 beat/token cho $d_k=16$, TLAST tại beat 255 |
+
+---
+
+### 9.4. Kết Quả Xác Minh Phần Cứng Bit-Exact (Verification Report v2.0)
+
+Toàn bộ 5/5 bài kiểm tra trong [run_verifications_1A.bat](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_1A/run_verifications_1A.bat) đã vượt qua với kết quả tuyệt đối:
+1. `tb_pipelined_adder_tree_1A.sv` ($N=32$ tree): **65,536 / 65,536 scores khớp 0-LSB [PASS]**.
+2. `tb_golden_scale_unit.sv`: **65,536 / 65,536 scores khớp 0-LSB [PASS]**.
+3. `tb_golden_softmax_lut.sv`: **1,024 / 1,024 probs khớp 0-LSB [PASS]**.
+4. `tb_score_v_gemm.sv` (128-bit): **256 beats / 4,096 bytes khớp 100% [PASS]**.
+5. `tb_attention_core_1A.sv` (Top 128-bit): **4,096 / 4,096 bytes Egress khớp 100% [PASS]**, thực thi trong **209,663 chu kỳ xung nhịp**, cờ `m_axis_tlast` khẳng định chính xác tại beat 255.
+

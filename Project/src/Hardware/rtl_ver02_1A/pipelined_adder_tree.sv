@@ -1,16 +1,17 @@
 `timescale 1ns / 1ps
 // ============================================================================
 // Module Name:   pipelined_adder_tree
-// Description:  Pipelined Reduction Tree supporting 16-element INT8xINT8 signed
-//               multiplications and 4-stage binary adder reduction into INT32.
+// Description:  Pipelined Reduction Tree supporting up to 32-element INT8xINT8
+//               multiplications and 5-stage binary adder reduction into INT32.
 //               Architecture: 100% FPGA Logic Fabric (0 DSP48E2 used).
+//               Achieves sustained Initiation Interval II = 1 (1 score / cycle).
 // Standard:     IEEE 1800-2012 SystemVerilog
 // Target:       AMD Kria KV260 / Zynq UltraScale+ MPSoC
-// Version:      v1.0 (Variant 1A Pure Fabric Multipliers)
+// Version:      v2.0 (N=32 Multi-Stage Parametric Support: dk=16, 20, 24, 32)
 // ============================================================================
 
 module pipelined_adder_tree #(
-    parameter int N         = 16,
+    parameter int N         = 32,
     parameter int IN_WIDTH  = 8,
     parameter int OUT_WIDTH = 32,
     parameter bit HAS_MULT  = 1'b1
@@ -26,7 +27,7 @@ module pipelined_adder_tree #(
 );
 
     // ------------------------------------------------------------------------
-    // Stage 0: 16 Parallel Multipliers (INT8 x INT8 -> INT16 / INT32)
+    // Stage 0: N Parallel Multipliers (INT8 x INT8 -> INT32)
     // ------------------------------------------------------------------------
     logic signed [OUT_WIDTH-1:0] mult_stage [0:N-1];
     logic                        mult_valid;
@@ -48,7 +49,7 @@ module pipelined_adder_tree #(
     end
 
     // ------------------------------------------------------------------------
-    // Stage 1: 8 Pairwise Adders (16 -> 8)
+    // Stage 1: 16 Pairwise Adders (32 -> 16)
     // ------------------------------------------------------------------------
     logic signed [OUT_WIDTH-1:0] stage1_sum [0:(N/2)-1];
     logic                        stage1_valid;
@@ -66,7 +67,7 @@ module pipelined_adder_tree #(
     end
 
     // ------------------------------------------------------------------------
-    // Stage 2: 4 Pairwise Adders (8 -> 4)
+    // Stage 2: 8 Pairwise Adders (16 -> 8)
     // ------------------------------------------------------------------------
     logic signed [OUT_WIDTH-1:0] stage2_sum [0:(N/4)-1];
     logic                        stage2_valid;
@@ -84,7 +85,7 @@ module pipelined_adder_tree #(
     end
 
     // ------------------------------------------------------------------------
-    // Stage 3: 2 Pairwise Adders (4 -> 2)
+    // Stage 3: 4 Pairwise Adders (8 -> 4)
     // ------------------------------------------------------------------------
     logic signed [OUT_WIDTH-1:0] stage3_sum [0:(N/8)-1];
     logic                        stage3_valid;
@@ -102,22 +103,40 @@ module pipelined_adder_tree #(
     end
 
     // ------------------------------------------------------------------------
-    // Stage 4: 1 Final Root Adder (2 -> 1)
+    // Stage 4: 2 Pairwise Adders (4 -> 2)
     // ------------------------------------------------------------------------
-    logic signed [OUT_WIDTH-1:0] stage4_root_sum;
+    logic signed [OUT_WIDTH-1:0] stage4_sum [0:(N/16)-1];
     logic                        stage4_valid;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            stage4_valid    <= 1'b0;
-            stage4_root_sum <= '0;
+            stage4_valid <= 1'b0;
+            for (int i = 0; i < N/16; i++) stage4_sum[i] <= '0;
         end else begin
-            stage4_valid    <= stage3_valid;
-            stage4_root_sum <= stage3_sum[0] + stage3_sum[1];
+            stage4_valid <= stage3_valid;
+            for (int i = 0; i < N/16; i++) begin
+                stage4_sum[i] <= stage3_sum[2*i] + stage3_sum[2*i+1];
+            end
         end
     end
 
-    assign dot_product = stage4_root_sum;
-    assign out_valid   = stage4_valid;
+    // ------------------------------------------------------------------------
+    // Stage 5: 1 Final Root Adder (2 -> 1)
+    // ------------------------------------------------------------------------
+    logic signed [OUT_WIDTH-1:0] stage5_root_sum;
+    logic                        stage5_valid;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            stage5_valid    <= 1'b0;
+            stage5_root_sum <= '0;
+        end else begin
+            stage5_valid    <= stage4_valid;
+            stage5_root_sum <= stage4_sum[0] + stage4_sum[1];
+        end
+    end
+
+    assign dot_product = stage5_root_sum;
+    assign out_valid   = stage5_valid;
 
 endmodule

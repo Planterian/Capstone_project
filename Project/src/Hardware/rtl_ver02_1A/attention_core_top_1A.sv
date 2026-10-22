@@ -15,7 +15,7 @@
 module attention_core_top_1A #(
     parameter int C_S_AXI_DATA_WIDTH = 32,
     parameter int C_S_AXI_ADDR_WIDTH = 8,
-    parameter int C_AXIS_DATA_WIDTH  = 64,
+    parameter int C_AXIS_DATA_WIDTH  = 128,  // 16 INT8 tokens/beat (128-bit AXI-Stream)
     parameter int ARRAY_SIZE         = 4,
     parameter int MAX_TOKENS         = 256,
     parameter int MAX_HEAD_DIM       = 32
@@ -216,20 +216,17 @@ module attention_core_top_1A #(
     logic [1:0]  ing_slice_idx;
     logic        head_data_ready;
 
-    // Beats per matrix = (seq_len * head_dim) / 8
+    // Beats per matrix calculation (128-bit bus = 16 bytes/beat)
     logic [15:0] beats_per_mat;
-    assign beats_per_mat = (reg_seq_len[8:0] * reg_head_dim[5:0]) >> 3;
-
     always_comb begin
         if (reg_head_dim <= 16'd16) begin
+            beats_per_mat = 16'(reg_seq_len);         // 256 beats (1 beat/token)
+            ing_tok_idx   = 8'(ing_beat_cnt);
+            ing_slice_idx = 2'b00;
+        end else begin
+            beats_per_mat = 16'(reg_seq_len << 1);     // 512 beats (2 beats/token)
             ing_tok_idx   = 8'(ing_beat_cnt >> 1);
             ing_slice_idx = 2'(ing_beat_cnt & 16'd1);
-        end else if (reg_head_dim <= 16'd24) begin
-            ing_tok_idx   = 8'(ing_beat_cnt / 3);
-            ing_slice_idx = 2'(ing_beat_cnt % 3);
-        end else begin
-            ing_tok_idx   = 8'(ing_beat_cnt >> 2);
-            ing_slice_idx = 2'(ing_beat_cnt & 16'd3);
         end
     end
 
@@ -245,9 +242,9 @@ module attention_core_top_1A #(
                 ing_beat_cnt    <= '0;
                 head_data_ready <= 1'b0;
             end else if (skid_tvalid && skid_tready) begin
-                for (int b = 0; b < 8; b++) begin
+                for (int b = 0; b < 16; b++) begin
                     int dim_idx;
-                    dim_idx = ing_slice_idx * 8 + b;
+                    dim_idx = ing_slice_idx * 16 + b;
                     if (dim_idx < MAX_HEAD_DIM) begin
                         case (ing_load_state)
                             ING_Q: q_mem[ing_tok_idx][dim_idx] <= $signed(skid_tdata[b*8 +: 8]);
@@ -277,7 +274,7 @@ module attention_core_top_1A #(
     end
 
     // ------------------------------------------------------------------------
-    // 5. STAGE 1: PURE FABRIC PIPELINED ADDER TREE (100% LUT, 0 DSP48E2)
+    // 5. STAGE 1: PURE FABRIC PIPELINED ADDER TREE (N=32, 100% LUT, 0 DSP48E2)
     //    Initiation Interval II = 1 (1 score / cycle sustained).
     // ------------------------------------------------------------------------
     logic signed [31:0] stage1_score;
@@ -288,12 +285,12 @@ module attention_core_top_1A #(
     logic               row_start_pulse;
     logic               k_stream_valid;
 
-    // Mask inputs by reg_head_dim dynamically (for N=16)
-    logic signed [7:0]  tree_in_a [0:15];
-    logic signed [7:0]  tree_in_b [0:15];
+    // Mask inputs by reg_head_dim dynamically (for N=32, supporting dk=16, 20, 24, 32)
+    logic signed [7:0]  tree_in_a [0:31];
+    logic signed [7:0]  tree_in_b [0:31];
 
     always_comb begin
-        for (int d = 0; d < 16; d++) begin
+        for (int d = 0; d < 32; d++) begin
             if (d < reg_head_dim) begin
                 tree_in_a[d] = q_curr_vec[d];
                 tree_in_b[d] = k_mem[k_col_idx][d];
@@ -305,7 +302,7 @@ module attention_core_top_1A #(
     end
 
     pipelined_adder_tree #(
-        .N         (16),
+        .N         (32),
         .IN_WIDTH  (8),
         .OUT_WIDTH (32),
         .HAS_MULT  (1'b1)
@@ -373,9 +370,10 @@ module attention_core_top_1A #(
     // ------------------------------------------------------------------------
     // 8. STAGE 4: SCORE x V CONTEXT AGGREGATION GEMM ENGINE
     // ------------------------------------------------------------------------
-    logic [63:0]       context_axis_tdata;
-    logic              context_axis_tvalid;
-    logic              context_axis_tlast;
+    logic [C_AXIS_DATA_WIDTH-1:0]     context_axis_tdata;
+    logic [(C_AXIS_DATA_WIDTH/8)-1:0] context_axis_tkeep;
+    logic                             context_axis_tvalid;
+    logic                             context_axis_tlast;
     logic [8:0]        score_v_token_cnt;
     logic              score_v_row_done;
     logic signed [7:0] v_vec_active [0:MAX_HEAD_DIM-1];
@@ -401,9 +399,10 @@ module attention_core_top_1A #(
     end
 
     score_v_gemm #(
-        .MAX_TOKENS   (MAX_TOKENS),
-        .MAX_HEAD_DIM (MAX_HEAD_DIM),
-        .PROB_WIDTH   (16)
+        .MAX_TOKENS      (MAX_TOKENS),
+        .MAX_HEAD_DIM    (MAX_HEAD_DIM),
+        .PROB_WIDTH      (16),
+        .AXIS_DATA_WIDTH (C_AXIS_DATA_WIDTH)
     ) u_score_v_gemm (
         .clk           (clk),
         .rst_n         (rst_n),
@@ -415,6 +414,7 @@ module attention_core_top_1A #(
         .head_dim      (reg_head_dim[15:0]),
         .m_axis_tvalid (context_axis_tvalid),
         .m_axis_tdata  (context_axis_tdata),
+        .m_axis_tkeep  (context_axis_tkeep),
         .m_axis_tlast  (context_axis_tlast),
         .m_axis_tready (m_axis_tready),
         .row_token_cnt (score_v_token_cnt),
@@ -541,7 +541,7 @@ module attention_core_top_1A #(
     // 10. AXI-STREAM EGRESS & STATUS WIRES
     // ------------------------------------------------------------------------
     assign m_axis_tdata  = context_axis_tdata;
-    assign m_axis_tkeep  = 8'hFF;
+    assign m_axis_tkeep  = context_axis_tkeep;
     assign m_axis_tlast  = context_axis_tlast;
     assign m_axis_tvalid = context_axis_tvalid;
 

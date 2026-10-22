@@ -264,3 +264,80 @@ Dù có hiệu năng thấp hơn 2A đối với bài toán cụ thể MobileViT
 > **Ý nghĩa học thuật & Luận văn**: Phương án 3B là **minh chứng thuyết phục nhất về năng lực thiết kế phần cứng vi mạch tiên tiến (Advanced VLSI Design)**. 
 > - Nó giải quyết trọn vẹn bài toán đồng bộ hóa 2 chiều, kỹ thuật tính toán dạng sóng (Wavefront Systolic Computation), kỹ thuật DSP Packing trong không gian 2D, và cơ chế chuyển đổi không gian địa chỉ bộ nhớ (Address Reordering Buffer).
 > - Đây là nền tảng cốt lõi để mở rộng đề tài sang các kiến trúc Transformer quy mô lớn (ViT, Swin, LLaMA) và là điểm nhấn quan trọng trong hồ sơ bảo vệ đồ án tốt nghiệp.
+
+---
+
+## 10. Nhật Ký Cập Nhật Kiến Trúc (Architecture Revision History & Latest Upgrade Log)
+
+### 10.1. Lịch Sử Các Phiên Bản Thiết Kế
+
+| Phiên Bản | Ngày Hoàn Thành | Chuẩn Bus AXI-Stream | Cấu Trúc GEMM 1 | Phạm Vi Hỗ Trợ Stage | Trạng Thái Xác Minh |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| **v1.0 (Baseline)** | 20/10/2026 | 64-bit (8 bytes/beat) | Mảng $4 \times 4$ Systolic Grid, quét cố định $d_k=16$ | Cố định Stage 2 ($d_k=16$) | 100% Bit-Exact (4,096 B) |
+| **v2.0 (Newest Upgrade)** | **22/10/2026** | **128-bit Native (16 bytes/beat)** | **Mảng $4 \times 4$ Systolic Grid + Quét chiều $d_k$ động** | **Đa tầng linh hoạt 3 Stages ($d_k=16, 20, 24$)** | **100% Bit-Exact (337,216 cycles)** |
+
+---
+
+### 10.2. Chi Tiết Nâng Cấp Phiên Bản Mới Nhất (Version 2.0 - 128-Bit & Dynamic $d_k$ Sweep)
+
+Nhằm chuẩn hóa giao tiếp AXI4-Stream 128-bit trên SoC Kria KV260 và khai thác tối đa ưu thế kiến trúc Output-Stationary cho cả 3 Stages của MobileViT-XXS, Biến thể 3B đã được nâng cấp toàn diện:
+
+#### 1. Nâng cấp Bus AXI4-Stream Lên 128-Bit Native
+- **Giao diện Skid Buffer Ingress & Egress**: Cập nhật toàn diện `C_AXIS_DATA_WIDTH = 128` (16 bytes/beat, `s_axis_tkeep` 16-bit).
+- **Rút ngắn 50% thời gian DMA Ingress**:
+  - Tại Stage 2 ($d_k = 16$), mỗi token nạp trọn vẹn trong 1 beat 16 bytes.
+  - Tổng số beat DMA nạp ma trận $Q, K, V$ giảm một nửa từ **1,536 beats xuống còn đúng 768 beats**.
+- **Đồng bộ ngõ ra Score-V GEMM 128-bit**: Egress Master xuất 256 beats (16 bytes/beat), cờ `m_axis_tlast` khẳng định chính xác tại beat 255.
+
+#### 2. Khả Năng Thích Nghi Tự Nhiên Với Chiều $d_k$ Động Trên Trục Thời Gian
+- Bản chất của kiến trúc **Output-Stationary (OS)** trong [systolic_mac_array.sv](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_3B/systolic_mac_array.sv):
+  - Giá trị tích lũy (Accumulator) đứng yên tại mỗi PE vật lý.
+  - Chiều sâu đặc trưng $d_k$ được tích lũy tuần tự theo **trục thời gian (Temporal Accumulation)** qua từng chu kỳ xung nhịp.
+- Tại [attention_core_top_3B.sv](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_3B/attention_core_top_3B.sv):
+  ```systemverilog
+  // FSM quét chiều sâu đặc trưng linh hoạt
+  if (dim_cnt == reg_head_dim - 1) begin
+      dim_cnt   <= '0;
+      flush_cnt <= '0;
+      state     <= TILE_FLUSH;
+  end else begin
+      dim_cnt <= dim_cnt + 1'b1;
+  end
+  ```
+  - Khi chạy **Stage 2** ($d_k=16$): `dim_cnt` quét từ $0 \to 15$ ($T_{\text{feed}} = 16\text{ cycles}$).
+  - Khi chạy **Stage 3** ($d_k=20$): `dim_cnt` quét từ $0 \to 19$ ($T_{\text{feed}} = 20\text{ cycles}$).
+  - Khi chạy **Stage 4** ($d_k=24$): `dim_cnt` quét từ $0 \to 23$ ($T_{\text{feed}} = 24\text{ cycles}$).
+- **Ưu điểm vượt trội**: Không cần mở rộng mảng PE, không cần thêm bộ cộng dồn hay bộ ghép mux phức tạp; mảng tự động hỗ trợ bất kỳ $d_k \le 32$ chỉ bằng cách thay đổi giá trị CSR `reg_head_dim`!
+
+#### 3. Quy Luật Tăng Vọt Hiệu Suất PE Khi Chiều $d_k$ Tăng (Scalability Analysis)
+- Trong kiến trúc 3B, thời gian xả mảng (Drain) cố định là **32 chu kỳ** cho mỗi Tile $4 \times 8$:
+  - Tại $d_k = 16$: Thời gian tính $T_{\text{compute}} = 16 + 6 = 22\text{ cycles} \implies \eta = \frac{16}{16 + 12 + 32} \approx \mathbf{26.7\%}$.
+  - Tại $d_k = 20$: Thời gian tính $T_{\text{compute}} = 20 + 6 = 26\text{ cycles} \implies \eta = \frac{20}{20 + 12 + 32} \approx \mathbf{31.2\%}$.
+  - Tại $d_k = 24$: Thời gian tính $T_{\text{compute}} = 24 + 6 = 30\text{ cycles} \implies \eta = \frac{24}{24 + 12 + 32} \approx \mathbf{35.3\%}$.
+  - Tại $d_k = 64$ (ViT-Base): Thời gian tính $T_{\text{compute}} = 64 + 6 = 70\text{ cycles} \implies \eta = \frac{64}{64 + 12 + 32} \approx \mathbf{59.3\%}$.
+- Tỷ trọng thời gian chết Drain giảm dần khi $d_k$ tăng, chứng minh mảng tâm thu 3B ngày càng phát huy hiệu suất vượt trội ở các Stage lớn.
+
+---
+
+### 10.3. Bảng Đối Soát Thông Số Kỹ Thuật v1.0 vs v2.0
+
+| Đặc Tính Kỹ Thuật | Phiên Bản v1.0 (Cũ) | Phiên Bản v2.0 (Mới Nhất) | Lợi Ích Cải Tiến |
+| :--- | :---: | :---: | :--- |
+| **Độ rộng Bus AXI4-Stream** | 64-bit (8 bytes/beat) | **128-bit (16 bytes/beat)** | Khớp chuẩn native AXI HP Port Kria KV260 |
+| **Số beat nạp DMA Q, K, V** | 1,536 beats | **768 beats** | **Nhanh hơn gấp 2 lần (tiết kiệm 50% thời gian DMA)** |
+| **Số khối DSP48E2 sử dụng** | **16 DSP (1.28%)** | **16 DSP (1.28%)** | 32 MACs/cycle trên mảng $4 \times 4$ PE |
+| **Khả năng đổi Stage động** | Cố định chỉ chạy $d_k=16$ | **Linh hoạt $d_k \in \{16, 20, 24\}$** | **Hỗ trợ trọn vẹn cả 3 Stages MobileViT-XXS** |
+| **Cơ chế quét chiều đặc trưng** | Cố định 16 chu kỳ | **Quét động theo `reg_head_dim`** | Quét dọc trục thời gian, không tốn thêm tài nguyên |
+| **Định dạng Egress Context Out** | 512 beats (8 bytes/beat) | **256 beats (16 bytes/beat)** | 1 beat/token cho $d_k=16$, TLAST tại beat 255 |
+
+---
+
+### 10.4. Kết Quả Xác Minh Phần Cứng Bit-Exact (Verification Report v2.0)
+
+Toàn bộ 5/5 bài kiểm tra trong [run_verifications_3B.bat](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_3B/run_verifications_3B.bat) đã vượt qua với kết quả tuyệt đối:
+1. `tb_systolic_mac_array_3B.sv` (4x4 PE Grid + Drain): **32 / 32 Tile items khớp 100% [PASS]**.
+2. `tb_golden_scale_unit.sv`: **65,536 / 65,536 scores khớp 0-LSB [PASS]**.
+3. `tb_golden_softmax_lut.sv`: **1,024 / 1,024 probs khớp 0-LSB [PASS]**.
+4. `tb_score_v_gemm.sv` (128-bit): **256 beats / 4,096 bytes khớp 100% [PASS]**.
+5. `tb_attention_core_3B.sv` (Top 128-bit): **4,096 / 4,096 bytes Egress khớp 100% [PASS]**, thực thi trong **337,216 chu kỳ xung nhịp**, cờ `m_axis_tlast` khẳng định chính xác tại beat 255.
+

@@ -9,10 +9,15 @@
 
 module tb_score_v_gemm;
 
-    parameter int MAX_TOKENS   = 256;
-    parameter int MAX_HEAD_DIM = 32;
-    parameter int HEAD_DIM     = 16;
-    parameter int PROB_WIDTH   = 16;
+    parameter int MAX_TOKENS      = 256;
+    parameter int MAX_HEAD_DIM    = 32;
+    parameter int HEAD_DIM        = 16;
+    parameter int PROB_WIDTH      = 16;
+    parameter int AXIS_DATA_WIDTH = 128;
+
+    localparam int BYTES_PER_BEAT = AXIS_DATA_WIDTH / 8;
+    localparam int BEATS_PER_ROW  = (AXIS_DATA_WIDTH == 128) ? ((HEAD_DIM <= 16) ? 1 : 2) : ((HEAD_DIM + 7) / 8);
+    localparam int TOTAL_BEATS    = MAX_TOKENS * BEATS_PER_ROW;
 
     logic clk;
     logic rst_n;
@@ -26,7 +31,7 @@ module tb_score_v_gemm;
     logic [15:0]                   head_dim_sig;
 
     logic                          m_axis_tvalid;
-    logic [63:0]                   m_axis_tdata;
+    logic [AXIS_DATA_WIDTH-1:0]    m_axis_tdata;
     logic                          m_axis_tlast;
     logic                          m_axis_tready;
 
@@ -37,7 +42,8 @@ module tb_score_v_gemm;
     score_v_gemm #(
         .MAX_TOKENS(MAX_TOKENS),
         .MAX_HEAD_DIM(MAX_HEAD_DIM),
-        .PROB_WIDTH(PROB_WIDTH)
+        .PROB_WIDTH(PROB_WIDTH),
+        .AXIS_DATA_WIDTH(AXIS_DATA_WIDTH)
     ) dut (
         .clk(clk),
         .rst_n(rst_n),
@@ -71,31 +77,39 @@ module tb_score_v_gemm;
     // Output monitor
     always @(posedge clk) begin
         if (rst_n && m_axis_tvalid && m_axis_tready) begin
-            // Check each byte in 64-bit beat
-            for (int b = 0; b < 8; b++) begin
-                int byte_idx;
-                logic signed [7:0] actual_byte;
-                logic signed [7:0] expected_byte;
+            int current_row;
+            int beat_in_row;
+            current_row = beat_count / BEATS_PER_ROW;
+            beat_in_row = beat_count % BEATS_PER_ROW;
 
-                byte_idx = beat_count * 8 + b;
-                actual_byte = $signed(m_axis_tdata[b*8 +: 8]);
-                expected_byte = $signed(golden_ctx_mem[byte_idx]);
+            for (int b = 0; b < BYTES_PER_BEAT; b++) begin
+                int dim_idx;
+                dim_idx = beat_in_row * BYTES_PER_BEAT + b;
+                if (dim_idx < HEAD_DIM) begin
+                    int byte_idx;
+                    logic signed [7:0] actual_byte;
+                    logic signed [7:0] expected_byte;
 
-                if (actual_byte !== expected_byte) begin
-                    if (error_count < 10) begin
-                        $display("[ERROR] Beat %0d Byte %0d (Idx %0d): Got 0x%02h (%0d), Expected 0x%02h (%0d)",
-                                 beat_count, b, byte_idx, actual_byte, actual_byte, expected_byte, expected_byte);
+                    byte_idx = current_row * HEAD_DIM + dim_idx;
+                    actual_byte = $signed(m_axis_tdata[b*8 +: 8]);
+                    expected_byte = $signed(golden_ctx_mem[byte_idx]);
+
+                    if (actual_byte !== expected_byte) begin
+                        if (error_count < 10) begin
+                            $display("[ERROR] Beat %0d Byte %0d (Idx %0d): Got 0x%02h (%0d), Expected 0x%02h (%0d)",
+                                     beat_count, b, byte_idx, actual_byte, actual_byte, expected_byte, expected_byte);
+                        end
+                        error_count++;
+                    end else begin
+                        match_count++;
                     end
-                    error_count++;
-                end else begin
-                    match_count++;
                 end
             end
 
             // Check tlast
-            if (beat_count == 511) begin
+            if (beat_count == TOTAL_BEATS - 1) begin
                 if (!m_axis_tlast) begin
-                    $display("[ERROR] Beat 511: m_axis_tlast is 0, expected 1!");
+                    $display("[ERROR] Beat %0d: m_axis_tlast is 0, expected 1!", beat_count);
                     tlast_errors++;
                 end
             end else begin
@@ -136,7 +150,8 @@ module tb_score_v_gemm;
         rst_n = 1;
         #10;
 
-        $display("=== STARTING SCORE_V_GEMM VERIFICATION (256 ROWS, 512 BEATS) ===");
+        $display("=== STARTING SCORE_V_GEMM VERIFICATION (%0d ROWS, %0d BEATS, %0d-BIT BUS) ===",
+                 MAX_TOKENS, TOTAL_BEATS, AXIS_DATA_WIDTH);
 
         // Iterate through all 256 rows
         for (int r = 0; r < MAX_TOKENS; r++) begin
@@ -161,7 +176,7 @@ module tb_score_v_gemm;
             prob_valid <= 1'b0;
             prob_last  <= 1'b0;
 
-            // Wait for row egress to complete (2 beats for head_dim=16)
+            // Wait for row egress to complete
             while (!row_done) begin
                 @(posedge clk);
             end
@@ -171,13 +186,13 @@ module tb_score_v_gemm;
         #50;
 
         $display("=== SCORE_V_GEMM VERIFICATION REPORT ===");
-        $display("Total Beats Processed:  %0d (Expected: 512)", beat_count);
+        $display("Total Beats Processed:  %0d (Expected: %0d)", beat_count, TOTAL_BEATS);
         $display("Total Bytes Matched:    %0d / 4096", match_count);
         $display("Total Byte Errors:      %0d", error_count);
         $display("Total TLAST Errors:     %0d", tlast_errors);
 
-        if (error_count == 0 && tlast_errors == 0 && beat_count == 512 && match_count == 4096) begin
-            $display(">>> SUCCESS: score_v_gemm PASSED 100%% BIT-EXACT MATCH! <<<");
+        if (error_count == 0 && tlast_errors == 0 && beat_count == TOTAL_BEATS && match_count == 4096) begin
+            $display(">>> SUCCESS: score_v_gemm PASSED 100%%%% BIT-EXACT MATCH! <<<");
         end else begin
             $display(">>> FAILED: Discrepancies detected in score_v_gemm! <<<");
         end

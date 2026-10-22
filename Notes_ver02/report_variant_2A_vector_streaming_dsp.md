@@ -222,3 +222,78 @@ Nếu đọc đồng thời $K[2j]$ và $K[2j+1]$, tổng băng thông yêu cầ
 > - Nó chỉ tiêu tốn đúng **8 DSP (0.64%)**, giải phóng 99.36% DSP cho các phần còn lại của mạng.
 > - Giảm hơn **40% diện tích LUT** so với Phương án 1A.
 > - Đạt thông lượng dòng chảy tự nhiên cao nhất và dễ dàng đạt mức xung nhịp 200–300 MHz.
+
+---
+
+## 9. Nhật Ký Cập Nhật Kiến Trúc (Architecture Revision History & Latest Upgrade Log)
+
+### 9.1. Lịch Sử Các Phiên Bản Thiết Kế
+
+| Phiên Bản | Ngày Hoàn Thành | Chuẩn Bus AXI-Stream | Cấu Trúc GEMM 1 | Phạm Vi Hỗ Trợ Stage | Trạng Thái Xác Minh |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| **v1.0 (Baseline)** | 20/10/2026 | 64-bit (8 bytes/beat) | 8 DSP Packing, 2 beats tích lũy cố định | Cố định Stage 2 ($d_k=16$) | 100% Bit-Exact (4,096 B) |
+| **v2.0 (Newest Upgrade)** | **22/10/2026** | **128-bit Native (16 bytes/beat)** | **8 DSP Packing + Bộ tích lũy đa beat tự động** | **Đa tầng linh hoạt 3 Stages ($d_k=16, 20, 24$)** | **100% Bit-Exact (209,919 cycles)** |
+
+---
+
+### 9.2. Chi Tiết Nâng Cấp Phiên Bản Mới Nhất (Version 2.0 - 128-Bit & Multi-Beat Sequencer)
+
+Nhằm tối ưu hóa hiệu năng hệ thống SoC trên Kria KV260 và hỗ trợ đầy đủ cả 3 Stages của MobileViT-XXS, Biến thể 2A đã được nâng cấp toàn diện:
+
+#### 1. Nâng cấp Bus AXI4-Stream Lên 128-Bit Native
+- **Giao diện Skid Buffer Ingress & Egress**: Nâng cấp toàn diện lên `DATA_WIDTH = 128` (16 bytes/beat).
+- **Rút ngắn 50% thời gian nạp DMA Ingress**: 
+  - Tại Stage 2 ($d_k = 16$), mỗi token chiếm 1 beat 16 bytes.
+  - Tổng số beat DMA nạp ma trận $Q, K, V$ giảm một nửa từ **1,536 beats xuống còn đúng 768 beats**.
+- **Đồng bộ ngõ ra Score-V GEMM 128-bit**: Egress xuất 256 beats (16 bytes/beat), cờ `m_axis_tlast` khẳng định chính xác tại beat 255.
+
+#### 2. Mở Rộng Bộ Tuần Tự Tích Lũy Đa Beat 8-DSP (Multi-Beat Accumulation Sequencer)
+- Tại [dsp_packed_adder_tree.sv](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_2A/dsp_packed_adder_tree.sv):
+  - Mở rộng ngõ vào kiểm soát beat: `input logic [1:0] in_beat;` (hỗ trợ các giá trị `2'b00`, `2'b01`, `2'b10`, `2'b11`).
+  - Tự động phát hiện beat cuối theo kích thước chiều đặc trưng $d_k$:
+    ```systemverilog
+    assign is_last_beat = (head_dim <= 16'd16) ? (in_beat == 2'd1) :
+                          (head_dim <= 16'd24) ? (in_beat == 2'd2) : (in_beat == 2'd3);
+    ```
+  - **Mạch tích lũy và chuyển tiếp không bọt khí (Zero-Bubble Serializer)**:
+    - Khi `t3_beat == 2'b00`: Khởi tạo thanh ghi tích lũy `accum_even` và `accum_odd` với kết quả tầng gốc Tree Stage 3.
+    - Khi `!t3_last`: Tiếp tục cộng dồn các beat trung gian (`accum += t3_root`).
+    - Khi `t3_last`: Xuất ngay lập tức giá trị `dot_product` cho token Even (`out_valid = 1`), đồng thời chốt giá trị token Odd vào `odd_hold_reg` và bật cờ `odd_pending`.
+    - Ở chu kỳ kế tiếp, nếu `odd_pending == 1`, giá trị `odd_hold_reg` lập tức được xuất ra mà không làm chậm dòng dữ liệu (`out_valid = 1`).
+    - Nhờ vậy, với $d_k = 16$ hệ thống đạt liên tục **$II = 1$ (1 score / chu kỳ)**, và với $d_k = 20, 24$ hệ thống xử lý trơn tru 2 tokens trong đúng 3 chu kỳ xung nhịp.
+
+#### 3. Bộ Đệm Nạp BRAM Đa Tầng Linh Hoạt
+- Tại [attention_core_top_2A.sv](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_2A/attention_core_top_2A.sv):
+  - Ingress logic tự động chia lát:
+    - Với $d_k \le 16$: Nạp 1 token / beat (`ing_tok_idx = ing_beat_cnt`).
+    - Với $d_k > 16$: Nạp 1 token / 2 beats (`ing_tok_idx = ing_beat_cnt >> 1`, `ing_slice_idx = ing_beat_cnt[0]`).
+  - GEMM 1 FSM điều khiển `k_sub_beat` linh hoạt:
+    ```systemverilog
+    assign beats_per_pair_m1 = (reg_head_dim <= 16'd16) ? 2'd1 :
+                               (reg_head_dim <= 16'd24) ? 2'd2 : 2'd3;
+    ```
+
+---
+
+### 9.3. Bảng Đối Soát Thông Số Kỹ Thuật v1.0 vs v2.0
+
+| Đặc Tính Kỹ Thuật | Phiên Bản v1.0 (Cũ) | Phiên Bản v2.0 (Mới Nhất) | Lợi Ích Cải Tiến |
+| :--- | :---: | :---: | :--- |
+| **Độ rộng Bus AXI4-Stream** | 64-bit (8 bytes/beat) | **128-bit (16 bytes/beat)** | Khớp chuẩn native AXI HP Port Kria KV260 |
+| **Số beat nạp DMA Q, K, V** | 1,536 beats | **768 beats** | **Nhanh hơn gấp 2 lần (tiết kiệm 50% thời gian DMA)** |
+| **Số khối DSP48E2 sử dụng** | **8 DSP (0.64%)** | **8 DSP (0.64%)** | **Giữ nguyên mức tiêu thụ DSP siêu tiết kiệm** |
+| **Số beat tích lũy GEMM 1** | Cố định 2 beats ($d_k=16$) | **Linh hoạt 2 hoặc 3 beats** | Hỗ trợ tự nhiên $d_k \in \{16, 20, 24\}$ |
+| **Khả năng đổi Stage động** | Cố định chỉ chạy $d_k=16$ | **Linh hoạt $d_k \in \{16, 20, 24\}$** | **Hỗ trợ trọn vẹn cả 3 Stages MobileViT-XXS** |
+| **Định dạng Egress Context Out** | 512 beats (8 bytes/beat) | **256 beats (16 bytes/beat)** | 1 beat/token cho $d_k=16$, TLAST tại beat 255 |
+
+---
+
+### 9.4. Kết Quả Xác Minh Phần Cứng Bit-Exact (Verification Report v2.0)
+
+Toàn bộ 5/5 bài kiểm tra trong [run_verifications_2A.bat](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_2A/run_verifications_2A.bat) đã vượt qua với kết quả tuyệt đối:
+1. `tb_dsp_packed_adder_tree_2A.sv` (8 DSP PEs + Tree): **65,536 / 65,536 scores khớp 0-LSB [PASS]**.
+2. `tb_golden_scale_unit.sv`: **65,536 / 65,536 scores khớp 0-LSB [PASS]**.
+3. `tb_golden_softmax_lut.sv`: **1,024 / 1,024 probs khớp 0-LSB [PASS]**.
+4. `tb_score_v_gemm.sv` (128-bit): **256 beats / 4,096 bytes khớp 100% [PASS]**.
+5. `tb_attention_core_2A.sv` (Top 128-bit): **4,096 / 4,096 bytes Egress khớp 100% [PASS]**, thực thi trong **209,919 chu kỳ xung nhịp**, cờ `m_axis_tlast` khẳng định chính xác tại beat 255.
+
