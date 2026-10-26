@@ -25,6 +25,9 @@ graph TD
     HYB --> V4C["PHƯƠNG ÁN 4C: General Configurable Top<br/>- Tích hợp cả 2A và 3B qua MODE_SEL<br/>- Clock Gating + Shared Downstream<br/>- Thư mục: rtl_ver02_4C"]
 ```
 
+> [!NOTE]  
+> Chi tiết toàn diện về sơ đồ thông lượng (Throughput Datapath), nhịp sóng thời gian (Timing Waveforms) và phân tích điểm nghẽn Amdahl của cả 3 biến thể được tổng hợp tại: [`so_do_thong_luong_3_variants.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes_ver02/so_do_thong_luong_3_variants.md).
+
 ---
 
 ## 2. Bảng Đối Sánh Định Lượng Toàn Diện (Master Quantitative Comparison Matrix)
@@ -44,13 +47,14 @@ Dưới đây là bảng tổng hợp tất cả các chỉ số kỹ thuật đ
 | • **Tần số cực đại ($F_{max}$)** | ~330 MHz (có pipeline) | **~408 MHz** ✓ | ~250 MHz | ~250 MHz | Target 200 MHz |
 | • **Worst Negative Slack (WNS)** | $+1.98\text{ ns}$ | **$+2.55\text{ ns}$** ✓ | $+1.02\text{ ns}$ | $+1.00\text{ ns}$ | Phải $> 0\text{ ns}$ |
 | **III. HIỆU NĂNG THỰC THI (PERFORMANCE)** | | | | | |
-| • **Sustained Throughput (GEMM 1)** | 1 score / chu kỳ | 1 score / chu kỳ | 0.57 score / chu kỳ | 1 (M0) / 0.57 (M1) | — |
-| • **Chu kỳ GEMM 1 / Hàng (Row)** | 261 chu kỳ | 262 chu kỳ | 448 chu kỳ | 262 / 448 chu kỳ | — |
+| • **Sustained Throughput (GEMM 1)** | 1 score / chu kỳ ($II=1$) | 1 score / chu kỳ ($II=1$) | 0.57 score / chu kỳ ($32/56$) | 1 (M0) / 0.57 (M1) | — |
+| • **Chu kỳ GEMM 1 / Hàng (Row)** | 261 chu kỳ | 262 chu kỳ | 448 chu kỳ (1,792/4) | 262 / 448 chu kỳ | — |
 | • **Tổng chu kỳ GEMM 1 / Head** | 66,816 chu kỳ | 67,072 chu kỳ | 114,688 chu kỳ | 67,072 / 114,688 | — |
 | • **Thời gian GEMM 1 / Head (@ 200MHz)**| **0.334 ms** | **0.335 ms** | 0.573 ms | 0.335 / 0.573 ms | — |
-| • **Tổng chu kỳ Fused Attention / Head**| **272,640 chu kỳ** | **272,896 chu kỳ** | 320,512 chu kỳ | 272,896 / 320,512 | — |
-| • **Tổng thời gian cho 4 Heads (@ 200MHz)**| **5.45 ms** | **5.46 ms** | 6.41 ms | 5.46 / 6.41 ms | — |
-| • **Tốc độ khung hình (Attention FPS)**| **~183.5 FPS** | **~183.2 FPS** | **~156.0 FPS** | **~183 / ~156 FPS** | — |
+| • **Tổng chu kỳ Full Head (Thực Đo 128-bit TB)**| **209,663 chu kỳ** | **209,919 chu kỳ** | **337,216 chu kỳ** | 209,919 / 337,216 | Testbench RTL Full Top |
+| • **Thời gian 1 Head (@ 200MHz)**| **1.048 ms** | **1.050 ms** | **1.686 ms** | 1.050 / 1.686 ms | — |
+| • **Tổng thời gian cho 4 Heads (@ 200MHz)**| **4.193 ms** | **4.198 ms** | **6.744 ms** | 4.198 / 6.744 ms | — |
+| • **Tốc độ khung hình (Attention FPS)**| **~238.5 FPS** | **~238.2 FPS** | **~148.3 FPS** | **~238 / ~148 FPS** | — |
 | **IV. ĐỘ PHỨC TẠP & KHẢ NĂNG MỞ RỘNG** | | | | | |
 | • **Độ phức tạp xác minh (Verification)** | ★☆☆ (Thấp) | ★★☆ (Vừa) | ★★★ (Cao) | ★★★★ (Rất cao) | — |
 | • **Khả năng mở rộng cho ViT-Base ($d_k=64$)**| Rất kém (Bùng nổ LUT) | Trung bình | **Rất tốt (Tối ưu)** ✓ | **Rất tốt (Tối ưu)** ✓ | — |
@@ -60,15 +64,15 @@ Dưới đây là bảng tổng hợp tất cả các chỉ số kỹ thuật đ
 
 ## 3. Biểu Đồ Trực Quan So Sánh Các Chiều Chỉ Số
 
-### 3.1. So Sánh Thời Gian Trễ Tính Toán Cho 4 Heads (Càng thấp càng tốt)
+### 3.1. So Sánh Thời Gian Trễ Thực Đo Cho 4 Heads (Chuẩn 128-Bit Native Bus @ 200 MHz)
 ```
-Thời Gian Trễ (ms) — Xung nhịp 200 MHz
+Thời Gian Thực Thi (ms) — Đo đạc chính xác trên Testbench RTL Full Top
 ═══════════════════════════════════════════════════════════════════════
-Phương Án 1A (LUT Stream)   | 5.45 ms  [█████████████████████████░░░░░]  (183.5 FPS)
-Phương Án 2A (DSP Stream)   | 5.46 ms  [█████████████████████████░░░░░]  (183.2 FPS)
-Phương Án 3B (Systolic OS)  | 6.41 ms  [██████████████████████████████]  (156.0 FPS) - Chậm hơn 17.5%
-Phương Án 4C Mode 0         | 5.46 ms  [█████████████████████████░░░░░]  (183.2 FPS)
-Phương Án 4C Mode 1         | 6.41 ms  [██████████████████████████████]  (156.0 FPS)
+Phương Án 1A (LUT Stream)   | 4.19 ms  [██████████████████░░░░░░░░░░░░]  (238.5 FPS) - Nhanh nhất (0 DSP)
+Phương Án 2A (DSP Stream)   | 4.20 ms  [██████████████████░░░░░░░░░░░░]  (238.2 FPS) - Tối ưu nhất (8 DSP)
+Phương Án 3B (Systolic OS)  | 6.74 ms  [██████████████████████████████]  (148.3 FPS) - Chậm hơn 60.6% do Drain
+Phương Án 4C Mode 0         | 4.20 ms  [██████████████████░░░░░░░░░░░░]  (238.2 FPS)
+Phương Án 4C Mode 1         | 6.74 ms  [██████████████████████████████]  (148.3 FPS)
 ```
 
 ### 3.2. So Sánh Mức Chiếm Dụng Diện Tích LUT Logic Fabric (Càng thấp càng tốt)
@@ -91,7 +95,7 @@ Phương Án 4C (Unified Top)  | ~5,325 LUTs [███████████�
 graph TD
     START["XÁC ĐỊNH MỤC TIÊU VÀ ĐIỀU KIỆN DỰ ÁN"] --> Q_GOAL{"Mục tiêu trọng tâm của đề tài"}
 
-    Q_GOAL -->|Tối ưu FPS cho MobileViT| CHOOSE_2A["KHUYẾN NGHỊ: PHƯƠNG ÁN 2A<br/>- Hiệu năng cao nhất (183 FPS)<br/>- Ít tốn tài nguyên nhất (2.3% LUT, 8 DSP)<br/>- Dễ verify, chạy ổn định nhất."]
+    Q_GOAL -->|Tối ưu FPS cho MobileViT| CHOOSE_2A["KHUYẾN NGHỊ: PHƯƠNG ÁN 2A<br/>- Hiệu năng cao nhất (~238 FPS)<br/>- Ít tốn tài nguyên nhất (2.3% LUT, 8 DSP)<br/>- Dễ verify, chạy ổn định nhất."]
 
     Q_GOAL -->|Nghiên cứu sâu và đóng góp học thuật| CHOOSE_4C["KHUYẾN NGHỊ: PHƯƠNG ÁN 4C<br/>- 3 Đóng góp học thuật xuất sắc<br/>- Tích hợp cả Streaming và Systolic<br/>- Tạo bảng đo thực nghiệm đỉnh cao."]
 

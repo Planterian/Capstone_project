@@ -17,6 +17,9 @@ Phương án **3B (2D Systolic MAC Array)** là kiến trúc gia tốc phần c�
 - **Kích thước khối ngõ ra (Output Tile Size)**: Do mỗi cột PE tính toán đồng thời 2 cột trọng số ($K_{col0}$ và $K_{col1}$), mảng $4 \times 4$ PE tạo ra một mảnh ma trận kết quả kích thước **$4\text{ hàng} \times 8\text{ cột}$** ($4 \times 8 = 32$ phần tử tích lũy).
 - **Mô hình luân chuyển dữ liệu (Dataflow)**: **Output-Stationary (OS)** — Giá trị tích lũy (Accumulator) đứng yên tại chỗ bên trong mỗi PE. Dữ liệu kích hoạt $Q$ và trọng số $K$ di chuyển xuyên qua mảng theo dạng sóng lan truyền (Wavefront).
 
+> [!NOTE]
+> **Sơ Đồ Thông Lượng Toàn Mạch & Nút Thắt Drain**: Phân tích chi tiết về sơ đồ thông lượng end-to-end, giản đồ nhịp sóng Wavefront, so sánh tương quan giữa $d_k=16$ và $d_k > 16$, cùng phân tích điểm nghẽn Drain theo định luật Amdahl có tại: [so_do_thong_luong_3_variants.md](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes_ver02/so_do_thong_luong_3_variants.md).
+
 ---
 
 ## 2. Sơ Đồ Khối Chi Tiết Mảng 2D Systolic Array $4 \times 4$ PE
@@ -82,11 +85,15 @@ graph TD
 
 ## 3. Bản Chất Toán Học & Sự Lệch Pha Của Dòng Sóng (Wavefront Compute Timing)
 
-### 3.1. Cơ Chế Lệch Pha (Skewing)
-Để đảm bảo các phần tử của vector $Q$ và ma trận $K$ gặp nhau chính xác tại các giao điểm không gian:
+### 3.1. Cơ Chế Lệch Pha Tự Động (Auto Wavefront Skewing Logic)
+Để đảm bảo các phần tử của vector $Q$ và ma trận $K$ gặp nhau chính xác tại các giao điểm không gian trong mảng 2D:
 - Hàng thứ $r$ của ma trận $Q$ phải trễ $r$ chu kỳ xung nhịp trước khi vào PE $(r, 0)$.
 - Cột thứ $c$ của ma trận $K$ phải trễ $c$ chu kỳ xung nhịp trước khi vào PE $(0, c)$.
-- Do đó, phần tử PE $(r, c)$ nhận dữ liệu hợp lệ đầu tiên tại chu kỳ:
+- **Triển khai RTL thực tế**: Trong [systolic_mac_array.sv](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_3B/systolic_mac_array.sv), cơ chế này được tích hợp sẵn thông qua parameter `AUTO_SKEW = 1'b1` và khối logic `gen_auto_skew`:
+  - Mảng thanh ghi trễ bậc thang `q_skew_regs[r][d]` tự động chèn $r$ tầng Flip-Flop trễ cho hàng $r$.
+  - Mảng thanh ghi trễ bậc thang `k_skew_regs[c][d]` tự động chèn $c$ tầng Flip-Flop trễ cho cột $c$.
+  - Nhờ vậy, bộ điều khiển FSM ngoài Top Core có thể cấp đồng thời các hàng $Q$ và cột $K$ mà không cần tự quản lý các thanh ghi lệch pha rải rác bên ngoài!
+- Phần tử PE $(r, c)$ nhận dữ liệu hợp lệ đầu tiên tại chu kỳ:
   $$t_{\text{start}}(r, c) = r + c$$
 - PE góc dưới cùng $(3, 3)$ là phần tử bắt đầu và kết thúc muộn nhất, trễ $3 + 3 = 6$ chu kỳ so với PE $(0, 0)$.
 
@@ -234,8 +241,9 @@ stateDiagram-v2
 | **Số khối BRAM18K bổ sung** | 0 | **2 khối** (4 KB) | Bắt buộc cho Score Matrix Reordering Buffer |
 | **Chu kỳ tính GEMM 1 / Head** | **67,072 chu kỳ** | **114,688 chu kỳ** | **3B chậm hơn 71%** (do nghẽn Drain 32 chu kỳ) |
 | **Thời gian GEMM 1 @ 200MHz** | **0.335 ms** | **0.573 ms** | 2A nhanh hơn rõ rệt |
-| **Tổng thời gian Attention Head** | **1.36 ms** (4 heads: 5.46 ms) | **1.60 ms** (4 heads: 6.41 ms)| 2A tổng thể nhanh hơn 17.4% |
-| **Khung hình/giây (Attention FPS)**| **~183 FPS** | **~156 FPS** | 2A dẫn trước 27 FPS |
+| **Tổng chu kỳ Full Head (Thực Đo 128-bit TB)** | **209,919 chu kỳ** | **337,216 chu kỳ** | **3B tốn hơn 60.6% chu kỳ** |
+| **Thời gian 4 Heads (Full Attention @ 200MHz)** | **4.20 ms** | **6.74 ms** | 2A nhanh hơn 60.6% |
+| **Khung hình/giây (Attention FPS)**| **~238.2 FPS** | **~148.3 FPS** | 2A dẫn trước ~90 FPS |
 
 ### 7.2. Giải Pháp Nâng Cao: Mảng PE Có Bộ Đệm Kép (Shadow Accumulator)
 Để triệt tiêu hoàn toàn thời gian chết trong pha Drain, ta có thể bổ sung **Shadow Accumulator (Double-Buffered Registers)** vào bên trong mỗi PE:

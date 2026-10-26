@@ -1,0 +1,254 @@
+\documentclass[11pt,a4paper]{article}
+
+% ==============================================================================
+% PAGE LAYOUT & PACKAGES (1-Column A4 Full Size)
+% ==============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper, margin=0.8in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+%\usepackage{microtype}
+
+% ==============================================================================
+% CUSTOM ALGORITHMIC KEYWORDS & CONFIGURATION
+% ==============================================================================
+% Format comments with triangle symbol
+\algrenewcommand{\algorithmiccomment}[1]{\hfill$\triangleright$ \textit{#1}}
+
+% Left-aligned Section / Pass / Case Header
+\newcommand{\AlgHeader}[1]{\Statex $\triangleright$ \textbf{#1}}
+
+% Hanging Indentation for Long / Multiline Statements (Continuation Indent)
+% When a statement wraps to a new line, \parState ensures wrapped lines align
+% with the statement's indent level, with an extra 1.2em shift to the right.
+\makeatletter
+\newcommand{\parState}[1]{%
+  \State \parbox[t]{\dimexpr\linewidth-\ALG@thistlm}{%
+    \strut\hangindent=1.2em\hangafter=1 #1\strut}%
+}
+\makeatother
+
+% Custom loop commands mapping directly to native \For / \EndFor
+\newcommand{\ForEach}[1]{\For{\textbf{each} #1}}
+\newcommand{\EndForEach}{\EndFor}
+\newcommand{\ParallelForEach}[1]{\For{\textbf{each} #1 \textbf{parallel}}}
+\newcommand{\EndParallelForEach}{\EndFor}
+
+% Mathematical helpers
+\newcommand{\Clamp}{\text{Clamp}}
+\newcommand{\INT}{\text{INT}}
+\newcommand{\UINT}{\text{UINT}}
+\newcommand{\ASR}{\mathbin{\gg\mkern-6mu\gg}}
+
+% ==============================================================================
+% DOCUMENT BODY (Modular Algorithm Frames Per Phase)
+% ==============================================================================
+\begin{document}
+
+\pagestyle{empty} % No page numbers for clean inclusion
+
+% ==============================================================================
+% ALGORITHM 1: TOP-LEVEL MHA ACCELERATOR ORCHESTRATION
+% ==============================================================================
+\begin{algorithm}[H]
+\caption{Top-Level Multi-Head Attention Accelerator Orchestration (\texttt{attention\_core\_top})}
+\label{alg:mha_top}
+\begin{algorithmic}[1]
+\Require Matrices $Q, K, V \in \INT8^{N \times d_k}$ per head stored in off-chip DDR4 memory;\\
+         Dyadic scaling parameters: Mantissa $M \in [0, 2^{18}-1]$, Exponent $E \in [0, 31]$;\\
+         Softmax Exp-LUT parameters ($1024 \times 20$-bit fixed-point coefficients in DDR4);\\
+         Constants: Sequence length $N = 256$, Head dimension $d_k \in \{16, 20, 24\}$, Number of heads $H = 4$;\\
+         AXI4-Stream bus width $W_{\text{bus}} \in \{64, 128\}$ bits;\\
+         Control flags: \texttt{start\_pulse}, \texttt{update\_lut\_cfg}, \texttt{clear\_buf}, \texttt{soft\_reset}.
+\Ensure  Context output matrix $O \in \INT8^{N \times d_k}$ per head written back to DDR4 memory;\\
+         Core status flag \texttt{DONE} asserted upon completion.
+
+\Statex
+\If{\texttt{update\_lut\_cfg} is \textbf{true}}
+    \parState{Load 1024-word Exp-LUT coefficients from DDR into True Dual-Port BRAM via AXI-Lite MMIO (Reg \texttt{0x40/0x44})}
+\EndIf
+
+\ForEach{attention head $h \in [0, H)$}
+    \parState{$\text{DMA\_MM2S\_Transfer}(Q[h], K[h], V[h])$ from DDR into on-chip Ping-Pong BRAM ($Q_{\text{MEM}}, K_{\text{MEM}}, V_{\text{MEM}}$)}
+    
+    \ForEach{query token row $i \in [0, N)$}
+        \State $\mathbf{s}_{\text{raw}}[i, :] \gets \textsc{Stage1\_QKT\_GEMM}(Q_{\text{MEM}}[i, :], K_{\text{MEM}}, N, d_k)$ \Comment{Call Algorithm~\ref{alg:qkt_variants}}
+        \State $\mathbf{s}_{\text{scaled}}[i, :] \gets \textsc{Stage2\_Dyadic\_Scaler}(\mathbf{s}_{\text{raw}}[i, :], M, E, N)$ \Comment{Call Algorithm~\ref{alg:stage2_scaler}}
+        \State $\mathbf{P}[i, :] \gets \textsc{Stage3\_Hardware\_IntSoftmax}(\mathbf{s}_{\text{scaled}}[i, :], N)$ \Comment{Call Algorithm~\ref{alg:stage3_softmax}}
+        \State $\mathbf{o}_i \gets \textsc{Stage4\_Context\_GEMM}(\mathbf{P}[i, :], V_{\text{MEM}}, N, d_k)$ \Comment{Call Algorithm~\ref{alg:stage4_gemm}}
+        \State Store token vector $O[i, :] \gets \mathbf{o}_i$ into Egress Ping-Pong Buffer
+    \EndFor
+    
+    \parState{$\text{DMA\_S2MM\_Transfer}(O)$ to DDR4 via AXI4-Stream Egress ($W_{\text{bus}}$ beats, \texttt{tlast} asserted at final beat)}
+\EndForEach
+\parState{Assert core \texttt{DONE} interrupt and update \texttt{STATUS} register ($\text{Reg }\texttt{0x04}[1] \gets 1$)}
+\end{algorithmic}
+\end{algorithm}
+
+\newpage
+
+% ==============================================================================
+% ALGORITHM 2: STAGE 1 - GENERALIZED QKT GEMM & ARCHITECTURE VARIANTS
+% ==============================================================================
+\begin{algorithm}[H]
+\caption{Stage 1 --- Generalized $QK^T$ GEMM Row Computation \& Microarchitecture Mapping}
+\label{alg:qkt_variants}
+\begin{algorithmic}[1]
+\Require Query row vector $\mathbf{q}_i = Q[i, 0 : d_k-1] \in \INT8^{1 \times d_k}$;\\
+         Key matrix $K \in \INT8^{N \times d_k}$ stored in on-chip Ping-Pong BRAM ($K_{\text{MEM}}$);\\
+         Parameters: Sequence length $N = 256$, Head dimension $d_k \in \{16, 20, 24\}$, Bus width $W_{\text{bus}} \in \{64, 128\}$ bits;\\
+         Target Variant $\in \{\text{\textbf{Variant 1A}}, \text{\textbf{Variant 2A}}, \text{\textbf{Variant 3B}}\}$.
+\Ensure  Raw Attention Score row vector $\mathbf{s}_{\text{raw}}[i, 0 : N-1] \in \INT32^{1 \times N}$.
+
+\Statex
+\AlgHeader{Case 1: Variant 1A --- Pure LUT Streaming with $N=32$ Parallel Adder Tree (\texttt{pipelined\_adder\_tree})}
+\If{$\text{Target Variant} == \text{\textbf{Variant 1A}}$}
+    \parState{Latch query row vector $\mathbf{q}_i$ into local query registers \Comment{Stationary across all $N$ key tokens}}
+    \ForEach{key token index $j \in [0, N)$}
+        \parState{Fetch key token vector $K[j, 0 : d_k-1]$ from BRAM \Comment{1 beat/token on 128-bit bus, zero-padded to 32B}}
+        \ParallelForEach{channel $c \in [0, 32)$}
+            \parState{$\text{prod}[c] \gets (c < d_k) \;?\; \big(\mathbf{q}_i[c] \times K[j, c]\big) : 0$ \Comment{32 parallel INT8 multipliers in LUT}}
+        \EndParallelForEach
+        \parState{$s_{\text{raw}}[i, j] \gets \textsc{Pipelined\_Adder\_Tree\_5\_Stages}\big(\text{prod}[0 : 31]\big)$ \Comment{Throughput = 1 cycle ($II=1$)}}
+    \EndFor
+
+\Statex
+\AlgHeader{Case 2: Variant 2A --- Interleaved DSP-Packed Streaming (\texttt{dsp\_packed\_adder\_tree}, 8 DSPs, Dual Trees)}
+\ElsIf{$\text{Target Variant} == \text{\textbf{Variant 2A}}$}
+    \parState{Latch query row vector $\mathbf{q}_i$ into local query registers \Comment{Stationary across all key token pairs}}
+    \State $n_{\text{beats}} \gets \lceil d_k / 8 \rceil$ \Comment{Token sub-beats: 2 beats for $d_k=16$; 3 beats for $d_k=20, 24$}
+    \ForEach{key token pair $p \in [0, N/2)$} \Comment{Stream 128 pairs of Even ($j_e = 2p$) and Odd ($j_o = 2p+1$) tokens}
+        \State $j_e \gets 2p, \quad j_o \gets 2p + 1$
+        \State Initialize beat accumulators: $\text{acc}_e \gets 0, \quad \text{acc}_o \gets 0$
+        \ForEach{beat $b \in [0, n_{\text{beats}})$}
+            \parState{Fetch slices $\mathbf{q}_i[8b : 8b+7]$, $K[j_e, 8b : 8b+7]$, $K[j_o, 8b : 8b+7]$ from BRAM}
+            \ParallelForEach{DSP slice $d \in [0, 8)$} \Comment{8 DSP48E2 packed MAC units ($27 \times 18$-bit)}
+                \State $\text{prod}_e[d] \gets \mathbf{q}_i[8b + d] \times K[j_e, 8b + d]$ \Comment{Port A $\times$ Port B ($K_{\text{even}}$ product)}
+                \State $\text{prod}_o[d] \gets \mathbf{q}_i[8b + d] \times K[j_o, 8b + d]$ \Comment{Port A $\times$ Port C ($K_{\text{odd}}$ product)}
+            \EndParallelForEach
+            \State $\text{acc}_e \gets \text{acc}_e + \textsc{Adder\_Tree\_3\_Stages}(\text{prod}_e[0:7])$ \Comment{3-stage binary tree ($8 \to 4 \to 2 \to 1$)}
+            \State $\text{acc}_o \gets \text{acc}_o + \textsc{Adder\_Tree\_3\_Stages}(\text{prod}_o[0:7])$ \Comment{Parallel tree for odd token}
+        \EndForEach
+        \parState{$\{s_{\text{raw}}[i, j_e],\, s_{\text{raw}}[i, j_o]\} \gets \textsc{Zero\_Bubble\_Interleaver}(\text{acc}_e, \text{acc}_o)$ \Comment{Sustained throughput $II = 1$ cycle}}
+    \EndFor
+
+\Statex
+\AlgHeader{Case 3: Variant 3B --- 2D Output-Stationary Systolic MAC Array (\texttt{systolic\_mac\_array}, $4 \times 4$ Grid, 16 DSPs)}
+\ElsIf{$\text{Target Variant} == \text{\textbf{Variant 3B}}$}
+    \parState{Constants: Tile rows $T_{\text{row}} = 4$, Tile columns $T_{\text{col}} = 8$ (via $4 \times 4$ PE grid with dual-INT8 packing)}
+    \ForEach{column block $j_{\text{blk}} \in [0, N)$ with step $T_{\text{col}}$}
+        \State $c_{\text{blk\_col}} \gets \min(T_{\text{col}}, N - j_{\text{blk}})$
+        \ForEach{row block $i_{\text{blk}} \in [0, N)$ with step $T_{\text{row}}$}
+            \State $c_{\text{blk\_row}} \gets \min(T_{\text{row}}, N - i_{\text{blk}})$
+            \State Initialize systolic local accumulator tile: $\mathbf{C}_{\text{local}}[0 : T_{\text{row}}-1, 0 : T_{\text{col}}-1] \gets 0$
+            \ForEach{dimension slice $k_0 \in [0, d_k)$ with step 1}
+                \State Skew \& stream local $Q$ slice $Q[i_{\text{blk}} : i_{\text{blk}} + T_{\text{row}} - 1, k_0]$ into PE row inputs
+                \State Skew \& stream local $K$ slice $K[j_{\text{blk}} : j_{\text{blk}} + T_{\text{col}} - 1, k_0]$ into PE column inputs
+                \parState{$\mathbf{C}_{\text{local}} \gets \mathbf{C}_{\text{local}} + Q_{\text{local}} \times K_{\text{local}}^T$ \Comment{$4 \times 4$ PEs $\times 2$ INT8 = 32 MACs/cycle}}
+            \EndForEach
+            \parState{Sequentially drain tile $\mathbf{C}_{\text{local}}$ (32 items) into Reorder Buffer at offset $(i_{\text{blk}}, j_{\text{blk}})$}
+        \EndForEach
+    \EndForEach
+    \parState{Drain raw score row vector from Reorder Buffer: $\mathbf{s}_{\text{raw}}[i, 0 : N-1] \gets \text{Reorder\_Buffer}[i, 0 : N-1]$}
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+\newpage
+
+% ==============================================================================
+% ALGORITHM 3: STAGE 2 - PIPELINED DYADIC SCALER UNIT
+% ==============================================================================
+\begin{algorithm}[H]
+\caption{Stage 2 --- Pipelined Dyadic Scaler Unit (\texttt{scale\_unit})}
+\label{alg:stage2_scaler}
+\begin{algorithmic}[1]
+\Require Raw Attention Score row vector $\mathbf{s}_{\text{raw}}[i, 0 : N-1] \in \INT32^{1 \times N}$;\\
+         Dyadic scaling parameters: Mantissa $M \in [0, 2^{18}-1]$, Exponent $E \in [0, 31]$;\\
+         Sequence length $N = 256$.
+\Ensure  Scaled Attention Score row vector $\mathbf{s}_{\text{scaled}}[i, 0 : N-1] \in \INT16^{1 \times N}$ saturated to $[-32768, 32767]$.
+
+\Statex
+\ForEach{key token index $j \in [0, N)$}
+    \State $P_{\text{mult}} \gets s_{\text{raw}}[i, j] \times M$ \Comment{DSP multiplication: $\INT32 \times \INT18 \to \INT50$}
+    \State $S_{\text{shifted}} \gets P_{\text{mult}} \ASR E$ \Comment{Arithmetic right shift by $E$ positions}
+    \State $s_{\text{scaled}}[i, j] \gets \Clamp_{\INT16}\big(S_{\text{shifted}}\big)$ \Comment{Saturation clamp to $[-32768, 32767]$}
+\EndForEach
+\State \Return $\mathbf{s}_{\text{scaled}}[i, 0 : N-1]$
+\end{algorithmic}
+\end{algorithm}
+
+\vspace{1.2em}
+
+% ==============================================================================
+% ALGORITHM 4: STAGE 3 - RECONFIGURABLE 3-PASS HARDWARE INTSOFTMAX ENGINE
+% ==============================================================================
+\begin{algorithm}[H]
+\caption{Stage 3 --- Reconfigurable 3-Pass Hardware IntSoftmax Engine (\texttt{softmax\_lut})}
+\label{alg:stage3_softmax}
+\begin{algorithmic}[1]
+\Require Scaled Attention Score row vector $\mathbf{s}_{\text{scaled}}[i, 0 : N-1] \in \INT16^{1 \times N}$;\\
+         True Dual-Port Exp-LUT BRAM table $\text{EXP\_BRAM\_LUT}[0 : 1023]$ ($1024 \times 20$-bit);\\
+         Sequence length $N = 256$.
+\Ensure  Normalized Attention Probability row vector $\mathbf{P}[i, 0 : N-1] \in \UINT16^{1 \times N}$ where $P[i, j] \in [0, 32767]$.
+
+\Statex
+\AlgHeader{Pass 1: Streaming Row Maximum Search}
+\State $m_i \gets -32768$ \Comment{Initialize to minimum INT16 value}
+\ForEach{key token index $j \in [0, N)$}
+    \State $m_i \gets \max\big(m_i, s_{\text{scaled}}[i, j]\big)$ \Comment{Dynamic peak tracking comparator}
+\EndFor
+
+\Statex
+\AlgHeader{Pass 2: Exponentiation via BRAM LUT \& Denominator Summation}
+\State $S_i \gets 0$ \Comment{Initialize 24-bit denominator accumulator}
+\ForEach{key token index $j \in [0, N)$}
+    \State $d_{i,j} \gets s_{\text{scaled}}[i, j] - m_i$ \Comment{Subtract max: guaranteed $d_{i,j} \le 0$}
+    \parState{$\text{lut\_addr} \gets \Clamp_{\INT}\big(-1023, 0, d_{i,j}\big) + 1023$ \Comment{Bound check to BRAM index $[0, 1023]$}}
+    \State $e_{i,j} \gets \text{EXP\_BRAM\_LUT}[\text{lut\_addr}]$ \Comment{Lookup exponential value in UFix20\_19}
+    \State $S_i \gets S_i + e_{i,j}$ \Comment{Accumulate sum $\sum e^{s_j - m_i}$}
+\EndFor
+
+\Statex
+\AlgHeader{Intermediate: 32-Step Restoring Integer Division}
+\parState{$R_i \gets \textsc{32\_Step\_Restoring\_Divider}\big(2^{31}, S_i\big)$ \Comment{Reciprocal multiplier $R_i = \lfloor 2^{31} / S_i \rfloor$ (UFix32\_31)}}
+
+\Statex
+\AlgHeader{Pass 3: Probability Normalization \& Saturation}
+\ForEach{key token index $j \in [0, N)$}
+    \State $M_{\text{prob}} \gets e_{i,j} \times R_i$ \Comment{Multiplier: $20\text{-bit} \times 32\text{-bit} \to 52\text{-bit}$}
+    \State $P[i, j] \gets \Clamp_{\UINT16}\big(M_{\text{prob}} \ASR 16\big)$ \Comment{Normalized probability in range $[0, 32767]$}
+\EndFor
+\State \Return $\mathbf{P}[i, 0 : N-1]$
+\end{algorithmic}
+\end{algorithm}
+
+\vspace{1.2em}
+
+% ==============================================================================
+% ALGORITHM 5: STAGE 4 - CONTEXT SCORE X VALUE GEMM ENGINE
+% ==============================================================================
+\begin{algorithm}[H]
+\caption{Stage 4 --- Context Score $\times$ Value GEMM Engine (\texttt{score\_v\_gemm})}
+\label{alg:stage4_gemm}
+\begin{algorithmic}[1]
+\Require Normalized Probability row vector $\mathbf{P}[i, 0 : N-1] \in \UINT16^{1 \times N}$;\\
+         Value matrix $V \in \INT8^{N \times d_k}$ stored in on-chip Ping-Pong BRAM ($V_{\text{MEM}}$);\\
+         Constants: Sequence length $N = 256$, Head dimension $d_k \in \{16, 20, 24\}$.
+\Ensure  Context output token vector $\mathbf{o}_i = O[i, 0 : d_k-1] \in \INT8^{1 \times d_k}$.
+
+\Statex
+\ParallelForEach{feature channel $d \in [0, d_k)$}
+    \State $\text{acc}_{\text{out}}[d] \gets 0$ \Comment{Initialize 32-bit channel accumulator}
+    \ForEach{token index $j \in [0, N)$}
+        \parState{$\text{acc}_{\text{out}}[d] \gets \text{acc}_{\text{out}}[d] + \big(P[i, j] \times V_{\text{MEM}}[j, d]\big)$ \Comment{$\UINT16 \times \INT8 \to \INT24$ accumulation}}
+    \EndForEach
+    \State $S_{\text{proj}} \gets \text{acc}_{\text{out}}[d] \ASR 15$ \Comment{Fixed-point 15-bit shift right}
+    \State $O[i, d] \gets \Clamp_{\INT8}\big(S_{\text{proj}}\big)$ \Comment{Saturation clamp to $[-128, 127]$}
+\EndParallelForEach
+\State \Return $O[i, 0 : d_k-1]$
+\end{algorithmic}
+\end{algorithm}
+
+\end{document}

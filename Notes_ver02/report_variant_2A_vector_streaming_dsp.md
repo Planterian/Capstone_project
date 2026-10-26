@@ -98,53 +98,42 @@ graph TD
 
 Do toán hạng $A$ được chia sẻ chung giữa hai phép nhân, việc ánh xạ các ma trận $Q$ và $K$ vào các khối DSP Packing đòi hỏi sự chặt chẽ về mặt thuật toán:
 
-### Phương Án Khuyến Nghị: Kiến Trúc Phát Đôi 2-Key Song Song (2-Key Interleaved Dual Streaming)
-Để tận dụng tối đa sức mạnh của 16 phép nhân từ 8 khối DSP Packing:
-- **Nguyên lý**: Gán toán hạng $A$ làm vector hàng của Query: $A[d] = Q[i, d]$.
-- Gán toán hạng $B$ và $C$ cho **hai token khóa (Key tokens) liền kề nhau**:
-  $$B[d] = K[2j, d], \quad C[d] = K[2j+1, d] \quad (d = 0..15)$$
-- **Số lượng phần cứng**: Sử dụng **16 khối `pe_slice_dsp_packing`** (hoặc 8 khối chia làm 2 nhịp):
-  - Với 16 DSPs: Tính trọn vẹn **hai dot-product score hoàn chỉnh** ($S_{i, 2j}$ và $S_{i, 2j+1}$) trong **cùng 1 chu kỳ xung nhịp**!
-  - Thông lượng đạt được: **2 scores / chu kỳ xung nhịp** ($II = 0.5$ cycle/score).
-- Với phương án **8 DSPs** (cấu hình tiêu chuẩn tối ưu tài nguyên cho Edge):
-  - 8 DSPs tính 8 chiều $d = 0..7$ ở nhịp 1, và 8 chiều $d = 8..15$ ở nhịp 2.
-  - Sau đó gộp lại thông qua cây cộng dồn tích lũy.
+### 4.1. Kiến Trúc Chính Thức: Phát Đôi 2-Key Song Song Xen Kẽ (Interleaved Even/Odd Dual-Token Streaming)
+Để tối ưu hóa diện tích phần cứng và khai thác triệt để 16 phép nhân INT8 từ **8 khối cứng DSP48E2**:
+- **Nguyên lý phân kênh toán hạng**:
+  - Toán hạng $A$: Vector hàng truy vấn stationary $A[d] = Q[i, 8b + d]$ ($d = 0..7$).
+  - Toán hạng $B$: Slice của Key token chẵn $B[d] = K[2p, 8b + d]$ ($K_{\text{even}}$).
+  - Toán hạng $C$: Slice của Key token lẻ $C[d] = K[2p+1, 8b + d]$ ($K_{\text{odd}}$).
+- **Cơ chế nạp đa beat (Multi-Beat)**:
+  - Với $d_k = 16$: Cần $n_{\text{beats}} = 2$ beats (Beat 0: $d = 0..7$, Beat 1: $d = 8..15$).
+  - Trong mỗi beat (1 chu kỳ xung nhịp), 8 lát DSP48E2 thực hiện đồng thời 16 phép nhân ($8 \times K_{\text{even}}$ và $8 \times K_{\text{odd}}$).
+  - Kết quả tích riêng của từng nhánh được đưa qua **hai cây cộng nhị phân 3 tầng độc lập** ($8 \to 4 \to 2 \to 1$) để thu được `t3_even` và `t3_odd`.
+- **Tích lũy & Tuần tự hóa triệt tiêu bọt khí (Zero-Bubble Serializer)**:
+  - Qua 2 beats, `accum_even` và `accum_odd` tích lũy trọn vẹn tích vô hướng của cả 2 tokens ($2 \times 16 = 32$ phép MAC).
+  - Khối tuần tự hóa phát điểm số chẵn $S_{\text{even}}$ ở chu kỳ $T$, và phát điểm số lẻ $S_{\text{odd}}$ (từ `odd_hold_reg`) ở chu kỳ $T+1$.
+  - Nhờ vậy, dòng điểm số xuất ra ngoài đạt **thông lượng liên tục tuyệt đối $II = 1$ cycle / score** mà không hề xuất hiện bất kỳ chu kỳ chết (bubble) nào!
 
 ```mermaid
 graph TD
-    subgraph DUAL_STREAM ["KIẾN TRÚC STREAMING 8 DSP PACKING (16 PHÉP NHÂN INT8)"]
-        Q_LATCH["Thanh Ghi Q Hàng i<br/>q0..q15"]
-        K_EVEN["Vector Key 2j<br/>k_even 0..15"]
-        K_ODD["Vector Key 2j+1<br/>k_odd 0..15"]
+    subgraph DUAL_STREAM ["KIẾN TRÚC THỰC TẾ RTL: 8 DSP PACKING + DUAL 3-STAGE TREES + SERIALIZER"]
+        Q_BEAT["Vector Q (Beat b)<br/>q (8b .. 8b+7)"]
+        K_EVEN["Key Even (Beat b)<br/>k_even (8b .. 8b+7)"]
+        K_ODD["Key Odd (Beat b)<br/>k_odd (8b .. 8b+7)"]
 
-        Q_LATCH -->|q0| DSP0["DSP #0"]
-        K_EVEN  -->|k0_even| DSP0
-        K_ODD   -->|k0_odd| DSP0
+        Q_BEAT -->|q 0..7| DSP_BANK["8x DSP48E2 Slices (pe_slice_dsp_packing)<br/>Tính đồng thời 8 tích Even & 8 tích Odd"]
+        K_EVEN  -->|k_even 0..7| DSP_BANK
+        K_ODD   -->|k_odd 0..7| DSP_BANK
 
-        Q_LATCH -->|q1| DSP1["DSP #1"]
-        K_EVEN  -->|k1_even| DSP1
-        K_ODD   -->|k1_odd| DSP1
+        DSP_BANK -->|8 tích chẵn| TREE_EVEN["Cây cộng nhị phân Even (3 tầng)<br/>8 -> 4 -> 2 -> 1"]
+        DSP_BANK -->|8 tích lẻ| TREE_ODD["Cây cộng nhị phân Odd (3 tầng)<br/>8 -> 4 -> 2 -> 1"]
 
-        Q_LATCH -->|...| DSP_DOT["... (8 DSPs)"]
-        K_EVEN  -->|...| DSP_DOT
-        K_ODD   -->|...| DSP_DOT
+        TREE_EVEN -->|t3_even| ACC_EVEN["Bộ tích lũy Even (accum_even)<br/>Tích lũy qua n_beats"]
+        TREE_ODD  -->|t3_odd| ACC_ODD["Bộ tích lũy Odd (accum_odd)<br/>Tích lũy qua n_beats"]
 
-        Q_LATCH -->|q7| DSP7["DSP #7"]
-        K_EVEN  -->|k7_even| DSP7
-        K_ODD   -->|k7_odd| DSP7
+        ACC_EVEN -->|Khi beat cuối| SER["Zero-Bubble Serializer Engine<br/>- Chu kỳ T: Xuất Score Even<br/>- Chu kỳ T+1: Xuất Score Odd (từ odd_hold_reg)"]
+        ACC_ODD  -->|Khi beat cuối| SER
 
-        DSP0 -->|p0_even| TREE_EVEN["CÂY CỘNG NHÁNH EVEN<br/>8 sang 1 INT32"]
-        DSP1 -->|p1_even| TREE_EVEN
-        DSP_DOT -->|pe_even| TREE_EVEN
-        DSP7 -->|p7_even| TREE_EVEN
-
-        DSP0 -->|p0_odd| TREE_ODD["CÂY CỘNG NHÁNH ODD<br/>8 sang 1 INT32"]
-        DSP1 -->|p1_odd| TREE_ODD
-        DSP_DOT -->|pe_odd| TREE_ODD
-        DSP7 -->|p7_odd| TREE_ODD
-
-        TREE_EVEN -->|Score S_even| OUT_EVEN["Score Out Even (INT32)"]
-        TREE_ODD  -->|Score S_odd| OUT_ODD["Score Out Odd (INT32)"]
+        SER -->|1 score / cycle liên tục II = 1| OUT_SCORE["s_raw i, j tới Stage 2 Scaler"]
     end
 ```
 
@@ -158,24 +147,23 @@ Khối DSP48E2 có **2 chu kỳ độ trễ phần cứng bên trong** (`LATENCY
 sequenceDiagram
     autonumber
     participant FSM as Master FSM
-    participant BRAM as BRAM Q va K
-    participant DSP as 8x DSP48E2 Stage 1-2
-    participant TREE as Reduction Tree Stage 3-6
-    participant SCALE as Scale Unit
-    participant SM as Softmax Buffer
+    participant BRAM as On-Chip Storage (k_mem)
+    participant DSP as 8x DSP48E2 (Stage 1-2)
+    participant TREE as Dual 3-Stage Trees (Stage 3-5)
+    participant SER as Zero-Bubble Serializer (Stage 6)
+    participant SCALE as Stage 2 Dyadic Scaler
+    participant SM as Stage 3 Softmax Engine
 
-    FSM->>BRAM: Kích hoạt đọc Q
-    BRAM-->>FSM: Trả về Q 128-bit
-    FSM->>FSM: Latch vào thanh ghi cục bộ q_curr_vec
+    FSM->>BRAM: Chốt vector Q hàng i (Stationary)
     
-    loop Stream 256 Key Vectors
-        FSM->>BRAM: Đọc K chẵn và K lẻ
-        BRAM-->>DSP: Cấp toán hạng A, B, C ở chu kỳ t
-        Note over DSP: Chu kỳ t+1: Nhân trong DSP<br/>Chu kỳ t+2: Unpack và sửa dấu
-        DSP-->>TREE: Xuất 16 tích con ở chu kỳ t+2
-        Note over TREE: Chu kỳ t+3: Tầng L1<br/>Chu kỳ t+4: Tầng L2<br/>Chu kỳ t+5: Tầng L3 Root
-        TREE-->>SCALE: Xuất 2 Scores INT32 ở chu kỳ t+6
-        SCALE-->>SM: Ghi 2 Scaled Scores vào Buffer
+    loop Lặp 128 Cặp Token Khóa (Key Pairs p = 0..127)
+        FSM->>BRAM: Chu kỳ t: Nạp Beat 0 (K_even[0:7], K_odd[0:7])
+        FSM->>BRAM: Chu kỳ t+1: Nạp Beat 1 (K_even[8:15], K_odd[8:15])
+        Note over DSP: Chu kỳ t+2: Unpack & sửa dấu Beat 0 (8 Even, 8 Odd)<br/>Chu kỳ t+3: Unpack & sửa dấu Beat 1 (8 Even, 8 Odd)
+        Note over TREE: Chu kỳ t+3..t+5: Dual 3-Stage Trees cộng gộp 8->1
+        Note over SER: Chu kỳ t+6: Beat 1 tới Root, phát ngay Score Even S[2p]<br/>Chu kỳ t+7: Phát ngay Score Odd S[2p+1] từ odd_hold_reg
+        SER-->>SCALE: Dòng điểm số xuất liên tục mỗi chu kỳ 1 score (II = 1)
+        SCALE-->>SM: Thu phóng bão hòa INT16 và nạp trực tiếp vào Softmax Buffer
     end
 ```
 
@@ -203,16 +191,18 @@ sequenceDiagram
 
 ---
 
-## 7. Các Điểm Cần Làm Rõ & Đề Xuất Tối Ưu Hệ Thống
+## 7. Giải Pháp Đồng Bộ & Triệt Tiêu Nút Thắt Downstream (Resolved by Architecture)
 
-### 7.1. Xử Lý Nút Thắt Downstream Khi GEMM Phát 2 Scores/Chu Kỳ
-- **Vấn đề**: Nếu chạy chế độ 2-Key song song, GEMM 1 xuất ra 2 scores/chu kỳ. Tuy nhiên, khối `scale_unit.sv` và `softmax_lut.sv` hiện tại chỉ có 1 cổng vào đơn ($1\text{ score/cycle}$).
-- **Giải pháp**:
-  - *Giải pháp 1 (Đơn giản nhất)*: Cấu hình mảng 8 DSP chạy ở chế độ **1-Key stream** (8 DSP xử lý 8 byte chẵn của 1 Key, 8 byte lẻ được xử lý ở chu kỳ tiếp theo hoặc dùng 8 DSP đóng gói theo cặp chiều $d$). Khi đó tốc độ phát đúng bằng 1 score/chu kỳ, ghép nối hoàn hảo với Softmax hiện tại.
-  - *Giải pháp 2 (Băng thông tối đa)*: Nâng cấp `score_buffer` trong Softmax thành **True Dual-Port BRAM**, cho phép ghi đồng thời 2 scores tại địa chỉ $2j$ và $2j+1$.
+### 7.1. Triệt Tiêu Nút Thắt Downstream Bằng Zero-Bubble Serializer
+- **Vấn đề lý thuyết ban đầu**: Nếu GEMM 1 xuất 2 scores đồng thời trong cùng 1 chu kỳ, khối `scale_unit.sv` và `softmax_lut.sv` phía sau bắt buộc phải có 2 cổng vào song song (gấp đôi tài nguyên BRAM Dual-Port).
+- **Giải pháp hoàn thiện trong RTL**: Module [`dsp_packed_adder_tree.sv`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_2A/dsp_packed_adder_tree.sv) tích hợp sẵn bộ đệm giữ `odd_hold_reg` và máy phát nhịp `odd_pending`.
+  - Tại chu kỳ $T$ khi nạp xong beat cuối: Xuất ngay điểm số chẵn $S[2p]$ (`out_valid = 1`).
+  - Tại chu kỳ $T+1$: Xuất điểm số lẻ $S[2p+1]$ từ `odd_hold_reg` (`out_valid = 1`).
+  - Do 2 beats đầu vào mất 2 chu kỳ, và 2 điểm số đầu ra phát trong đúng 2 chu kỳ, dòng dữ liệu đạt **thông lượng liên tục $II = 1$ score / cycle**. Khối `scale_unit` và `softmax_lut` downstream nhận dữ liệu trơn tru qua giao tiếp 1 cổng đơn cực kỳ nhỏ gọn!
 
-### 7.2. Yêu Cầu Băng Thông Đọc BRAM Cho 2-Key Stream
-Nếu đọc đồng thời $K[2j]$ và $K[2j+1]$, tổng băng thông yêu cầu là $2 \times 128\text{ bit} = \mathbf{256\text{ bit/cycle}}$. Điều này đòi hỏi BRAM K phải được cấu hình Dual-Port (mỗi cổng đọc 128-bit) hoặc tách thành hai khối BRAM độc lập: `BRAM_K_Even` và `BRAM_K_Odd`.
+### 7.2. Băng Thông & Tổ Chức Lưu Trữ BRAM K Cho 2-Key Stream
+- Tại [`attention_core_top_2A.sv`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_2A/attention_core_top_2A.sv), bộ nhớ `k_mem` được tổ chức 2 chiều: `k_mem[0:MAX_TOKENS-1][0:MAX_HEAD_DIM-1]`.
+- Logic đọc truy xuất đồng thời 2 địa chỉ token chẵn `col_even = {k_pair_idx, 1'b0}` và token lẻ `col_odd = {k_pair_idx, 1'b1}`. Mỗi nhịp chỉ cần đọc 8 byte cho mỗi token (tổng cộng 16 bytes = 128 bit/chu kỳ), khớp hoàn toàn với băng thông bus bộ nhớ on-chip BRAM!
 
 ---
 
