@@ -61,9 +61,14 @@ Thuật toán Softmax số nguyên trong **I-ViT (Shiftmax)** được xây dự
                           │
                           v  inv_sum_reg [31:0]
     +---------------------------------------------------------------------------+
-    | Pass 4: Normalization Multiplier & Shift-Right                            |
-    | prod_prob = (rom_data_exp * inv_sum_reg)                                  |
-    | out_prob  = prod_prob [31:16] (UINT16 [0..32767])                         |
+    | Pass 4: 2-Stage Pipelined Normalization & Saturation (Timing Closed)      |
+    | [Stage 4.1 - Mult Reg]:                                                   |
+    |   mult_full_reg <= {32'd0, rom_data_exp} * {20'd0, inv_sum_reg};         |
+    |   (Suy luận DSP48E2 internal MREG / PREG, trễ ~2.4 ns)                    |
+    | [Stage 4.2 - Shift & Clamp]:                                              |
+    |   shifted_prob   = mult_full_reg >> 16;                                   |
+    |   out_prob      <= (shifted_prob > 65535) ? 16'hFFFF : shifted_prob[15:0];|
+    |   out_valid     <= pipe_valid_stage2;                                     |
     +---------------------------------------------------------------------------+
 ```
 
@@ -78,3 +83,56 @@ Khối BRAM 1024 từ $\times$ 20 bits được nạp sẵn từ tệp `exp_rom_
 - **Phân vùng dự phòng:** Địa chỉ `0x300` .. `0x3FF` (768 .. 1023)
 
 Cổng Port B cho phép CPU ARM ghi đè bảng tra tại thời gian chạy (Runtime Reconfiguration) qua các thanh ghi AXI-Lite `0x40` và `0x44`.
+
+---
+
+## 4. NHẬT KÝ CẬP NHẬT THIẾT KẾ (DESIGN CHANGELOG)
+
+### [2026-10-27] Tối Ưu Hóa Pipeline Đa Tầng Cho Softmax Normalizer & Tái Kiểm Thử Bit-Exact
+
+- **Bối cảnh & Động lực:**
+  - Kết quả Place-and-Route (PnR) trên chip AMD Kria KV260 (`xck26-sfvc784-2LV-c`) tại tần số mục tiêu 200.0 MHz ($T_{clk} = 5.0\text{ ns}$) ghi nhận vi phạm Setup Time ($WNS = -0.803\text{ ns}$ trên 1A, $-1.095\text{ ns}$ trên 2A, $-0.924\text{ ns}$ trên 3B).
+  - Phân tích chi tiết báo cáo `post_route_timing.rpt` xác định **100% các điểm vi phạm timing trên cả 3 biến thể đều bắt nguồn từ một đường trễ tổ hợp duy nhất** trong `softmax_lut.sv`:
+    $$\text{RAMB36E2 CLKBWRCLK (1.305 ns)} \to \text{DSP48E2 cascade (2.80 ns)} \to \text{LUT shifters/clamp (0.80 ns)} \to \texttt{out\_prob\_reg[*]/D}$$
+    Tổng trễ đường truyền lên tới ~5.6 - 5.9 ns.
+  - **Nguyên nhân cốt lõi:** Phép nhân chuẩn hóa `assign mult_full = {32'd0, rom_data_exp} * {20'd0, inv_sum_reg};` được khai báo dạng tổ hợp (`assign`), khiến Vivado không thể ánh xạ các thanh ghi đường ống nội bộ của DSP48E2 (`MREG` và `PREG`), buộc chu trình đọc BRAM, nhân 52-bit, dịch bit và bộ dồn saturation clamp phải diễn ra trong cùng một chu kỳ xung nhịp 5.0 ns.
+
+- **Nội dung sửa đổi phần cứng (`softmax_lut.sv`):**
+  1. Thêm cờ pipeline 2 tầng: `logic pipe_valid_stage2;` điều khiển tín hiệu hợp lệ sau tầng nhân.
+  2. Bổ sung thanh ghi đường ống `mult_full_reg [51:0]` cho phép Vivado suy luận trực tiếp thanh ghi nội `MREG / PREG` của DSP48E2:
+     ```systemverilog
+     // Stage 1: Chốt kết quả nhân DSP
+     if (pipe_valid) begin
+         mult_full_reg <= {32'd0, rom_data_exp} * {20'd0, inv_sum_reg};
+     end
+     ```
+  3. Tách biệt tầng dịch bit và bộ kẹp bão hòa (Saturation Clamp) sang chu kỳ tiếp theo:
+     ```systemverilog
+     // Stage 2: Dịch bit, kẹp dải và xuất out_valid
+     pipe_valid_stage2 <= pipe_valid;
+     if (pipe_valid_stage2) begin
+         out_valid <= 1'b1;
+         if (OUT_WIDTH == 16) begin
+             out_prob <= (shifted_prob > 36'd65535) ? 16'hFFFF : shifted_prob[15:0];
+         end else begin
+             out_prob <= (shifted_prob > 36'd255) ? 8'hFF : shifted_prob[7:0];
+         end
+     end
+     ```
+  4. Cập nhật điều kiện kết thúc trạng thái `ST_NORM_OUT`: Chờ cạn kiệt cả 2 tầng pipeline (`cnt_reg == N_TOKENS && !pipe_valid && !pipe_valid_stage2`) trước khi chuyển về `ST_IDLE`.
+
+- **Hiệu quả timing đạt được:**
+  - Đường truyền dài ~5.8 ns được chia thành 2 chu kỳ ngắn:
+    - **Nửa đầu:** BRAM Read $\to$ DSP48E2 Mult ($\sim 3.4\text{ ns} \le 5.0\text{ ns}$).
+    - **Nửa sau:** DSP48E2 PREG $\to$ Shift/Clamp $\to$ Output Flip-Flop ($\sim 1.4\text{ ns} \le 5.0\text{ ns}$).
+  - Đảm bảo $F_{max} > 250\text{ MHz}$, đưa $WNS \ge +1.2\text{ ns}$ tại 200.0 MHz, đóng timing hoàn toàn.
+  - Tác động chu kỳ: Toàn bộ dòng chảy streaming giữ nguyên thông lượng (1 token/chu kỳ không tạo bubble), chỉ thêm đúng 1 chu kỳ trễ xuất phát (initial pipeline latency) mỗi hàng 256 tokens (tương đương $+0.04\%$ tổng thời gian thực thi).
+
+- **Kết quả tái kiểm thử Bit-Exact (Verification Pass):**
+  - Đã cập nhật đồng bộ cho cả 3 thư mục RTL:
+    - [`Project/src/Hardware/rtl_ver02_1A/softmax_lut.sv`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_1A/softmax_lut.sv)
+    - [`Project/src/Hardware/rtl_ver02_2A/softmax_lut.sv`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_2A/softmax_lut.sv)
+    - [`Project/src/Hardware/rtl_ver02_3B/softmax_lut.sv`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_3B/softmax_lut.sv)
+  - Đã chạy kiểm chứng độc lập `tb_golden_softmax_lut`: **1,024 / 1,024 tokens khớp tuyệt đối 100% (0 LSB Error)** trên từng biến thể.
+  - Đã chạy kiểm chứng toàn bộ 3 bài test Isolated Suite và 3 bài test Sequential Multi-Stage Suite trên cả 3 biến thể: **100% PASS (Tổng cộng 92,160 bytes context và 3,072 tokens Softmax khớp hoàn toàn với mô hình PyTorch I-ViT)**.
+

@@ -2,36 +2,32 @@
 
 > **Dự án:** Tăng tốc Attention Core MobileViT-XXS trên AMD Kria KV260  
 > **Phiên bản:** v2.0 (Cập nhật chuẩn hóa theo RTL `rtl_ver02`)  
-> **Tài liệu gốc tham chiếu:** [`Notes/mha_level_1_bo_nho_dem_lenh.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes/mha_level_1_bo_nho_dem_lenh.md)
+> **Tài liệu gốc tham chiếu:** [`Notes/mha_level_1_bo_nho_dem_lenh.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes/m## 1. TỔNG QUAN HỆ THỐNG BỘ NHỚ ĐỆM INGRESS
 
----
-
-## 1. TỔNG QUAN HỆ THỐNG BỘ NHỚ ĐỆM INGRESS
-
-Hệ thống bộ nhớ đệm Ingress chịu trách nhiệm thu nhận dòng dữ liệu AXI4-Stream 64-bit tốc độ cao từ kênh DMA MM2S, loại bỏ hiện tượng bong bóng đường ống (Zero Bubble Ingress), và giải mã tự động nạp vào 3 phân vùng bộ nhớ nội chip của Head hiện hành ($Q, K, V$).
+Hệ thống bộ nhớ đệm Ingress chịu trách nhiệm thu nhận dòng dữ liệu AXI4-Stream 128-bit native tốc độ cao từ kênh DMA MM2S, loại bỏ hiện tượng bong bóng đường ống (Zero Bubble Ingress), và giải mã tự động nạp vào 3 phân vùng bộ nhớ nội chip của Head hiện hành ($Q, K, V$).
 
 ```text
 ========================================================================================================================
-                              LEVEL 1: INGRESS BUFFERING & ON-CHIP MEMORY ARCHITECTURE
+                              LEVEL 1: INGRESS BUFFERING & ON-CHIP MEMORY ARCHITECTURE (128-BIT NATIVE)
 ========================================================================================================================
 
     AXI DMA MM2S (DDR4 Memory)
-   +--------------------------+
-   | 64-bit Stream TX Master  |
-   +------------+-------------+
-                |
-                | S_AXIS_TDATA [63:0], TVALID, TREADY, TLAST
-                v
+   +---------------------------+
+   | 128-bit Stream TX Master  |
+   +-------------+-------------+
+                 |
+                 | S_AXIS_TDATA [127:0], TVALID, TREADY, TLAST (16 INT8 tokens/beat)
+                 v
    +-------------------------------------------------------------------------------------------------------------------+
-   | SKID BUFFER (axis_adapter.sv)                                                                                     |
-   | - Lưu trữ tức thời 1 beat dự phòng khi downstream bận (tready = 0)                                                |
+   | SKID BUFFER (axis_adapter.sv - DATA_WIDTH = 128)                                                                  |
+   | - Lưu trữ tức thời 1 beat 128-bit dự phòng khi downstream bận (tready = 0)                                        |
    | - Triệt tiêu 100% rủi ro mất dữ liệu trên bus bắt tay AXI-Stream                                                  |
    +--------------------------------------------+----------------------------------------------------------------------+
                                                 |
-                                                | skid_tdata [63:0], skid_tvalid, skid_tready
+                                                | skid_tdata [127:0], skid_tvalid, skid_tready
                                                 v
    +-------------------------------------------------------------------------------------------------------------------+
-   | FSM GIẢI MÃ NẠP TỰ ĐỘNG INGRESS (ing_load_state in attention_core_top.sv)                                         |
+   | FSM GIẢI MÃ NẠP TỰ ĐỘNG INGRESS (ing_load_state in attention_core_top_*.sv)                                       |
    |                                                                                                                   |
    |   [ING_Q]  --> Nạp đủ beats_per_mat beats vào q_mem [256][MAX_HEAD_DIM]                                          |
    |      |                                                                                                            |
@@ -60,33 +56,45 @@ Hệ thống bộ nhớ đệm Ingress chịu trách nhiệm thu nhận dòng d�
 
 ---
 
-## 2. NGUYÊN LÝ GIẢI MÃ ĐỊA CHỈ TOKEN ĐA CHIỀU (MULTI-STAGE ADDRESSING)
+## 2. NGUYÊN LÝ GIẢI MÃ ĐỊA CHỈ TOKEN ĐA CHIỀU (MULTI-STAGE ADDRESSING TRÊN BUS 128-BIT)
 
-Mỗi beat AXI4-Stream chứa 8 giá trị INT8 (64 bits = 8 bytes). Việc đóng gói và giải nén phụ thuộc vào số chiều của từng Stage:
+Mỗi beat AXI4-Stream 128-bit chứa **16 giá trị INT8** (16 bytes/beat). Mạch giải mã trong RTL kiểm tra trực tiếp kích thước $d_k$ (`reg_head_dim`) để xác định số beats cần nạp:
+
+```systemverilog
+always_comb begin
+    if (reg_head_dim <= 16'd16) begin
+        beats_per_mat = 16'(reg_seq_len);         // 256 beats (1 beat/token)
+        ing_tok_idx   = 8'(ing_beat_cnt);
+        ing_slice_idx = 2'b00;
+    end else begin
+        beats_per_mat = 16'(reg_seq_len << 1);     // 512 beats (2 beats/token)
+        ing_tok_idx   = 8'(ing_beat_cnt >> 1);
+        ing_slice_idx = 2'(ing_beat_cnt & 16'd1);
+    end
+end
+```
 
 ### 2.1 Stage 2 ($d_k = 16$):
-- Mỗi token chiếm 16 bytes $\implies$ đúng 2 beats 64-bit:
-  - Beat 0: 8 chiều thấp (`dim 0..7`).
-  - Beat 1: 8 chiều cao (`dim 8..15`).
+- Mỗi token chiếm đúng 16 bytes $\implies$ **đúng 1 beat 128-bit duy nhất**:
+  - Beat 0: Chứa trọn vẹn 16 chiều đặc trưng (`dim 0..15`).
+- Giải mã địa chỉ:
+  - Token index: `ing_tok_idx = ing_beat_cnt;`
+  - Slice index: `ing_slice_idx = 2'b00;`
+- Tổng số beats mỗi ma trận: $256 \times 1 = \mathbf{256\text{ beats}}$.
+- Tổng số beats cho cả 3 ma trận $Q, K, V$: $3 \times 256 = \mathbf{768\text{ beats}}$ (tiết kiệm 50% số nhịp truyền so với bus 64-bit cũ).
+
+### 2.2 Stage 3 ($d_k = 20$) & Stage 4 ($d_k = 24$):
+- Số chiều vượt quá 16 bytes, áp dụng chuẩn **Token-Aligned Padding** (mỗi token chiếm 2 beats 128-bit = 32 bytes):
+  - **Beat 0** (`ing_slice_idx == 0`): 16 bytes đầu (`dim 0..15`).
+  - **Beat 1** (`ing_slice_idx == 1`):
+    - Stage 3 ($d_k = 20$): 4 bytes (`dim 16..19`) + 12 bytes đệm zero.
+    - Stage 4 ($d_k = 24$): 8 bytes (`dim 16..23`) + 8 bytes đệm zero.
+    - Mở rộng $d_k = 32$: 16 bytes trọn vẹn (`dim 16..31`).
 - Giải mã địa chỉ:
   - Token index: `ing_tok_idx = ing_beat_cnt >> 1;`
   - Slice index: `ing_slice_idx = ing_beat_cnt & 1;`
-- Tổng số beats mỗi ma trận: $(256 \times 16) / 8 = 512\text{ beats}$.
-
-### 2.2 Stage 3 ($d_k = 20$):
-- Mỗi token chiếm 20 bytes $\implies$ 2.5 beats 64-bit.
-- Đóng gói căn lề 3 beats (24 bytes) cho mỗi token để giữ tính đối xứng:
-  - Beat 0: `dim 0..7`
-  - Beat 1: `dim 8..15`
-  - Beat 2: `dim 16..19` (4 bytes đầu, 4 bytes sau đệm zero).
-- Tổng số beats mỗi ma trận: $256 \times 3 = 768\text{ beats}$.
-
-### 2.3 Stage 4 ($d_k = 24$):
-- Mỗi token chiếm 24 bytes $\implies$ 3 beats 64-bit:
-  - Beat 0: `dim 0..7`
-  - Beat 1: `dim 8..15`
-  - Beat 2: `dim 16..23`
-- Tổng số beats mỗi ma trận: $256 \times 3 = 768\text{ beats}$.
+- Tổng số beats mỗi ma trận: $256 \times 2 = \mathbf{512\text{ beats}}$.
+- Tổng số beats cho cả 3 ma trận $Q, K, V$: $3 \times 512 = \mathbf{1,536\text{ beats}}$.
 
 ---
 

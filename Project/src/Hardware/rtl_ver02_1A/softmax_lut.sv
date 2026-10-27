@@ -58,8 +58,9 @@ module softmax_lut #(
     logic [ACC_WIDTH-1:0]       sum_exp_reg;
     logic [31:0]                inv_sum_reg;
 
-    // Pipeline valid flag
+    // Pipeline valid flags (Stage 1 ROM latch, Stage 2 Mult latch)
     logic                       pipe_valid;
+    logic                       pipe_valid_stage2;
 
     // 32-step Restoring Divider Registers
     logic [31:0]                div_rem_reg;
@@ -104,34 +105,36 @@ module softmax_lut #(
         end
     end
 
-    // Normalization intermediate wires
-    logic [51:0] mult_full;
+    // Normalization intermediate registers and wires (Pipelined Stage 1 & Stage 2)
+    logic [51:0] mult_full_reg;
     logic [35:0] shifted_prob;
-    assign mult_full    = {32'd0, rom_data_exp} * {20'd0, inv_sum_reg};
-    assign shifted_prob = mult_full >> 16;
+    assign shifted_prob = mult_full_reg >> 16;
 
     // FSM and Datapath
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            state_reg     <= ST_IDLE;
-            cnt_reg       <= '0;
-            s_max_reg     <= -16'sd32768;
-            sum_exp_reg   <= '0;
-            inv_sum_reg   <= '0;
-            div_rem_reg   <= '0;
-            div_quot_reg  <= '0;
-            div_denom_reg <= '0;
-            div_step_reg  <= '0;
-            pipe_valid    <= 1'b0;
-            out_valid     <= 1'b0;
-            out_prob      <= '0;
+            state_reg         <= ST_IDLE;
+            cnt_reg           <= '0;
+            s_max_reg         <= -16'sd32768;
+            sum_exp_reg       <= '0;
+            inv_sum_reg       <= '0;
+            div_rem_reg       <= '0;
+            div_quot_reg      <= '0;
+            div_denom_reg     <= '0;
+            div_step_reg      <= '0;
+            pipe_valid        <= 1'b0;
+            pipe_valid_stage2 <= 1'b0;
+            mult_full_reg     <= '0;
+            out_valid         <= 1'b0;
+            out_prob          <= '0;
         end else begin
             out_valid <= 1'b0;
 
             case (state_reg)
                 ST_IDLE: begin
-                    cnt_reg    <= '0;
-                    pipe_valid <= 1'b0;
+                    cnt_reg           <= '0;
+                    pipe_valid        <= 1'b0;
+                    pipe_valid_stage2 <= 1'b0;
                     if (start_row) begin
                         s_max_reg   <= -16'sd32768;
                         sum_exp_reg <= '0;
@@ -152,9 +155,10 @@ module softmax_lut #(
                         end
 
                         if (cnt_reg == N_TOKENS - 1) begin
-                            cnt_reg    <= '0;
-                            pipe_valid <= 1'b0;
-                            state_reg  <= ST_EXP_ACC;
+                            cnt_reg           <= '0;
+                            pipe_valid        <= 1'b0;
+                            pipe_valid_stage2 <= 1'b0;
+                            state_reg         <= ST_EXP_ACC;
                         end else begin
                             cnt_reg <= cnt_reg + 1'b1;
                         end
@@ -163,6 +167,7 @@ module softmax_lut #(
 
                 ST_EXP_ACC: begin
                     // Stage 0 requests rom_addr, Stage 1 latches rom_data_exp and accumulates
+                    pipe_valid_stage2 <= 1'b0;
                     if (cnt_reg < N_TOKENS) begin
                         pipe_valid <= 1'b1;
                         cnt_reg    <= cnt_reg + 1'b1;
@@ -210,14 +215,15 @@ module softmax_lut #(
                 end
 
                 ST_DIV_DONE: begin
-                    inv_sum_reg <= div_quot_reg;
-                    cnt_reg     <= '0;
-                    pipe_valid  <= 1'b0;
-                    state_reg   <= ST_NORM_OUT;
+                    inv_sum_reg       <= div_quot_reg;
+                    cnt_reg           <= '0;
+                    pipe_valid        <= 1'b0;
+                    pipe_valid_stage2 <= 1'b0;
+                    state_reg         <= ST_NORM_OUT;
                 end
 
                 ST_NORM_OUT: begin
-                    // Stage 0 requests rom_addr, Stage 1 latches rom_data_exp and outputs out_prob
+                    // Stage 0 requests rom_addr, Stage 1 latches rom_data_exp & multiplies, Stage 2 shifts/clamps & outputs out_prob
                     if (cnt_reg < N_TOKENS) begin
                         pipe_valid <= 1'b1;
                         cnt_reg    <= cnt_reg + 1'b1;
@@ -225,7 +231,12 @@ module softmax_lut #(
                         pipe_valid <= 1'b0;
                     end
 
+                    pipe_valid_stage2 <= pipe_valid;
                     if (pipe_valid) begin
+                        mult_full_reg <= {32'd0, rom_data_exp} * {20'd0, inv_sum_reg};
+                    end
+
+                    if (pipe_valid_stage2) begin
                         out_valid <= 1'b1;
                         if (OUT_WIDTH == 16) begin
                             out_prob <= (shifted_prob > 36'd65535) ? 16'hFFFF : shifted_prob[15:0];
@@ -234,7 +245,7 @@ module softmax_lut #(
                         end
                     end
 
-                    if (cnt_reg == N_TOKENS && !pipe_valid) begin
+                    if (cnt_reg == N_TOKENS && !pipe_valid && !pipe_valid_stage2) begin
                         cnt_reg   <= '0;
                         state_reg <= ST_IDLE;
                     end

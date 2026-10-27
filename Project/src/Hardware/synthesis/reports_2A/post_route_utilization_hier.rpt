@@ -1,0 +1,45 @@
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2026.1 (win64) Build 6511674 Tue Jun 16 11:02:23 MDT 2026
+| Date         : Tue Oct 27 00:30:21 2026
+| Host         : DESKTOP-L58T74E running 64-bit major release  (build 9200)
+| Command      : report_utilization -hierarchical -file ./reports_2A/post_route_utilization_hier.rpt
+| Design       : attention_core_top_2A
+| Device       : xck26-sfvc784-2LV-c
+| Speed File   : -2LV
+| Design State : Routed
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Utilization Design Information
+
+Table of Contents
+-----------------
+1. Utilization by Hierarchy
+
+1. Utilization by Hierarchy
+---------------------------
+
++-------------------------------+------------------------+------------+------------+---------+------+------+--------+--------+------+------------+
+|            Instance           |         Module         | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs | RAMB36 | RAMB18 | URAM | DSP Blocks |
++-------------------------------+------------------------+------------+------------+---------+------+------+--------+--------+------+------------+
+| attention_core_top_2A         |                  (top) |      10579 |       5839 |    4736 |    4 | 7337 |      1 |      0 |    0 |         52 |
+|   (attention_core_top_2A)     |                  (top) |       5063 |        327 |    4736 |    0 |  525 |      0 |      0 |    0 |          0 |
+|   u_axi_lite_regs             |          axi_lite_regs |        827 |        827 |       0 |    0 |  437 |      0 |      0 |    0 |          0 |
+|   u_dsp_packed_adder_tree     |  dsp_packed_adder_tree |       1131 |       1127 |       0 |    4 |  644 |      0 |      0 |    0 |         16 |
+|     (u_dsp_packed_adder_tree) |  dsp_packed_adder_tree |        347 |        343 |       0 |    4 |  388 |      0 |      0 |    0 |          0 |
+|     gen_dsp_pe[0].u_dsp_pe    |   pe_slice_dsp_packing |        114 |        114 |       0 |    0 |   32 |      0 |      0 |    0 |          2 |
+|     gen_dsp_pe[1].u_dsp_pe    | pe_slice_dsp_packing_0 |         96 |         96 |       0 |    0 |   32 |      0 |      0 |    0 |          2 |
+|     gen_dsp_pe[2].u_dsp_pe    | pe_slice_dsp_packing_1 |         98 |         98 |       0 |    0 |   32 |      0 |      0 |    0 |          2 |
+|     gen_dsp_pe[3].u_dsp_pe    | pe_slice_dsp_packing_2 |         96 |         96 |       0 |    0 |   32 |      0 |      0 |    0 |          2 |
+|     gen_dsp_pe[4].u_dsp_pe    | pe_slice_dsp_packing_3 |         98 |         98 |       0 |    0 |   32 |      0 |      0 |    0 |          2 |
+|     gen_dsp_pe[5].u_dsp_pe    | pe_slice_dsp_packing_4 |         96 |         96 |       0 |    0 |   32 |      0 |      0 |    0 |          2 |
+|     gen_dsp_pe[6].u_dsp_pe    | pe_slice_dsp_packing_5 |         98 |         98 |       0 |    0 |   32 |      0 |      0 |    0 |          2 |
+|     gen_dsp_pe[7].u_dsp_pe    | pe_slice_dsp_packing_6 |         96 |         96 |       0 |    0 |   32 |      0 |      0 |    0 |          2 |
+|   u_scale_unit                |             scale_unit |        268 |        268 |       0 |    0 |  114 |      0 |      0 |    0 |          2 |
+|   u_score_v_gemm              |           score_v_gemm |       1488 |       1488 |       0 |    0 | 1036 |      0 |      0 |    0 |         32 |
+|   u_skid_buffer_rx            |           axis_adapter |        132 |        132 |       0 |    0 |  260 |      0 |      0 |    0 |          0 |
+|   u_softmax_engine            |            softmax_lut |       1660 |       1660 |       0 |    0 | 4307 |      1 |      0 |    0 |          2 |
++-------------------------------+------------------------+------------+------------+---------+------+------+--------+--------+------+------------+
+* Note: The sum of lower-level cells may be larger than their parent cells total, due to cross-hierarchy LUT combining
+
+

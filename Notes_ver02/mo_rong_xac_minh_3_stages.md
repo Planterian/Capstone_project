@@ -81,25 +81,25 @@ sequenceDiagram
     participant CORE as Attention Core Pipeline
     participant EGR as AXI-Stream Egress
 
-    Note over TB,EGR: GIAI ĐOẠN 1: KIỂM THỬ STAGE 2 (dk = 16)
+    Note over TB,EGR: GIAI ĐOẠN 1: KIỂM THỬ STAGE 2 (dk = 16) - 128-bit Bus
     TB->>CSR: Ghi 0x14 = 16, 0x20 = 27640, 0x24 = 22
-    TB->>ING: Stream Q, K, V (Stage 2 - 1,536 beats)
+    TB->>ING: Stream Q, K, V (Stage 2 - 768 beats 128-bit)
     TB->>CSR: Ghi 0x00 = 1 (START)
-    CORE->>EGR: Xuất 512 beats (4,096 bytes Context Out)
+    CORE->>EGR: Xuất 256 beats 128-bit (4,096 bytes Context Out)
     EGR-->>TB: Đối soát 4,096 mẫu -> PASS 100%
 
-    Note over TB,EGR: GIAI ĐOẠN 2: KIỂM THỬ STAGE 3 (dk = 20)
+    Note over TB,EGR: GIAI ĐOẠN 2: KIỂM THỬ STAGE 3 (dk = 20) - 128-bit Token-Aligned
     TB->>CSR: Ghi 0x14 = 20, 0x20 = 21936, 0x24 = 22
-    TB->>ING: Stream Q, K, V (Stage 3 - 2,304 beats)
+    TB->>ING: Stream Q, K, V (Stage 3 - 1,536 beats 128-bit)
     TB->>CSR: Ghi 0x00 = 1 (START)
-    CORE->>EGR: Xuất 640 beats (5,120 bytes Context Out)
+    CORE->>EGR: Xuất 512 beats 128-bit (5,120 bytes Context Out)
     EGR-->>TB: Đối soát 5,120 mẫu -> PASS 100%
 
-    Note over TB,EGR: GIAI ĐOẠN 3: KIỂM THỬ STAGE 4 (dk = 24)
+    Note over TB,EGR: GIAI ĐOẠN 3: KIỂM THỬ STAGE 4 (dk = 24) - 128-bit Token-Aligned
     TB->>CSR: Ghi 0x14 = 24, 0x20 = 18810, 0x24 = 22
-    TB->>ING: Stream Q, K, V (Stage 4 - 2,304 beats)
+    TB->>ING: Stream Q, K, V (Stage 4 - 1,536 beats 128-bit)
     TB->>CSR: Ghi 0x00 = 1 (START)
-    CORE->>EGR: Xuất 768 beats (6,144 bytes Context Out)
+    CORE->>EGR: Xuất 512 beats 128-bit (6,144 bytes Context Out)
     EGR-->>TB: Đối soát 6,144 mẫu -> PASS 100%
 ```
 

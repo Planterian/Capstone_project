@@ -70,18 +70,28 @@ Mảng Systolic Array vận hành theo nguyên lý **Output-Stationary (OS)**: k
 
 ---
 
-## 3. ENGINE TÍCH VÔ HƯỚNG TRỰC TIẾP (HIGH-THROUGHPUT DOT-PRODUCT STREAMING)
+## 3. CÁC KIẾN TRÚC STREAMING COMPUTE ENGINE TRONG RTL VER02
 
-Bên cạnh mảng Systolic Array dạng tile, Top-Level tích hợp **High-Throughput Streaming Engine** để cấp dữ liệu trực tiếp 1 điểm/chu kỳ cho Softmax:
-```systemverilog
-always_comb begin
-    stage1_score = '0;
-    for (int d = 0; d < MAX_HEAD_DIM; d++) begin
-        if (d < reg_head_dim) begin
-            stage1_score = stage1_score + (32'($signed(q_curr_vec[d])) * 32'($signed(k_mem[k_col_idx][d])));
-        end
-    end
-end
-```
-- Phép nhân song song $d_k$ chiều giúp tính toán $Q[i, :] \cdot K[j, :]^T$ tức thời trong 1 chu kỳ.
-- Vòng lặp `k_col_idx` từ $0 \dots 255$ cung cấp liên tục 256 scores cho khối Hardware Softmax mà không cần bộ đệm trung gian.
+Để khắc phục hoàn toàn nút thắt trễ đường truyền tổ hợp (critical timing path) từ phiên bản tiền nhiệm, RTL `rtl_ver02` triển khai 2 kiến trúc Streaming Dot-Product Engine đường ống hóa hoàn toàn, cùng đạt thông lượng tối đa **$II = 1$ (1 kết quả tích vô hướng / chu kỳ)**:
+
+### 3.1 Cây Cộng Pipeline Thuần Logic Fabric (Variant 1A — `pipelined_adder_tree.sv`)
+- **Tài nguyên:** 0 khối DSP48E2 (100% sử dụng FPGA Logic Fabric LUTs/FFs).
+- **Cấu trúc:** 32 bộ nhân INT8 song song kết hợp cây cộng nhị phân 5 tầng thanh ghi (5-stage binary reduction tree):
+  - **Tầng 0:** 32 tích số nhân $Q[d] \times K[d]$ (định dạng INT16). Kênh $d \ge d_k$ tự động bị zero-masking.
+  - **Tầng 1 (reg_stage1):** 16 bộ cộng 2 nhánh $\to$ 16 tổng INT17 có thanh ghi chốt.
+  - **Tầng 2 (reg_stage2):** 8 bộ cộng 2 nhánh $\to$ 8 tổng INT18 có thanh ghi chốt.
+  - **Tầng 3 (reg_stage3):** 4 bộ cộng 2 nhánh $\to$ 4 tổng INT19 có thanh ghi chốt.
+  - **Tầng 4 (reg_stage4):** 2 bộ cộng 2 nhánh $\to$ 2 tổng INT20 có thanh ghi chốt.
+  - **Tầng 5 (reg_stage5):** 1 bộ cộng cuối $\to$ 1 tổng tích lũy INT32 hoàn chỉnh.
+- **Đặc tính thời gian:** Độ trễ cố định **Latency = 6 chu kỳ xung nhịp**, thông lượng **$II = 1$**, đạt tần số vận hành $F_{\max} \ge 250\text{ MHz}$ trên Kria KV260.
+
+### 3.2 Dòng Phát Xen Kẽ & Zero-Bubble Serializer (Variant 2A — `dsp_packed_adder_tree.sv`)
+- **Tài nguyên:** Đúng 8 khối DSP48E2 (tận dụng kỹ thuật đóng gói 2x INT8 Packing ở Mục 1 để thực hiện 16 phép nhân song song).
+- **Cơ chế Streaming Chẵn/Lẻ (Even/Odd Interleaved Streaming):**
+  - Nhịp $2k$: Nạp và nhân 8 kênh đặc trưng chẵn ($d \in \{0, 2, 4, 6, 8, 10, 12, 14\}$).
+  - Nhịp $2k+1$: Nạp và nhân 8 kênh đặc trưng lẻ ($d \in \{1, 3, 5, 7, 9, 11, 13, 15\}$).
+- **Thu dồn qua Zero-Bubble Serializer:**
+  - 8 tích số chẵn và 8 tích số lẻ lần lượt đi qua cây cộng gom 8 nhánh (3 tầng pipeline).
+  - Bộ tuần tự hóa Zero-Bubble Serializer ghép nối chính xác tổng nửa chẵn và tổng nửa lẻ của cùng một cặp token $(Q_i, K_j)$ mà không tạo ra bất kỳ khoảng trống bong bóng (0-bubble) nào trong đường ống.
+- **Đặc tính thời gian:** Độ trễ cố định **Latency = 9 chu kỳ xung nhịp**, thông lượng đầu ra **$II = 1$** (1 raw score/chu kỳ), bảo toàn 100% độ chính xác bit-exact so với Variant 1A.
+

@@ -1,0 +1,9 @@
+List of CLB Tiles
+CLEL_L_X34Y32
+CLEL_L_X11Y28
+CLEL_R_X11Y28
+
+List of Congested Nets
+u_reorder_buffer/rd_col_cnt_reg[1]_rep__13_n_0
+u_reorder_buffer/read_data[12]_i_226_n_0
+

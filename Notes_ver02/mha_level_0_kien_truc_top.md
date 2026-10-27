@@ -19,11 +19,11 @@
   | Regs: 0x00=CTRL, 0x04=STATUS, 0x10=N, 0x14=dk, ... |          | Simple DMA S2MM (Write DDR4) <- Stream Slave  |
   +-------------------------+--------------------------+          +-----------+-----------------------+-----------+
                             |                                                 |                       ^
-                            | AXI4-Lite (32-bit Control / CSR)                | AXI4-Stream           | AXI4-Stream
-                            | (awaddr, wdata, araddr, rdata)                  | RX (64-bit Ingress)   | TX (64-bit Egress)
+                            | AXI4-Lite (32-bit Control / CSR)                | AXI4-Stream            | AXI4-Stream
+                            | (awaddr, wdata, araddr, rdata)                  | RX (128-bit Ingress)   | TX (128-bit Egress)
                             v                                                 v                       |
   +-------------------------------------------------------------------------------------------------------------------+
-  | ATTENTION CORE TOP-LEVEL SHELL (attention_core_top.sv)                                                            |
+  | ATTENTION CORE TOP-LEVEL SHELL (attention_core_top_*.sv)                                                          |
   |                                                                                                                   |
   |  +-------------------------------------------------------------------------------------------------------------+  |
   |  | CONTROL PLANE: AXI4-Lite Register File & Sequential Head Controller (axi_lite_regs.sv)                      |  |
@@ -41,12 +41,12 @@
   |  |                                                                                                             |  |
   |  |  AXI-Stream RX Skid Buffer                                                                                  |  |
   |  |  +------------------+                                                                                       |  |
-  |  |  | axis_adapter_rx  |===(64-bit Stream with Backpressure TVALID/TREADY/TLAST)===+                            |  |
+  |  |  | axis_adapter_rx  |===(128-bit Stream with Backpressure TVALID/TREADY/TLAST)===+                       |  |
   |  |  +------------------+                                                           |                            |  |
   |  |                                                                                 v                            |  |
   |  |                                                             +---------------------------------------+        |  |
   |  |                                                             | Ingress Multi-Bank Buffer             |        |  |
-  |  |                                                             | FSM nạp đủ Q -> K -> V (1536 beats)   |        |  |
+  |  |                                                             | FSM nạp đủ Q -> K -> V (768 beats)    |        |  |
   |  |                                                             | On-chip BRAM (q_mem, k_mem, v_mem)    |        |  |
   |  |                                                             +-------------------+-------------------+        |  |
   |  |                                                                                 |                            |  |
@@ -79,7 +79,7 @@
   |  |  AXI-Stream TX Interface                                                        |                            |  |
   |  |  +------------------+                                                           |                            |  |
   |  |  | m_axis_tdata     |<==========================================================+                            |  |
-  |  |  | 512 beats / head |                                                                                        |  |
+  |  |  | 256 beats / head |                                                                                        |  |
   |  |  +------------------+                                                                                        |  |
   |  +-------------------------------------------------------------------------------------------------------------+  |
   +-------------------------------------------------------------------------------------------------------------------+
@@ -107,21 +107,22 @@
 
 ## 3. PHÂN TÍCH BĂNG THÔNG & ĐỘ TRỄ (BANDWIDTH & LATENCY MODEL)
 
-### 3.1 Lưu lượng dữ liệu trên 1 Head ($N=256, d_k=16$):
+### 3.1 Lưu lượng dữ liệu trên 1 Head ($N=256, d_k=16$ trên bus 128-bit Native):
 1. **Dữ liệu nạp Ingress (PS -> PL qua DMA MM2S):**
-   - Ma trận Q: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies 512\text{ beats (64-bit)}$.
-   - Ma trận K: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies 512\text{ beats (64-bit)}$.
-   - Ma trận V: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies 512\text{ beats (64-bit)}$.
-   - **Tổng lưu lượng Ingress:** $1,536\text{ beats} = 12,288\text{ bytes}$.
+   - Ma trận Q: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies \mathbf{256\text{ beats (128-bit)}}$.
+   - Ma trận K: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies \mathbf{256\text{ beats (128-bit)}}$.
+   - Ma trận V: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies \mathbf{256\text{ beats (128-bit)}}$.
+   - **Tổng lưu lượng Ingress:** $\mathbf{768\text{ beats}} = 12,288\text{ bytes}$ (giảm 50% số nhịp so với bus 64-bit).
 2. **Dữ liệu xuất Egress (PL -> PS qua DMA S2MM):**
-   - Ma trận Context Output: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies 512\text{ beats (64-bit)}$.
+   - Ma trận Context Output: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies \mathbf{256\text{ beats (128-bit)}}$.
 
-### 3.2 Chu kỳ thực thi (Cycle Breakdown):
-Tại tần số $200\text{ MHz}$ ($T_{\text{clk}} = 5.0\text{ ns}$):
-- Thời gian nạp dữ liệu Ingress: $1,536\text{ cycles}$.
-- Thời gian tính toán Attention ($256\text{ hàng}$):
-  - Mỗi hàng mất khoảng $800\text{ cycles}$ (gồm $256\text{ cycles}$ GEMM $QK^T$, $256\text{ cycles}$ Softmax max/acc, $32\text{ cycles}$ chia, $256\text{ cycles}$ Score*V).
-  - $256 \times 800 \approx 204,800\text{ cycles}$.
-- **Tổng chu kỳ đo được thực tế:** **208,384 clock cycles** ($\approx 1.04\text{ ms}$).
-- Đối với toàn bộ 4 Heads: $4 \times 1.04\text{ ms} \approx 4.16\text{ ms}$ cho 1 lớp Attention.
-- Băng thông AXI4-Stream trung bình: $\approx 1.6\text{ GB/s}$ (trong khả năng đáp ứng $3.2\text{ GB/s}$ của bus AXI HP trên Zynq UltraScale+).
+### 3.2 Chu kỳ thực thi thực tế (Verified Hardware Cycles):
+Tại tần số danh định **$200\text{ MHz}$** ($T_{\text{clk}} = 5.0\text{ ns}$) trên AMD Kria KV260:
+- **Variant 1A (Vector Streaming Fabric Tree, 0 DSP):**
+  - Chu kỳ đo được: **209,663 cycles / head** ($\approx 1.048\text{ ms}$, thông lượng $\approx 238.4\text{ FPS}$).
+- **Variant 2A (Even/Odd Streaming, 8 DSP Packing):**
+  - Chu kỳ đo được: **209,919 cycles / head** ($\approx 1.050\text{ ms}$, thông lượng $\approx 238.1\text{ FPS}$).
+- **Variant 3B (2D Systolic MAC Array, 16 DSPs):**
+  - Chu kỳ đo được: **337,216 cycles / head** ($\approx 1.686\text{ ms}$, thông lượng $\approx 148.2\text{ FPS}$).
+- Băng thông AXI4-Stream trung bình: $\approx 3.2\text{ GB/s}$ (tương thích hoàn hảo với cổng HP AXI 128-bit của Zynq UltraScale+).
+

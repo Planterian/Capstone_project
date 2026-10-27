@@ -64,9 +64,6 @@ module attention_core_top_2A #(
     input  logic                                m_axis_tready
 );
 
-    // Assign egress keep: all bytes valid
-    assign m_axis_tkeep = '1;
-
     // ------------------------------------------------------------------------
     // 1. Control & Status Signals from AXI-Lite
     // ------------------------------------------------------------------------
@@ -182,7 +179,7 @@ module attention_core_top_2A #(
         .rst_n           (rst_n),
         .s_axis_tdata    (skid_tdata),
         .s_axis_tvalid   (skid_tvalid),
-        .s_axis_tready   (skid_tready),
+        .s_axis_tready   (),
         .s_axis_tlast    (skid_tlast),
         .ram_target_sel  (2'b00),
         .read_en         (bram_read_en),
@@ -199,12 +196,17 @@ module attention_core_top_2A #(
         .pp_bank_sel     (pp_bank_sel)
     );
 
+    assign skid_tready = (ing_load_state != ING_READY);
+
     // ------------------------------------------------------------------------
-    // 4. ON-CHIP Q, K, V STORAGE FOR ACTIVE HEAD (Synthesizable Block RAM)
+    // 4. ON-CHIP Q, K, V STORAGE FOR ACTIVE HEAD (128-bit Banked Distributed RAM)
     // ------------------------------------------------------------------------
-    (* ram_style = "block" *) logic signed [7:0] q_mem [0:MAX_TOKENS-1][0:MAX_HEAD_DIM-1];
-    (* ram_style = "block" *) logic signed [7:0] k_mem [0:MAX_TOKENS-1][0:MAX_HEAD_DIM-1];
-    (* ram_style = "block" *) logic signed [7:0] v_mem [0:MAX_TOKENS-1][0:MAX_HEAD_DIM-1];
+    (* ram_style = "distributed" *) logic [127:0] q_mem_lo [0:MAX_TOKENS-1];
+    (* ram_style = "distributed" *) logic [127:0] q_mem_hi [0:MAX_TOKENS-1];
+    (* ram_style = "distributed" *) logic [127:0] k_mem_lo [0:MAX_TOKENS-1];
+    (* ram_style = "distributed" *) logic [127:0] k_mem_hi [0:MAX_TOKENS-1];
+    (* ram_style = "distributed" *) logic [127:0] v_mem_lo [0:MAX_TOKENS-1];
+    (* ram_style = "distributed" *) logic [127:0] v_mem_hi [0:MAX_TOKENS-1];
 
     typedef enum logic [1:0] {
         ING_Q = 2'b00,
@@ -233,7 +235,28 @@ module attention_core_top_2A #(
         end
     end
 
-    // Ingress write into active head on-chip storage (16 bytes / beat from 128-bit bus)
+    // Dedicated synchronous RAM write process (NO async reset - required for DRAM/BRAM inference)
+    always_ff @(posedge clk) begin
+        if (skid_tvalid && skid_tready) begin
+            if (ing_slice_idx == 1'b0) begin
+                case (ing_load_state)
+                    ING_Q: q_mem_lo[ing_tok_idx] <= skid_tdata;
+                    ING_K: k_mem_lo[ing_tok_idx] <= skid_tdata;
+                    ING_V: v_mem_lo[ing_tok_idx] <= skid_tdata;
+                    default: ;
+                endcase
+            end else begin
+                case (ing_load_state)
+                    ING_Q: q_mem_hi[ing_tok_idx] <= skid_tdata;
+                    ING_K: k_mem_hi[ing_tok_idx] <= skid_tdata;
+                    ING_V: v_mem_hi[ing_tok_idx] <= skid_tdata;
+                    default: ;
+                endcase
+            end
+        end
+    end
+
+    // Ingress FSM and control registers (with async reset)
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             ing_load_state  <= ING_Q;
@@ -245,19 +268,6 @@ module attention_core_top_2A #(
                 ing_beat_cnt    <= '0;
                 head_data_ready <= 1'b0;
             end else if (skid_tvalid && skid_tready) begin
-                for (int b = 0; b < 16; b++) begin
-                    int dim_idx;
-                    dim_idx = ing_slice_idx * 16 + b;
-                    if (dim_idx < MAX_HEAD_DIM) begin
-                        case (ing_load_state)
-                            ING_Q: q_mem[ing_tok_idx][dim_idx] <= skid_tdata[b*8 +: 8];
-                            ING_K: k_mem[ing_tok_idx][dim_idx] <= skid_tdata[b*8 +: 8];
-                            ING_V: v_mem[ing_tok_idx][dim_idx] <= skid_tdata[b*8 +: 8];
-                            default: ;
-                        endcase
-                    end
-                end
-
                 if (ing_beat_cnt == beats_per_mat - 1) begin
                     ing_beat_cnt <= '0;
                     case (ing_load_state)
@@ -307,10 +317,14 @@ module attention_core_top_2A #(
         for (int d = 0; d < 8; d++) begin
             int actual_d;
             actual_d = k_sub_beat * 8 + d;
-            if (actual_d < MAX_HEAD_DIM) begin
+            if (actual_d < 16) begin
                 dsp_tree_q[d]      = q_curr_vec[actual_d];
-                dsp_tree_k_even[d] = k_mem[col_even][actual_d];
-                dsp_tree_k_odd[d]  = k_mem[col_odd][actual_d];
+                dsp_tree_k_even[d] = $signed(k_mem_lo[col_even][actual_d*8 +: 8]);
+                dsp_tree_k_odd[d]  = $signed(k_mem_lo[col_odd][actual_d*8 +: 8]);
+            end else if (actual_d < MAX_HEAD_DIM) begin
+                dsp_tree_q[d]      = q_curr_vec[actual_d];
+                dsp_tree_k_even[d] = $signed(k_mem_hi[col_even][(actual_d - 16)*8 +: 8]);
+                dsp_tree_k_odd[d]  = $signed(k_mem_hi[col_odd][(actual_d - 16)*8 +: 8]);
             end else begin
                 dsp_tree_q[d]      = 8'sd0;
                 dsp_tree_k_even[d] = 8'sd0;
@@ -389,13 +403,14 @@ module attention_core_top_2A #(
     // ------------------------------------------------------------------------
     // 8. STAGE 4: SCORE x V CONTEXT AGGREGATION GEMM ENGINE (128-BIT EGRESS)
     // ------------------------------------------------------------------------
-    logic [C_AXIS_DATA_WIDTH-1:0] context_axis_tdata;
-    logic                         context_axis_tvalid;
-    logic                         context_axis_tlast;
-    logic [8:0]                   score_v_token_cnt;
-    logic                         score_v_row_done;
-    logic signed [7:0]            v_vec_active [0:MAX_HEAD_DIM-1];
-    logic [8:0]                   v_tok_rd_idx;
+    logic [C_AXIS_DATA_WIDTH-1:0]     context_axis_tdata;
+    logic [(C_AXIS_DATA_WIDTH/8)-1:0] context_axis_tkeep;
+    logic                             context_axis_tvalid;
+    logic                             context_axis_tlast;
+    logic [8:0]                       score_v_token_cnt;
+    logic                             score_v_row_done;
+    logic signed [7:0]                v_vec_active [0:MAX_HEAD_DIM-1];
+    logic [8:0]                       v_tok_rd_idx;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -411,8 +426,9 @@ module attention_core_top_2A #(
     end
 
     always_comb begin
-        for (int d = 0; d < MAX_HEAD_DIM; d++) begin
-            v_vec_active[d] = v_mem[v_tok_rd_idx][d];
+        for (int b = 0; b < 16; b++) begin
+            v_vec_active[b]      = $signed(v_mem_lo[v_tok_rd_idx][b*8 +: 8]);
+            v_vec_active[16 + b] = $signed(v_mem_hi[v_tok_rd_idx][b*8 +: 8]);
         end
     end
 
@@ -432,6 +448,7 @@ module attention_core_top_2A #(
         .head_dim      (reg_head_dim[15:0]),
         .m_axis_tvalid (context_axis_tvalid),
         .m_axis_tdata  (context_axis_tdata),
+        .m_axis_tkeep  (context_axis_tkeep),
         .m_axis_tlast  (context_axis_tlast),
         .m_axis_tready (m_axis_tready),
         .row_token_cnt (score_v_token_cnt),
@@ -496,8 +513,9 @@ module attention_core_top_2A #(
                 end
 
                 MHA_ROW_START: begin
-                    for (int d = 0; d < MAX_HEAD_DIM; d++) begin
-                        q_curr_vec[d] <= q_mem[q_row_idx][d];
+                    for (int b = 0; b < 16; b++) begin
+                        q_curr_vec[b]      <= $signed(q_mem_lo[q_row_idx][b*8 +: 8]);
+                        q_curr_vec[16 + b] <= $signed(q_mem_hi[q_row_idx][b*8 +: 8]);
                     end
                     mha_state <= MHA_ROW_PREP;
                 end
@@ -571,6 +589,7 @@ module attention_core_top_2A #(
     assign core_error = 1'b0;
 
     assign m_axis_tdata  = context_axis_tdata;
+    assign m_axis_tkeep  = context_axis_tkeep;
     assign m_axis_tvalid = context_axis_tvalid;
     assign m_axis_tlast  = context_axis_tlast;
 

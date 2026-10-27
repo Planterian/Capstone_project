@@ -37,7 +37,7 @@ Sơ đồ kết nối phân định ranh giới giữa **Processing System (ARM 
    |                                                                                                                   |
    |  AXI DMA MM2S (DDR4 -> PL)                                                                                        |
    |  +--------------------+                                                                                           |
-   |  | AXI4-Stream Ingress|=== (64-bit S_AXIS_TDATA / TVALID / TREADY / TLAST) ===+                                   |
+   |  | AXI4-Stream Ingress|=== (128-bit S_AXIS_TDATA / TVALID / TREADY / TLAST) ===+                                  |
    |  +--------------------+                                                       |                                   |
    |                                                                               v                                   |
    |                                                           +----------------------------------------+              |
@@ -73,7 +73,7 @@ Sơ đồ kết nối phân định ranh giới giữa **Processing System (ARM 
    |                                                                               v                                   |
    |  AXI DMA S2MM (PL -> DDR4)                                                    |                                   |
    |  +--------------------+                                                       |                                   |
-   |  | AXI4-Stream Egress |<== (64-bit M_AXIS_TDATA / TVALID / TREADY / TLAST) ===+                                   |
+   |  | AXI4-Stream Egress |<== (128-bit M_AXIS_TDATA / TVALID / TREADY / TLAST) ===+                                  |
    |  +--------------------+                                                                                           |
    +-------------------------------------------------------------------------------------------------------------------+
 ```
@@ -90,7 +90,7 @@ Sơ đồ chi tiết luồng xử lý đồng bộ chu kỳ xung nhịp giữa c
 ========================================================================================================================
 
    AXI4-Stream RX  
-   S_AXIS_TDATA [63:0]  
+   S_AXIS_TDATA [127:0]  
    ======/======================================================================================================+  
          |                                                                                                      |  
          v                                                                                                      v  
@@ -117,13 +117,13 @@ Sơ đồ chi tiết luồng xử lý đồng bộ chu kỳ xung nhịp giữa c
    |                  |     |         |         |     |         |         |     |        |         |     |        |         |
    +--------+---------+     +---------+---------+     +---------+---------+     +--------+---------+     +--------+---------+
             | (Read Port)             |                         |                        |                        |
-            |                         | INT32 Raw Score         | INT16 Scaled Score     | UINT16 Prob [0..32767] | 64-bit Beats
+            |                         | INT32 Raw Score         | INT16 Scaled Score     | UINT16 Prob [0..32767] | 128-bit Beats
             +-------------------------+-------------------------+------------------------+------------------------+
                                                                                                                   |
                                                                                                                   v
                                                                                                           AXI4-Stream TX
-                                                                                                          M_AXIS_TDATA [63:0]
-                                                                                                          (512 Beats / Head)
+                                                                                                          M_AXIS_TDATA [127:0]
+                                                                                                          (256 Beats / Head - Stage 2)
 ```
 
 ---

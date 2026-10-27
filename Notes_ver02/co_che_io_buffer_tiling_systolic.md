@@ -37,17 +37,17 @@ $$256 \times 256 = \mathbf{65,536\text{ bộ nhân MACs}}$$
   +------------------------------------------------------------------------------------------------------------------+
   | TẦNG 1: INPUT PING-PONG BRAM BUFFER (Double Buffering ẩn độ trễ DMA)                                             |
   |                                                                                                                  |
-  |   AXI-Stream Ingress (DMA MM2S): 64-bit / beat (8x INT8)                                                         |
+  |   AXI-Stream Ingress (DMA MM2S): 128-bit Native / beat (16x INT8)                                                |
   |             │                                                                                                    |
   |             ├──> BANK 0 [Q_RAM, K_RAM, V_RAM] <── (DMA đang nạp Tile mới khi Bank 1 bận)                         |
   |             └──> BANK 1 [Q_RAM, K_RAM, V_RAM] ──> (Systolic Array đang đọc tính Tile hiện tại)                   |
   +-------------------------------------------------------┬----------------------------------------------------------+
-                                                          │ Đọc Vector 32-bit qua Subword Mux
+                                                          │ Đọc Vector 32-bit (4x INT8) qua Subword Mux
                                                           v
   +------------------------------------------------------------------------------------------------------------------+
   | TẦNG 2: INPUT FEEDER (Vector Slicing & Wavefront Skewing)                                                        |
   |                                                                                                                  |
-  |   Mỗi chu kỳ, bộ đệm tách từ 64-bit thành các Vector 32-bit (4x INT8) cấp vào dầm nhịp Systolic:                  |
+  |   Mỗi chu kỳ, bộ đệm trích xuất các Vector 32-bit (4x INT8) cấp vào dầm nhịp Systolic:                           |
   |     - act_row [0..3] = rdata_q_vec [31:0] ──> Nạp 4 hàng kích hoạt A (Tile 4 hàng)                              |
   |     - wt_col0 [0..3] = rdata_k_vec [31:0] ──> Nạp 4 cột trọng số chẵn B (Col 0, 2, 4, 6)                        |
   |     - wt_col1 [0..3] = rdata_v_vec [31:0] ──> Nạp 4 cột trọng số lẻ C (Col 1, 3, 5, 7)                          |
@@ -75,12 +75,12 @@ $$256 \times 256 = \mathbf{65,536\text{ bộ nhân MACs}}$$
 
 ## 3. CƠ CHẾ ĐỆM ĐẦU VÀO (INPUT BUFFERING) THEO TILE
 
-### 3.1 Căn chỉnh Băng thông Ingress (64-bit $\rightarrow$ 32-bit Subword Muxing)
-- **Phía AXI DMA:** Để tối ưu hóa băng thông DDR4, DMA nạp dữ liệu qua bus 64-bit AXI-Stream ($8 \times \text{INT8}$ bytes/beat) và ghi thẳng vào Block RAM 64-bit.
-- **Phía Systolic Array:** Mỗi cạnh của mảng gồm `ARRAY_SIZE = 4` PEs, do đó mỗi chu kỳ mảng chỉ tiêu thụ **4 bytes INT8 (32 bits)**.
-- **Bộ đệm Subword Multiplexing** ([`ping_pong_bram_buffer.sv:228-249`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02/ping_pong_bram_buffer.sv#L228-L249)) sử dụng bit địa chỉ thấp `raddr[0]` để lựa chọn nửa từ:
+### 3.1 Căn chỉnh Băng thông Ingress & Trích xuất Vector (Ingress $\rightarrow$ 32-bit Vector Feeder)
+- **Phía AXI DMA (Top-Level):** DMA nạp dữ liệu qua bus **128-bit Native AXI-Stream** ($16 \times \text{INT8}$ bytes/beat) giúp nạp nhanh gấp 2 lần, tối đa hóa hiệu quả cổng High-Performance (HP) DDR4 của Zynq UltraScale+.
+- **Phía Systolic Array:** Mỗi cạnh của mảng gồm `ARRAY_SIZE = 4` PEs, do đó mỗi chu kỳ mảng tiêu thụ **4 bytes INT8 (32 bits)** cho mỗi luồng vector ($Q, K_{\text{even}}, K_{\text{odd}}$).
+- **Bộ đệm Subword Multiplexing** ([`ping_pong_bram_buffer.sv:228-249`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02/ping_pong_bram_buffer.sv#L228-L249)) sử dụng bit địa chỉ thấp `raddr[0]` để giải mã nửa từ 32-bit:
   ```systemverilog
-  // Tách từ 64-bit BRAM thành 2 subword 32-bit (4x INT8 mỗi subword)
+  // Tách từ bộ nhớ BRAM thành các vector 32-bit (4x INT8 mỗi subword)
   rdata_q_vec <= raddr_q[0] ? ram_q[raddr >> 1][63:32] : ram_q[raddr >> 1][31:0];
   rdata_k_vec <= raddr_k[0] ? ram_k[raddr >> 1][63:32] : ram_k[raddr >> 1][31:0];
   rdata_v_vec <= raddr_v[0] ? ram_v[raddr >> 1][63:32] : ram_v[raddr >> 1][31:0];

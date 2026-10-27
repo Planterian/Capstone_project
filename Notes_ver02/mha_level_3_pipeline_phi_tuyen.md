@@ -45,7 +45,7 @@ Tầng xử lý phi tuyến biến đổi các điểm số tích vô hướng t
    |   1. Tích lũy 256 tokens: ctx_acc[d] += prob_data * V[token_idx, d]  (32 bộ tích lũy song song)                  |
    |   2. Chuẩn hóa dịch phải: ctx_shifted[d] = ctx_acc[d] >>> 15                                                      |
    |   3. Kẹp bão hòa INT8:    [-128, +127]                                                                            |
-   |   4. Đóng gói Egress:     8 bytes INT8 -> 1 beat 64-bit; Xuất 512 beats / head; tlast tại beat 511               |
+   |   4. Đóng gói Egress:     16 bytes INT8 -> 1 beat 128-bit; Xuất 256 beats/head (Stage 2); tlast tại beat 255      |
    +-------------------------------------------------------------------------------------------------------------------+
 ```
 
@@ -59,7 +59,7 @@ Tầng xử lý phi tuyến biến đổi các điểm số tích vô hướng t
 - **Phần cứng:** 
   - Tầng nhân 1: `prod_stage <= 48'($signed(in_score)) * 48'($signed(scale_m));`
   - Tầng dịch 2: `clamped_score <= sat_clamp(prod_stage >>> scale_e);`
-  - Đảm bảo độ trễ 2 chu kỳ clock có thanh ghi pipeline, không gây suy giảm tần số hoạt động.
+  - Đảm bảo độ trễ 2 chu kỳ clock có thanh ghi pipeline chốt tín hiệu, không gây suy giảm tần số hoạt động ($F_{\max} \ge 250\text{ MHz}$).
 
 ### 2.2 Khối Softmax Engine Tái Cấu Hình BRAM (`softmax_lut.sv`)
 - **BRAM Phân vùng đa tầng:**
@@ -70,9 +70,12 @@ Tầng xử lý phi tuyến biến đổi các điểm số tích vô hướng t
     - `head_dim == 24`: Trỏ Offset `0x200` (Stage 4)
 - **Bộ chia lặp 32 chu kỳ (Restoring Divider):**
   - Khắc phục hoàn toàn lỗi chia tổ hợp và lỗi tràn số dấu phẩy tĩnh.
-  - Đầu ra xác suất đạt chuẩn 16-bit khớp từng bit (0-LSB error) với mô hình PyTorch I-ViT.
+  - Sử dụng tử số chuẩn hóa $2^{31} - 1$, đầu ra xác suất đạt chuẩn UINT16 $[0, 32767]$ khớp từng bit (0-LSB error) với mô hình PyTorch I-ViT.
 
-### 2.3 Khối Context GEMM (`score_v_gemm.sv`)
-- Hoàn thiện bộ đếm $0 \dots 255$ tokens.
-- Hỗ trợ đầy đủ tín hiệu bắt tay AXI-Stream Egress (`m_axis_tready` / `m_axis_tvalid`).
-- Tín hiệu `m_axis_tlast` được định thời chính xác, không còn lỗi ngắt sớm.
+### 2.3 Khối Context GEMM (`score_v_gemm.sv`) & Giao Diện AXI4-Stream TX 128-Bit
+- **32 Bộ tích lũy song song:** Tích lũy liên tục qua 256 tokens (`ctx_acc[d] += prob_data * V[k, d]`), dịch phải 15 bits và kẹp bão hòa số nguyên INT8 $[-128, +127]$.
+- **Đóng gói Egress Native 128-bit (`AXIS_DATA_WIDTH = 128`):**
+  - **Với Stage 2 ($d_k \le 16$):** Mỗi hàng context xuất trong đúng **1 beat duy nhất** (`ST_OUT_BEAT0` ghép 16 bytes `ctx_safe[15:0]`). Toàn bộ 256 hàng xuất trọn vẹn trong **256 beats / head**, tín hiệu `m_axis_tlast` kích hoạt tại beat thứ 255.
+  - **Với Stage 3 & 4 ($d_k \in \{20, 24, 32\}$):** Mỗi hàng xuất trong **2 beats** (`ST_OUT_BEAT0` 16 bytes thấp, `ST_OUT_BEAT1` 16 bytes cao kèm mask `m_axis_tkeep`). Xuất trọn vẹn trong **512 beats / head**, `m_axis_tlast` kích hoạt tại beat thứ 511.
+- Hỗ trợ đầy đủ tín hiệu bắt tay backpressure AXI-Stream Egress (`m_axis_tready` / `m_axis_tvalid`).
+

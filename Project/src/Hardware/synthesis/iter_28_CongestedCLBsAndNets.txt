@@ -1,0 +1,34 @@
+List of CLB Tiles
+CLEM_X15Y19
+CLEL_R_X15Y19
+CLEM_X14Y26
+CLEL_L_X11Y40
+CLEL_R_X11Y40
+CLEL_L_X34Y33
+CLEL_R_X31Y42
+CLEM_X18Y47
+CLEL_R_X18Y47
+CLEM_X15Y27
+CLEL_R_X15Y27
+CLEM_X15Y30
+CLEL_R_X15Y30
+CLEM_X14Y25
+CLEL_L_X11Y7
+CLEL_R_X11Y7
+
+List of Congested Nets
+u_softmax_engine/mult_full__0/P[25]
+u_softmax_engine/mult_full__0/P[28]
+v_tok_rd_idx_reg[7]_rep_n_0
+v_mem_lo_reg_0_63_91_97/DOD
+u_softmax_engine/score_buffer_reg_n_0_[192][6]
+u_softmax_engine/score_buffer_reg_n_0_[194][6]
+u_softmax_engine/score_buffer_reg_n_0_[201][6]
+u_softmax_engine/score_buffer_reg_n_0_[204][6]
+u_softmax_engine/score_buffer_reg_n_0_[180][5]
+u_softmax_engine/score_buffer_reg_n_0_[182][5]
+u_softmax_engine/score_buffer_reg_n_0_[181][3]
+u_softmax_engine/score_buffer_reg_n_0_[180][3]
+u_softmax_engine/score_buffer_reg_n_0_[162][1]
+u_softmax_engine/exp_rom_reg_bram_0_i_1401_n_0
+
