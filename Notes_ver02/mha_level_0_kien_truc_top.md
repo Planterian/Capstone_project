@@ -105,6 +105,34 @@
 
 ---
 
+```
+ ┌────────────────────────────────────────────────────────┐
+ │            Zynq UltraScale+ MPSoC (PS)                 │
+ │  - pl_clk0: 170MHz / 200MHz                            │
+ │  - M_AXI_HPM0_FPD (AXI Master điều khiển CSR & DMA)    │
+ │  - S_AXI_HP0_FPD  (AXI Slave nhận DMA đọc/ghi DDR4)    │
+ └──────────────┬────────────────────────▲────────────────┘
+                │                        │
+        [AXI SmartConnect]               │ (DMA Bus 128-bit)
+        ┌───────┴────────┐               │
+        │                │               │
+        ▼                ▼               │
+ ┌─────────────┐  ┌──────────────┐       │
+ │ AXI-Lite    │  │   AXI DMA    ├───────┘
+ │ Regs (CSR)  │  │  Controller  │
+ └──────┬──────┘  └──────┬───────┘
+        │                │
+        │                ├─► S_AXIS_MM2S (128-bit Stream nạp Q, K, V)
+        ▼                │
+ ┌───────────────────────▼───────────────┐
+ │       ATTENTION CORE IP (PL)          │
+ │  - Ingress: 128-bit Stream            │
+ │  - Egress : 128-bit Stream            │
+ └───────────────────────┬───────────────┘
+                         │
+                         └─► M_AXIS_S2MM (128-bit Stream trả Context Out về DMA)
+```
+
 ## 3. PHÂN TÍCH BĂNG THÔNG & ĐỘ TRỄ (BANDWIDTH & LATENCY MODEL)
 
 ### 3.1 Lưu lượng dữ liệu trên 1 Head ($N=256, d_k=16$ trên bus 128-bit Native):

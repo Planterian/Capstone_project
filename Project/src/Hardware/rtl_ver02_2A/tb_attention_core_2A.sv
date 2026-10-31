@@ -348,4 +348,11 @@ module tb_attention_core_2A;
         $finish;
     end
 
+
+    // Setup waveform dumping for tools like GTKWave
+    initial begin
+        $dumpfile("tb_attention_core_2A.vcd");
+        $dumpvars(0, tb_attention_core_2A);
+    end
+
 endmodule

@@ -154,4 +154,11 @@ module tb_systolic_mac_array_3B;
         $finish;
     end
 
+
+    // Setup waveform dumping for tools like GTKWave
+    initial begin
+        $dumpfile("tb_systolic_mac_array_3B.vcd");
+        $dumpvars(0, tb_systolic_mac_array_3B);
+    end
+
 endmodule

@@ -435,4 +435,11 @@ module tb_stage4_isolated_2A;
         $finish;
     end
 
+
+    // Setup waveform dumping for tools like GTKWave
+    initial begin
+        $dumpfile("tb_stage4_isolated_2A.vcd");
+        $dumpvars(0, tb_stage4_isolated_2A);
+    end
+
 endmodule

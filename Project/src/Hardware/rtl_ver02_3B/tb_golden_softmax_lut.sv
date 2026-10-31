@@ -151,4 +151,11 @@ module tb_golden_softmax_lut;
         $finish;
     end
 
+
+    // Setup waveform dumping for tools like GTKWave
+    initial begin
+        $dumpfile("tb_golden_softmax_lut.vcd");
+        $dumpvars(0, tb_golden_softmax_lut);
+    end
+
 endmodule

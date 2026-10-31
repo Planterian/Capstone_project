@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
 -------------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version     : Vivado v.2026.1 (win64) Build 6511674 Tue Jun 16 11:02:23 MDT 2026
-| Date             : Tue Oct 27 10:26:11 2026
+| Date             : Tue Oct 27 22:07:52 2026
 | Host             : DESKTOP-L58T74E running 64-bit major release  (build 9200)
 | Command          : report_power -file ./reports_3B/post_route_power.rpt
 | Design           : attention_core_top_3B
@@ -30,14 +30,14 @@ Table of Contents
 ----------
 
 +--------------------------+--------------+
-| Total On-Chip Power (W)  | 0.781        |
+| Total On-Chip Power (W)  | 0.826        |
 | Design Power Budget (W)  | Unspecified* |
 | Power Budget Margin (W)  | NA           |
-| Dynamic (W)              | 0.490        |
+| Dynamic (W)              | 0.535        |
 | Device Static (W)        | 0.291        |
 | Effective TJA (C/W)      | 2.3          |
-| Max Ambient (C)          | 83.2         |
-| Junction Temperature (C) | 26.8         |
+| Max Ambient (C)          | 83.1         |
+| Junction Temperature (C) | 26.9         |
 | Confidence Level         | Medium       |
 | Setting File             | ---          |
 | Simulation Activity File | ---          |
@@ -53,19 +53,19 @@ Table of Contents
 | On-Chip                  | Power (W) | Used     | Available | Utilization (%) |
 +--------------------------+-----------+----------+-----------+-----------------+
 | Clocks                   |     0.121 |        3 |       --- |             --- |
-| CLB Logic                |     0.112 |    88493 |       --- |             --- |
-|   LUT as Logic           |     0.082 |    23719 |    117120 |           20.25 |
-|   LUT as Distributed RAM |     0.026 |    15392 |     57600 |           26.72 |
-|   Register               |     0.003 |    42320 |    234240 |           18.07 |
+| CLB Logic                |     0.116 |    88463 |       --- |             --- |
+|   LUT as Logic           |     0.087 |    23707 |    117120 |           20.24 |
+|   LUT as Distributed RAM |     0.025 |    15392 |     57600 |           26.72 |
+|   Register               |     0.003 |    42308 |    234240 |           18.06 |
 |   CARRY8                 |     0.002 |      326 |     14640 |            2.23 |
 |   LUT as Shift Register  |    <0.001 |       24 |     57600 |            0.04 |
 |   Others                 |     0.000 |       70 |       --- |             --- |
 |   F7/F8 Muxes            |     0.000 |     3969 |    117120 |            3.39 |
-| Signals                  |     0.236 |    74164 |       --- |             --- |
+| Signals                  |     0.276 |    74127 |       --- |             --- |
 | Block RAM                |     0.002 |        1 |       144 |            0.69 |
 | DSPs                     |     0.020 |       52 |      1248 |            4.17 |
 | Static Power             |     0.291 |          |           |                 |
-| Total                    |     0.781 |          |           |                 |
+| Total                    |     0.826 |          |           |                 |
 +--------------------------+-----------+----------+-----------+-----------------+
 
 
@@ -75,7 +75,7 @@ Table of Contents
 +------------------+-------------+-----------+-------------+------------+-------------+-------------+------------+
 | Source           | Voltage (V) | Total (A) | Dynamic (A) | Static (A) | Powerup (A) | Budget (A)  | Margin (A) |
 +------------------+-------------+-----------+-------------+------------+-------------+-------------+------------+
-| Vccint           |       0.720 |     0.752 |       0.681 |      0.071 |       NA    | Unspecified | NA         |
+| Vccint           |       0.720 |     0.814 |       0.743 |      0.071 |       NA    | Unspecified | NA         |
 | Vccint_io        |       0.850 |     0.036 |       0.000 |      0.036 |       NA    | Unspecified | NA         |
 | Vccbram          |       0.850 |     0.001 |       0.000 |      0.001 |       NA    | Unspecified | NA         |
 | Vccaux           |       1.800 |     0.076 |       0.000 |      0.076 |       NA    | Unspecified | NA         |
@@ -162,14 +162,14 @@ Table of Contents
 +--------------------------------------------+-----------+
 | Name                                       | Power (W) |
 +--------------------------------------------+-----------+
-| attention_core_top_3B                      |     0.490 |
+| attention_core_top_3B                      |     0.535 |
 |   u_axi_lite_regs                          |     0.009 |
-|   u_reorder_buffer                         |     0.175 |
-|   u_scale_unit                             |     0.025 |
+|   u_reorder_buffer                         |     0.202 |
+|   u_scale_unit                             |     0.026 |
 |   u_score_v_gemm                           |     0.029 |
-|   u_skid_buffer_rx                         |     0.020 |
-|   u_softmax_engine                         |     0.026 |
-|   u_systolic_mac_array                     |     0.110 |
+|   u_skid_buffer_rx                         |     0.022 |
+|   u_softmax_engine                         |     0.027 |
+|   u_systolic_mac_array                     |     0.123 |
 |     gen_pe_row[0].gen_pe_col[0].u_pe_slice |     0.002 |
 |     gen_pe_row[0].gen_pe_col[1].u_pe_slice |     0.002 |
 |     gen_pe_row[0].gen_pe_col[2].u_pe_slice |     0.002 |

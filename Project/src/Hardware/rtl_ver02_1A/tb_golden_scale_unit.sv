@@ -126,4 +126,11 @@ module tb_golden_scale_unit;
         $finish;
     end
 
+
+    // Setup waveform dumping for tools like GTKWave
+    initial begin
+        $dumpfile("tb_golden_scale_unit.vcd");
+        $dumpvars(0, tb_golden_scale_unit);
+    end
+
 endmodule

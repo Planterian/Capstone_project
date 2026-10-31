@@ -47,23 +47,23 @@ Thuật toán Softmax số nguyên trong **I-ViT (Shiftmax)** được xây dự
     +---------------------------------------------------------------------------+
     | Pass 2: Exp ROM Lookup & Accumulator                                      │
     | rom_addr = Delta[7:0]                                                     │
-    | rom_data_exp <= exp_rom [Stage_offset + rom_addr] <-----------------------+
-    | sum_exp_reg <= sum_exp_reg + rom_data_exp (ACC_WIDTH = 32)
-    +---------------------+
-                          │
-                          v  sum_exp_reg [31:0]
+    | rom_data_exp <= exp_rom [Stage_offset + rom_addr]                         |
+    | sum_exp_reg <= sum_exp_reg + rom_data_exp (ACC_WIDTH = 32)                |
+    +---------------------+-----------------------------------------------------+
+                          │                                                     
+                          v  sum_exp_reg [31:0]                                   
     +---------------------------------------------------------------------------+
     | Pass 3: 32-step Restoring Integer Divider                                 |
     | - Numerator: 32'h7FFF_FFFF (2^31 - 1)                                     |
     | - Denominator: sum_exp_reg                                                |
     | - Quotient: inv_sum_reg = (2^31 - 1) / sum_exp_reg (32 clock cycles)      |
-    +---------------------+
+    +---------------------+-----------------------------------------------------+
                           │
                           v  inv_sum_reg [31:0]
     +---------------------------------------------------------------------------+
     | Pass 4: 2-Stage Pipelined Normalization & Saturation (Timing Closed)      |
     | [Stage 4.1 - Mult Reg]:                                                   |
-    |   mult_full_reg <= {32'd0, rom_data_exp} * {20'd0, inv_sum_reg};         |
+    |   mult_full_reg <= {32'd0, rom_data_exp} * {20'd0, inv_sum_reg};          |
     |   (Suy luận DSP48E2 internal MREG / PREG, trễ ~2.4 ns)                    |
     | [Stage 4.2 - Shift & Clamp]:                                              |
     |   shifted_prob   = mult_full_reg >> 16;                                   |

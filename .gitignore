@@ -1,10 +1,103 @@
-# Ignore dataset cache directories
+# ==============================================================================
+# .gitignore for Capstone_Project (FPGA ViT/MHA Hardware-Software Co-Design)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. HARDWARE EDA & SIMULATION BUILD ARTIFACTS (VIVADO, ICARUS, GTKWAVE)
+# ------------------------------------------------------------------------------
+# Waveform execution dumps (Extremely large binary files: 50MB - 400MB each)
+*.vcd
+*.wdb
+*.vcd.fst
+*.fsdb
+
+# Icarus Verilog compiled simulation binaries
+*.vvp
+a.out
+
+# Vivado internal synthesis/implementation cache & temporary directories
+.Xil/
+*.Xil/
+Project/src/Hardware/synthesis/.Xil/
+mha_kv260_deploy.cache/
+mha_kv260_deploy.hw/
+mha_kv260_deploy.ip_user_files/
+mha_kv260_deploy.runs/
+mha_kv260_deploy.sim/
+hd_visual/
+*.jou
+*.backup.jou
+*.backup.log
+*.log
+vivado*.log
+vivado*.jou
+clockInfo.txt
+
+# Xilinx Board Store local cache (Can be downloaded via Vivado)
+XilinxBoardStore*/
+Reference/
+
+# ------------------------------------------------------------------------------
+# 2. SECURITY & SENSITIVE CREDENTIALS (NEVER COMMIT)
+# ------------------------------------------------------------------------------
+*ssh*.txt
+*password*.txt
+*credential*.txt
+*.key
+*.pem
+*.env
+id_rsa*
+secrets/
+
+# ------------------------------------------------------------------------------
+# 3. PYTHON, PYTORCH & JUPYTER NOTEBOOK ARTIFACTS
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Dataset cache directories
 cifar10_cache/
 model_notebook/cifar10_cache/
+*.tar.gz
+*.zip
 
-# Python compiled bytecode & cache
-__pycache__/
-*.pyc
+# Intermediate training checkpoints (Keep only final golden models)
+model_notebook/ivit_surgery/*_latest.pth
+model_notebook/models_cache/*_history.pt
+*.ckpt
 
-# Temporary Word lock files
+# ------------------------------------------------------------------------------
+# 4. LATEX & DOCUMENTATION BUILD ARTIFACTS
+# ------------------------------------------------------------------------------
+*.aux
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
 ~$*.docx
+
+# ------------------------------------------------------------------------------
+# 5. OS & IDE TEMPORARY FILES
+# ------------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo

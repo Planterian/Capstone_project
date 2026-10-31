@@ -60,8 +60,7 @@ module tb_golden_softmax_lut;
         clk = 0;
         forever #(CLK_PERIOD / 2.0) clk = ~clk;
     end
-
-    // Monitor Output Egress Probabilities
+// Monitor Output Egress Probabilities
     always @(posedge clk) begin
         if (out_valid) begin
             logic [15:0] exp_prob;
@@ -149,6 +148,13 @@ module tb_golden_softmax_lut;
         end
         $display("=======================================================================");
         $finish;
+    end
+
+
+    // Setup waveform dumping for tools like GTKWave
+    initial begin
+        $dumpfile("tb_golden_softmax_lut.vcd");
+        $dumpvars(0, tb_golden_softmax_lut);
     end
 
 endmodule

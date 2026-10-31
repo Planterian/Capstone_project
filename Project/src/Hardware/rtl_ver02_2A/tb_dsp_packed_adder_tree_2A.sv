@@ -173,4 +173,11 @@ module tb_dsp_packed_adder_tree_2A;
         $finish;
     end
 
+
+    // Setup waveform dumping for tools like GTKWave
+    initial begin
+        $dumpfile("tb_dsp_packed_adder_tree_2A.vcd");
+        $dumpvars(0, tb_dsp_packed_adder_tree_2A);
+    end
+
 endmodule

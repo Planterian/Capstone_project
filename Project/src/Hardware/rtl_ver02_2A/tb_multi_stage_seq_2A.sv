@@ -650,4 +650,11 @@ module tb_multi_stage_seq_2A;
         $finish;
     end
 
+
+    // Setup waveform dumping for tools like GTKWave
+    initial begin
+        $dumpfile("tb_multi_stage_seq_2A.vcd");
+        $dumpvars(0, tb_multi_stage_seq_2A);
+    end
+
 endmodule

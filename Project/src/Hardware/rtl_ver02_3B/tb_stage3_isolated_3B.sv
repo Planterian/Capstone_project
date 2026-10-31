@@ -423,4 +423,11 @@ module tb_stage3_isolated_3B;
         $finish;
     end
 
+
+    // Setup waveform dumping for tools like GTKWave
+    initial begin
+        $dumpfile("tb_stage3_isolated_3B.vcd");
+        $dumpvars(0, tb_stage3_isolated_3B);
+    end
+
 endmodule

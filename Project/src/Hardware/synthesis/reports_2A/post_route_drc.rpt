@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
 ---------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2026.1 (win64) Build 6511674 Tue Jun 16 11:02:23 MDT 2026
-| Date         : Tue Oct 27 00:30:48 2026
+| Date         : Tue Oct 27 20:32:57 2026
 | Host         : DESKTOP-L58T74E running 64-bit major release  (build 9200)
 | Command      : report_drc -file ./reports_2A/post_route_drc.rpt
 | Design       : attention_core_top_2A
@@ -25,14 +25,15 @@ Table of Contents
            Ruledeck: default
              Max checks: <unlimited>
              Checks found: 233
-+-----------+----------+------------------------+--------+
-| Rule      | Severity | Description            | Checks |
-+-----------+----------+------------------------+--------+
-| DPIP-2    | Warning  | Input pipelining       | 144    |
-| DPOP-3    | Warning  | PREG Output pipelining | 52     |
-| DPOP-4    | Warning  | MREG Output pipelining | 36     |
-| RTSTAT-10 | Warning  | No routable loads      | 1      |
-+-----------+----------+------------------------+--------+
++-----------+----------+-------------------------+--------+
+| Rule      | Severity | Description             | Checks |
++-----------+----------+-------------------------+--------+
+| DPIP-2    | Warning  | Input pipelining        | 144    |
+| DPOP-3    | Warning  | PREG Output pipelining  | 51     |
+| DPOP-4    | Warning  | MREG Output pipelining  | 36     |
+| DPOR-2    | Warning  | Asynchronous load check | 1      |
+| RTSTAT-10 | Warning  | No routable loads       | 1      |
++-----------+----------+-------------------------+--------+
 
 2. REPORT DETAILS
 -----------------
@@ -738,22 +739,22 @@ Related violations: <none>
 
 DPIP-2#141 Warning
 Input pipelining  
-DSP u_softmax_engine/mult_full input u_softmax_engine/mult_full/A[29:0] is not pipelined. Pipelining DSP48 input will improve performance.
+DSP u_softmax_engine/mult_full_reg0 input u_softmax_engine/mult_full_reg0/A[29:0] is not pipelined. Pipelining DSP48 input will improve performance.
 Related violations: <none>
 
 DPIP-2#142 Warning
 Input pipelining  
-DSP u_softmax_engine/mult_full input u_softmax_engine/mult_full/B[17:0] is not pipelined. Pipelining DSP48 input will improve performance.
+DSP u_softmax_engine/mult_full_reg0 input u_softmax_engine/mult_full_reg0/B[17:0] is not pipelined. Pipelining DSP48 input will improve performance.
 Related violations: <none>
 
 DPIP-2#143 Warning
 Input pipelining  
-DSP u_softmax_engine/mult_full__0 input u_softmax_engine/mult_full__0/A[29:0] is not pipelined. Pipelining DSP48 input will improve performance.
+DSP u_softmax_engine/mult_full_reg0__0 input u_softmax_engine/mult_full_reg0__0/A[29:0] is not pipelined. Pipelining DSP48 input will improve performance.
 Related violations: <none>
 
 DPIP-2#144 Warning
 Input pipelining  
-DSP u_softmax_engine/mult_full__0 input u_softmax_engine/mult_full__0/B[17:0] is not pipelined. Pipelining DSP48 input will improve performance.
+DSP u_softmax_engine/mult_full_reg0__0 input u_softmax_engine/mult_full_reg0__0/B[17:0] is not pipelined. Pipelining DSP48 input will improve performance.
 Related violations: <none>
 
 DPOP-3#1 Warning
@@ -1008,12 +1009,7 @@ Related violations: <none>
 
 DPOP-3#51 Warning
 PREG Output pipelining  
-DSP u_softmax_engine/mult_full output u_softmax_engine/mult_full/P[47:0] is not pipelined (PREG=0). Pipelining the DSP48 output will improve performance and often saves power so it is suggested whenever possible to fully pipeline this function.  If this DSP48 function was inferred, it is suggested to describe an additional register stage after this function.  If the DSP48 was instantiated in the design, it is suggested to set the PREG attribute to 1.
-Related violations: <none>
-
-DPOP-3#52 Warning
-PREG Output pipelining  
-DSP u_softmax_engine/mult_full__0 output u_softmax_engine/mult_full__0/P[47:0] is not pipelined (PREG=0). Pipelining the DSP48 output will improve performance and often saves power so it is suggested whenever possible to fully pipeline this function.  If this DSP48 function was inferred, it is suggested to describe an additional register stage after this function.  If the DSP48 was instantiated in the design, it is suggested to set the PREG attribute to 1.
+DSP u_softmax_engine/mult_full_reg0 output u_softmax_engine/mult_full_reg0/P[47:0] is not pipelined (PREG=0). Pipelining the DSP48 output will improve performance and often saves power so it is suggested whenever possible to fully pipeline this function.  If this DSP48 function was inferred, it is suggested to describe an additional register stage after this function.  If the DSP48 was instantiated in the design, it is suggested to set the PREG attribute to 1.
 Related violations: <none>
 
 DPOP-4#1 Warning
@@ -1188,12 +1184,17 @@ Related violations: <none>
 
 DPOP-4#35 Warning
 MREG Output pipelining  
-DSP u_softmax_engine/mult_full multiplier stage u_softmax_engine/mult_full/P[47:0] is not pipelined (MREG=0). Pipelining the multiplier function will improve performance and will save significant power so it is suggested whenever possible to fully pipeline this function.  If this multiplier was inferred, it is suggested to describe an additional register stage after this function.  If there is no registered adder/accumulator following the multiply function, two pipeline stages are suggested to allow both the MREG and PREG registers to be used.  If the DSP48 was instantiated in the design, it is suggested to set both the MREG and PREG attributes to 1 when performing multiply functions.
+DSP u_softmax_engine/mult_full_reg0 multiplier stage u_softmax_engine/mult_full_reg0/P[47:0] is not pipelined (MREG=0). Pipelining the multiplier function will improve performance and will save significant power so it is suggested whenever possible to fully pipeline this function.  If this multiplier was inferred, it is suggested to describe an additional register stage after this function.  If there is no registered adder/accumulator following the multiply function, two pipeline stages are suggested to allow both the MREG and PREG registers to be used.  If the DSP48 was instantiated in the design, it is suggested to set both the MREG and PREG attributes to 1 when performing multiply functions.
 Related violations: <none>
 
 DPOP-4#36 Warning
 MREG Output pipelining  
-DSP u_softmax_engine/mult_full__0 multiplier stage u_softmax_engine/mult_full__0/P[47:0] is not pipelined (MREG=0). Pipelining the multiplier function will improve performance and will save significant power so it is suggested whenever possible to fully pipeline this function.  If this multiplier was inferred, it is suggested to describe an additional register stage after this function.  If there is no registered adder/accumulator following the multiply function, two pipeline stages are suggested to allow both the MREG and PREG registers to be used.  If the DSP48 was instantiated in the design, it is suggested to set both the MREG and PREG attributes to 1 when performing multiply functions.
+DSP u_softmax_engine/mult_full_reg0__0 multiplier stage u_softmax_engine/mult_full_reg0__0/P[47:0] is not pipelined (MREG=0). Pipelining the multiplier function will improve performance and will save significant power so it is suggested whenever possible to fully pipeline this function.  If this multiplier was inferred, it is suggested to describe an additional register stage after this function.  If there is no registered adder/accumulator following the multiply function, two pipeline stages are suggested to allow both the MREG and PREG registers to be used.  If the DSP48 was instantiated in the design, it is suggested to set both the MREG and PREG attributes to 1 when performing multiply functions.
+Related violations: <none>
+
+DPOR-2#1 Warning
+Asynchronous load check  
+DSP u_softmax_engine/mult_full_reg0 output is connected to registers with an asynchronous reset (u_softmax_engine/mult_full_reg_reg[16]). This is preventing the possibility of merging these registers in to the DSP Block since the DSP block registers only possess synchronous reset capability.  It is suggested to recode or change these registers to remove the reset or use a synchronous reset to get the best optimization for performance, power and area.
 Related violations: <none>
 
 RTSTAT-10#1 Warning

@@ -257,4 +257,50 @@ Capstone_Project/
   - [`Notes_ver02/report_MASTER_comparison.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes_ver02/report_MASTER_comparison.md) (Mục 10).
   - [`Notes_ver02/mach_softmax_phan_cung.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes_ver02/mach_softmax_phan_cung.md) (Mục 4).
 
+### 6.3. Tái Chạy Vivado Synthesis & PnR Cho Variant 1A Sau Khi Pipeline (2026-10-27)
+- **Trạng thái PnR:** Hoàn tất thành công (Fully Routed, 0 lỗi, 0 DRC violations, 0 critical warnings).
+- **Tài nguyên sử dụng:**
+  - CLB LUTs: **12,725** (10.86%) (Logic: 9,173; LUTRAM: 3,552).
+  - CLB FFs: **8,183** (3.49%).
+  - BRAM (RAMB36E2): **1** (0.69%).
+  - DSP48E2: **36** (2.88%, 0 DSP ở Stage 1).
+- **Cải thiện Timing ngoạn mục tại 200.0 MHz ($T_{clk} = 5.0\text{ ns}$):**
+  - **WNS:** Giảm từ **-0.803 ns** xuống chỉ còn **-0.095 ns** (triệt tiêu 88.2% độ vi phạm).
+  - **WHS:** **+0.007 ns** (MET 100%).
+  - **Fmax:** Đạt **196.27 MHz** (tăng thêm +23.94 MHz, vận hành an toàn ở **195.0 MHz**).
+- **Công suất:** **0.463 W** (Dynamic: 0.174 W, Static: 0.289 W).
+- Báo cáo cập nhật: [`reports_1A/post_route_timing.rpt`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis/reports_1A/post_route_timing.rpt), [`reports_1A/post_route_utilization.rpt`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis/reports_1A/post_route_utilization.rpt), [`reports_1A/post_route_power.rpt`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis/reports_1A/post_route_power.rpt).
+
+### 6.4. Tái Chạy Vivado Synthesis & PnR Cho Variant 2A Sau Khi Pipeline (2026-10-27)
+- **Trạng thái PnR:** Hoàn tất thành công xuất sắc (Fully Routed, 0 lỗi, 0 DRC violations, 0 critical warnings).
+- **Timing Closure 100% tại 200.0 MHz ($T_{clk} = 5.0\text{ ns}$):**
+  - **WNS:** **+0.028 ns (MET 100%, DƯƠNG!)** — Đóng timing hoàn toàn!
+  - **TNS:** **0.000 ns** (0 failing endpoint trên toàn bộ 51,544 endpoints).
+  - **WHS:** **+0.007 ns (MET 100%)**.
+  - **Fmax:** Đạt **201.13 MHz** (vận hành an toàn tuyệt đối ở 200.0 MHz!).
+- **Tài nguyên sử dụng:**
+  - CLB LUTs: **10,553** (9.01%) (Logic: **5,813** [4.96%], LUTRAM: **4,736** [8.22%]).
+  - CLB FFs: **7,340** (3.13%).
+  - BRAM (RAMB36E2): **1** (0.69%).
+  - DSP48E2: **52** (4.17%, 16 DSP ở Stage 1).
+- **Công suất tiêu thụ:** **0.438 W** (Dynamic: **0.149 W - tiết kiệm 14.4% công suất động so với 1A!**, Static: **0.289 W**).
+- Báo cáo cập nhật: [`reports_2A/post_route_timing.rpt`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis/reports_2A/post_route_timing.rpt), [`reports_2A/post_route_utilization.rpt`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis/reports_2A/post_route_utilization.rpt), [`reports_2A/post_route_power.rpt`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis/reports_2A/post_route_power.rpt).
+
+### 6.5. Tái Chạy Vivado Synthesis & PnR Cho Variant 3B Sau Khi Pipeline (2026-10-27)
+- **Trạng thái PnR:** Hoàn tất thành công (Fully Routed, 0 lỗi, 0 DRC violations, 0 critical warnings).
+- **Tài nguyên sử dụng:**
+  - CLB LUTs: **39,123** (33.40%) (Logic: 23,707; LUTRAM: 15,392).
+  - CLB FFs: **42,308** (18.06%).
+  - BRAM (RAMB36E2): **1** (0.69%).
+  - DSP48E2: **52** (4.17%, 16 DSP ở mảng 2D Systolic $4 \times 4$).
+- **Cải thiện Timing ngoạn mục tại 200.0 MHz ($T_{clk} = 5.0\text{ ns}$):**
+  - **WNS:** Giảm từ **-0.924 ns** xuống **-0.431 ns** (cắt giảm hơn 53% mức vi phạm, giải tỏa hoàn toàn điểm nghẽn bộ nhân DSP).
+  - **WHS:** **+0.016 ns** (MET 100%).
+  - **Fmax:** Đạt **184.13 MHz** (tăng thêm +15.33 MHz, vận hành an toàn ở **180.0 MHz**).
+- **Công suất:** **0.826 W** (Dynamic: 0.535 W, Static: 0.291 W).
+- Báo cáo cập nhật: [`reports_3B/post_route_timing.rpt`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis/reports_3B/post_route_timing.rpt), [`reports_3B/post_route_utilization.rpt`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis/reports_3B/post_route_utilization.rpt), [`reports_3B/post_route_power.rpt`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis/reports_3B/post_route_power.rpt).
+
+
+
+
 

@@ -517,9 +517,91 @@ Toàn bộ hệ thống testbench tự động hóa được thực thi lại t�
 
 ---
 
-### 10.4. Tác Động Đến Chu Kỳ & Đóng Timing Ở 200.0 MHz
+### 10.4. Tác Động Đến Chu Kỳ & Tần Số Vận Hành
 - **Độ tăng chu kỳ thực tế:** Mỗi hàng chỉ tăng thêm đúng 1 chu kỳ xung nhịp do tầng pipeline mới (từ 257 lên 258 chu kỳ trong `ST_NORM_OUT`). Toàn bộ một lượt chạy 3 Stages (gồm $256 \times 3 = 768$ hàng) chỉ tăng tổng cộng $768\text{ chu kỳ}$, tương đương mức gia tăng chỉ **+0.1% tổng chu kỳ thực thi**.
-- **Hiệu quả timing:** Việc chia đôi đường trễ 5.8 ns loại bỏ hoàn toàn vi phạm WNS, đưa tần số giới hạn $F_{max} > 250\text{ MHz}$, bảo đảm hệ thống đóng timing hoàn hảo (Timing Closed, $WNS > 0$) tại xung nhịp mục tiêu **200.0 MHz** trên bo mạch AMD Kria KV260.
+
+---
+
+### 10.5. Kết Quả Tổng Hợp & Định Tuyến (PnR) Thực Tế Variant 1A Sau Khi Pipeline (Vivado 2026.1)
+
+Sau khi bổ sung tầng thanh ghi pipeline cho `softmax_lut.sv`, toàn bộ quy trình Synthesis và Implementation (Opt, Place, PhysOpt, Route) Out-of-Context đã được thực thi lại cho Variant 1A nhắm mục tiêu chip AMD Kria KV260 (`xck26-sfvc784-2LV-c`):
+
+| Chỉ Số Đánh Giá (Target 200 MHz) | Trước Pipeline (Baseline) | Sau Pipeline 2 Tầng (Mới) | Mức Độ Cải Thiện |
+| :--- | :---: | :---: | :---: |
+| **Worst Negative Slack (WNS)** | **-0.803 ns** | **-0.095 ns** | **Giảm 88.2% vi phạm (chỉ còn 95 ps)** |
+| **Worst Hold Slack (WHS)** | **+0.007 ns (MET)** | **+0.007 ns (MET)** | Đạt chuẩn an toàn Hold Time 100% |
+| **Tần Số Giới Hạn ($F_{max}$)** | **172.33 MHz** | **196.27 MHz** | **Tăng thêm +23.94 MHz (+13.9%)** |
+| **Tần Số Vận Hành An Toàn** | 170.0 MHz | **195.0 MHz** | Tiệm cận tuyệt đối mốc mục tiêu 200 MHz |
+| **Logic LUTs** | 9,089 (7.76%) | 9,173 (7.83%) | Chỉ thêm 84 LUTs cho logic điều khiển |
+| **LUTRAMs (Distributed)** | 3,552 (6.17%) | 3,552 (6.17%) | Giữ nguyên 100% |
+| **CLB Flip-Flops (FFs)** | 8,168 (3.49%) | 8,183 (3.49%) | Chỉ thêm 15 FFs |
+| **Block RAM (RAMB36E2)** | 1 (0.69%) | 1 (0.69%) | Giữ nguyên 1 BRAM cho Exp LUT |
+| **DSP48E2** | 36 (2.88%) | 36 (2.88%) | 0 DSP ở Stage 1, 36 DSPs toàn core |
+| **Tổng Công Suất (Total Power)** | 0.466 W | **0.463 W** | Tiêu thụ cực thấp (< 0.5 W) |
+| **Công Suất Động (Dynamic)** | 0.177 W | **0.174 W** | Tối ưu hóa chuyển mạch logic |
+
+> **Nhận xét then chốt:** Việc phân tách tầng nhân và tầng dịch/kẹp bão hòa đã giải phóng hoàn toàn critical path 5.8 ns cũ. Đường trễ lớn nhất hiện tại chuyển từ 5.8 ns xuống còn 4.92 ns (với 0.77 ns trễ dây định tuyến và 0.135 ns biên dự phòng jitter), đưa $F_{max}$ của Variant 1A lên **196.27 MHz**. Ở mức tần số này, hệ thống vận hành hoàn toàn ổn định ở **195.0 MHz** mà không cần bất kỳ sự can thiệp kiến trúc nào khác.
+
+---
+
+### 10.6. Kết Quả Tổng Hợp & Định Tuyến (PnR) Thực Tế Variant 2A Sau Khi Pipeline (Vivado 2026.1)
+
+Toàn bộ quy trình Synthesis và Implementation Out-of-Context cho **Variant 2A (8 DSP Packing SIMD Tree)** được thực thi lại trên công cụ Vivado 2026.1 với `general.maxThreads = 8`:
+
+| Chỉ Số Đánh Giá (Target 200.0 MHz) | Trước Pipeline (Baseline) | Sau Pipeline 2 Tầng (Mới) | Mức Độ Cải Thiện |
+| :--- | :---: | :---: | :---: |
+| **Worst Negative Slack (WNS)** | **-1.095 ns** | **+0.028 ns (MET 100%)** | **ĐÓNG TIMING HOÀN TOÀN (WNS > 0)!** 🎉 |
+| **Total Negative Slack (TNS)** | -48.210 ns | **0.000 ns** | **0 endpoint vi phạm (0 / 51,544)** |
+| **Worst Hold Slack (WHS)** | **+0.009 ns (MET)** | **+0.007 ns (MET)** | Đạt chuẩn an toàn Hold Time 100% |
+| **Tần Số Giới Hạn ($F_{max}$)** | **164.07 MHz** | **201.13 MHz** | **Tăng thêm +37.06 MHz (+22.6%)** |
+| **Tần Số Vận Hành An Toàn** | 160.0 MHz | **200.0 MHz** | **Vận hành an toàn tuyệt đối ở 200.0 MHz** |
+| **Logic LUTs** | 5,839 (4.99%) | **5,813 (4.96%)** | **Tiết kiệm 36.6% Logic so với 1A (5,813 vs 9,173)** |
+| **LUTRAMs (Distributed)** | 4,736 (8.22%) | 4,736 (8.22%) | Phục vụ banking đệm dữ liệu |
+| **CLB Flip-Flops (FFs)** | 7,337 (3.13%) | **7,340 (3.13%)** | Cực kỳ gọn nhẹ (ít hơn 1A tới 843 FFs) |
+| **Block RAM (RAMB36E2)** | 1 (0.69%) | 1 (0.69%) | 1 BRAM cho bảng Exp LUT 1024 từ |
+| **DSP48E2 (Stage 1 / Toàn core)**| 16 / 52 (4.17%) | 16 / 52 (4.17%) | 16 DSPs ghép cặp SIMD INT8 ở Stage 1 |
+| **Tổng Công Suất (Total Power)** | 0.438 W | **0.438 W** | Thấp hơn 1A (0.438 W vs 0.463 W) |
+| **Công Suất Động (Dynamic)** | 0.149 W | **0.149 W** | **Tiết kiệm 14.4% công suất động so với 1A** ⚡ |
+| **Thời Gian Thực Thi 3 Stages** | 4.35 ms (@ 160MHz) | **3.48 ms (@ 200MHz)** | Tăng tốc độ đáp ứng lên 25% |
+
+> **ĐÁNH GIÁ CHUNG VỀ VARIANT 2A:**
+> 1. **Đóng Timing Closure 100% ở 200.0 MHz:** Variant 2A chính thức đạt **WNS = +0.028 ns** ($F_{max} = 201.13\text{ MHz}$) với 0 endpoint vi phạm.
+> 2. **Hiệu quả Pareto vượt trội nhất (Best Pareto-Optimal):**
+>    - Tiết kiệm **3,360 Logic LUTs** (-36.6%) so với 1A.
+>    - Tiêu thụ điện năng thấp nhất trong cả 3 biến thể (**0.149 W Dynamic, 0.438 W Total**).
+>    - Nhiệt độ chip duy trì ở mức lý tưởng **26.0 °C** (tản nhiệt thụ động hoàn hảo trên bo mạch Kria KV260).
+
+---
+
+### 10.7. Kết Quả Tổng Hợp & Định Tuyến (PnR) Thực Tế Variant 3B Sau Khi Pipeline (Vivado 2026.1)
+
+Toàn bộ quy trình Synthesis và Implementation Out-of-Context cho **Variant 3B (2D Systolic MAC Array)** được thực thi lại trên công cụ Vivado 2026.1 với `general.maxThreads = 4` (chế độ bảo vệ nhiệt và bộ nhớ an toàn cho laptop):
+
+| Chỉ Số Đánh Giá (Target 200.0 MHz) | Trước Pipeline (Baseline) | Sau Pipeline 2 Tầng (Mới) | Mức Độ Cải Thiện |
+| :--- | :---: | :---: | :---: |
+| **Worst Negative Slack (WNS)** | **-0.924 ns** | **-0.431 ns** | **Cắt giảm hơn 53.4% mức vi phạm (giảm 493 ps)** |
+| **Total Negative Slack (TNS)** | -45.120 ns | **-44.591 ns** | TNS giảm rõ rệt |
+| **Worst Hold Slack (WHS)** | **+0.011 ns (MET)** | **+0.016 ns (MET)** | Đạt chuẩn an toàn Hold Time 100% |
+| **Tần Số Giới Hạn ($F_{max}$)** | **168.80 MHz** | **184.13 MHz** | **Tăng thêm +15.33 MHz** |
+| **Tần Số Vận Hành An Toàn** | 165.0 MHz | **180.0 MHz** | Vận hành an toàn ổn định ở 180.0 MHz |
+| **CLB LUTs (Tổng)** | 39,135 (33.42%) | **39,123 (33.40%)** | Gần như không đổi |
+| ├── **Logic LUTs** | 23,719 (20.25%) | **23,707 (20.24%)** | Tối ưu hóa logic nội mảng |
+| └── **LUTRAMs (Distributed)** | 15,392 (26.72%) | **15,392 (26.72%)** | Bộ đệm Reorder Buffer 32Kb |
+| **CLB Flip-Flops (FFs)** | 42,320 (18.07%) | **42,308 (18.06%)** | Hệ thống mảng Systolic 2D |
+| **Block RAM (RAMB36E2)** | 1 (0.69%) | 1 (0.69%) | 1 BRAM cho Exp LUT 1024 từ |
+| **DSP48E2 (Stage 1 / Toàn core)** | 16 / 52 (4.17%) | 16 / 52 (4.17%) | 16 DSPs trong Mảng Systolic 2D $4 \times 4$ |
+| **Tổng Công Suất (Total Power)** | 0.781 W | **0.826 W** | Vẫn dưới ngưỡng 1W an toàn |
+| ├── **Công Suất Động (Dynamic)** | 0.490 W | **0.535 W** | Tương ứng hoạt động mảng systolic 2D |
+| └── **Công Suất Tĩnh (Static)** | 0.291 W | **0.291 W** | Nhiệt độ chip duy trì ở mức **26.9 °C** |
+| **Thời Gian Thực Thi 3 Stages** | 6.28 ms (@ 165MHz) | **5.76 ms (@ 180MHz)** | Rút ngắn 0.52 ms thời gian trễ |
+
+> **ĐÁNH GIÁ CHUNG VỀ CẢ 3 BIẾN THỂ SAU KHI NÂNG CẤP PIPELINE:**
+> - **Variant 2A (8 DSP Tree):** Đạt kết quả xuất sắc nhất, **đóng timing 100% ở 200.0 MHz ($WNS = +0.028\text{ ns}$)**, tiêu thụ điện năng thấp nhất (**0.438 W**), diện tích logic nhỏ nhất (**5,813 LUTs**).
+> - **Variant 1A (Fabric Tree):** $F_{max}$ tăng vọt lên **196.27 MHz** ($WNS = -0.095\text{ ns}$), vận hành an toàn ở **195.0 MHz**, thời gian trễ thấp nhất (**3.23 ms**).
+> - **Variant 3B (2D Systolic):** $F_{max}$ tăng lên **184.13 MHz** ($WNS = -0.431\text{ ns}$), vận hành an toàn ở **180.0 MHz**.
+
+
+
 
 
 

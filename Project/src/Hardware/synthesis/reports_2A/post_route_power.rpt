@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
 -------------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version     : Vivado v.2026.1 (win64) Build 6511674 Tue Jun 16 11:02:23 MDT 2026
-| Date             : Tue Oct 27 00:30:42 2026
+| Date             : Tue Oct 27 20:32:46 2026
 | Host             : DESKTOP-L58T74E running 64-bit major release  (build 9200)
 | Command          : report_power -file ./reports_2A/post_route_power.rpt
 | Design           : attention_core_top_2A
@@ -53,18 +53,17 @@ Table of Contents
 | On-Chip                  | Power (W) | Used     | Available | Utilization (%) |
 +--------------------------+-----------+----------+-----------+-----------------+
 | Clocks                   |     0.040 |        3 |       --- |             --- |
-| CLB Logic                |     0.037 |    20559 |       --- |             --- |
-|   LUT as Logic           |     0.024 |     5839 |    117120 |            4.99 |
-|   LUT as Distributed RAM |     0.011 |     4736 |     57600 |            8.22 |
-|   Register               |     0.002 |     7337 |    234240 |            3.13 |
+| CLB Logic                |     0.037 |    20561 |       --- |             --- |
+|   LUT as Logic           |     0.024 |     5813 |    117120 |            4.96 |
+|   LUT as Distributed RAM |     0.010 |     4736 |     57600 |            8.22 |
+|   Register               |     0.002 |     7340 |    234240 |            3.13 |
 |   CARRY8                 |    <0.001 |      240 |     14640 |            1.64 |
 |   LUT as Shift Register  |    <0.001 |        4 |     57600 |           <0.01 |
-|   BUFG                   |    <0.001 |        1 |        32 |            3.13 |
 |   Others                 |     0.000 |       45 |       --- |             --- |
 |   F7/F8 Muxes            |     0.000 |      993 |    117120 |            0.85 |
-| Signals                  |     0.050 |    15845 |       --- |             --- |
+| Signals                  |     0.051 |    15871 |       --- |             --- |
 | Block RAM                |     0.002 |        1 |       144 |            0.69 |
-| DSPs                     |     0.020 |       52 |      1248 |            4.17 |
+| DSPs                     |     0.019 |       52 |      1248 |            4.17 |
 | Static Power             |     0.289 |          |           |                 |
 | Total                    |     0.438 |          |           |                 |
 +--------------------------+-----------+----------+-----------+-----------------+
@@ -76,7 +75,7 @@ Table of Contents
 +------------------+-------------+-----------+-------------+------------+-------------+-------------+------------+
 | Source           | Voltage (V) | Total (A) | Dynamic (A) | Static (A) | Powerup (A) | Budget (A)  | Margin (A) |
 +------------------+-------------+-----------+-------------+------------+-------------+-------------+------------+
-| Vccint           |       0.720 |     0.275 |       0.206 |      0.068 |       NA    | Unspecified | NA         |
+| Vccint           |       0.720 |     0.276 |       0.207 |      0.068 |       NA    | Unspecified | NA         |
 | Vccint_io        |       0.850 |     0.035 |       0.000 |      0.035 |       NA    | Unspecified | NA         |
 | Vccbram          |       0.850 |     0.001 |       0.000 |      0.001 |       NA    | Unspecified | NA         |
 | Vccaux           |       1.800 |     0.077 |       0.000 |      0.077 |       NA    | Unspecified | NA         |
@@ -175,9 +174,9 @@ Table of Contents
 |     gen_dsp_pe[6].u_dsp_pe |     0.002 |
 |     gen_dsp_pe[7].u_dsp_pe |     0.002 |
 |   u_scale_unit             |     0.018 |
-|   u_score_v_gemm           |     0.031 |
+|   u_score_v_gemm           |     0.030 |
 |   u_skid_buffer_rx         |     0.005 |
-|   u_softmax_engine         |     0.027 |
+|   u_softmax_engine         |     0.029 |
 +----------------------------+-----------+
 
 

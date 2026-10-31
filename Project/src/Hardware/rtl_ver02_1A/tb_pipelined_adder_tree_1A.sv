@@ -147,4 +147,11 @@ module tb_pipelined_adder_tree_1A;
         $finish;
     end
 
+
+    // Setup waveform dumping for tools like GTKWave
+    initial begin
+        $dumpfile("tb_pipelined_adder_tree_1A.vcd");
+        $dumpvars(0, tb_pipelined_adder_tree_1A);
+    end
+
 endmodule

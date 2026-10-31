@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
 ---------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2026.1 (win64) Build 6511674 Tue Jun 16 11:02:23 MDT 2026
-| Date         : Tue Oct 27 10:25:27 2026
+| Date         : Tue Oct 27 22:06:17 2026
 | Host         : DESKTOP-L58T74E running 64-bit major release  (build 9200)
 | Command      : report_utilization -hierarchical -file ./reports_3B/post_route_utilization_hier.rpt
 | Design       : attention_core_top_3B
@@ -22,16 +22,16 @@ Table of Contents
 +--------------------------------------------+-------------------------+------------+------------+---------+------+-------+--------+--------+------+------------+
 |                  Instance                  |          Module         | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs  | RAMB36 | RAMB18 | URAM | DSP Blocks |
 +--------------------------------------------+-------------------------+------------+------------+---------+------+-------+--------+--------+------+------------+
-| attention_core_top_3B                      |                   (top) |      39135 |      23719 |   15392 |   24 | 42320 |      1 |      0 |    0 |         52 |
-|   (attention_core_top_3B)                  |                   (top) |      19015 |       3623 |   15392 |    0 |   647 |      0 |      0 |    0 |          0 |
-|   u_axi_lite_regs                          |           axi_lite_regs |        741 |        741 |       0 |    0 |   437 |      0 |      0 |    0 |          0 |
-|   u_reorder_buffer                         |       reorder_buffer_3B |      12620 |      12620 |       0 |    0 | 32964 |      0 |      0 |    0 |          0 |
-|   u_scale_unit                             |              scale_unit |        269 |        269 |       0 |    0 |   110 |      0 |      0 |    0 |          2 |
+| attention_core_top_3B                      |                   (top) |      39123 |      23707 |   15392 |   24 | 42308 |      1 |      0 |    0 |         52 |
+|   (attention_core_top_3B)                  |                   (top) |      19022 |       3630 |   15392 |    0 |   643 |      0 |      0 |    0 |          0 |
+|   u_axi_lite_regs                          |           axi_lite_regs |        734 |        734 |       0 |    0 |   437 |      0 |      0 |    0 |          0 |
+|   u_reorder_buffer                         |       reorder_buffer_3B |      12637 |      12637 |       0 |    0 | 32967 |      0 |      0 |    0 |          0 |
+|   u_scale_unit                             |              scale_unit |        267 |        267 |       0 |    0 |    91 |      0 |      0 |    0 |          2 |
 |   u_score_v_gemm                           |            score_v_gemm |       1491 |       1491 |       0 |    0 |  1036 |      0 |      0 |    0 |         32 |
 |   u_skid_buffer_rx                         |            axis_adapter |        132 |        132 |       0 |    0 |   260 |      0 |      0 |    0 |          0 |
-|   u_softmax_engine                         |             softmax_lut |       1651 |       1651 |       0 |    0 |  4307 |      1 |      0 |    0 |          2 |
-|   u_systolic_mac_array                     |      systolic_mac_array |       3210 |       3186 |       0 |   24 |  2545 |      0 |      0 |    0 |         16 |
-|     (u_systolic_mac_array)                 |      systolic_mac_array |       1798 |       1774 |       0 |   24 |  2025 |      0 |      0 |    0 |          0 |
+|   u_softmax_engine                         |             softmax_lut |       1630 |       1630 |       0 |    0 |  4309 |      1 |      0 |    0 |          2 |
+|   u_systolic_mac_array                     |      systolic_mac_array |       3201 |       3177 |       0 |   24 |  2551 |      0 |      0 |    0 |         16 |
+|     (u_systolic_mac_array)                 |      systolic_mac_array |       1789 |       1765 |       0 |   24 |  2031 |      0 |      0 |    0 |          0 |
 |     gen_pe_row[0].gen_pe_col[0].u_pe_slice |    pe_slice_dsp_packing |         89 |         89 |       0 |    0 |    34 |      0 |      0 |    0 |          1 |
 |     gen_pe_row[0].gen_pe_col[1].u_pe_slice |  pe_slice_dsp_packing_0 |         88 |         88 |       0 |    0 |    32 |      0 |      0 |    0 |          1 |
 |     gen_pe_row[0].gen_pe_col[2].u_pe_slice |  pe_slice_dsp_packing_1 |         88 |         88 |       0 |    0 |    32 |      0 |      0 |    0 |          1 |

@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
 -------------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version     : Vivado v.2026.1 (win64) Build 6511674 Tue Jun 16 11:02:23 MDT 2026
-| Date             : Tue Oct 27 00:03:44 2026
+| Date             : Tue Oct 27 19:48:21 2026
 | Host             : DESKTOP-L58T74E running 64-bit major release  (build 9200)
 | Command          : report_power -file ./reports_1A/post_route_power.rpt
 | Design           : attention_core_top_1A
@@ -30,10 +30,10 @@ Table of Contents
 ----------
 
 +--------------------------+--------------+
-| Total On-Chip Power (W)  | 0.466        |
+| Total On-Chip Power (W)  | 0.463        |
 | Design Power Budget (W)  | Unspecified* |
 | Power Budget Margin (W)  | NA           |
-| Dynamic (W)              | 0.177        |
+| Dynamic (W)              | 0.174        |
 | Device Static (W)        | 0.289        |
 | Effective TJA (C/W)      | 2.3          |
 | Max Ambient (C)          | 83.9         |
@@ -53,18 +53,19 @@ Table of Contents
 | On-Chip                  | Power (W) | Used     | Available | Utilization (%) |
 +--------------------------+-----------+----------+-----------+-----------------+
 | Clocks                   |     0.043 |        3 |       --- |             --- |
-| CLB Logic                |     0.053 |    23788 |       --- |             --- |
-|   LUT as Logic           |     0.037 |     9089 |    117120 |            7.76 |
+| CLB Logic                |     0.052 |    23805 |       --- |             --- |
+|   LUT as Logic           |     0.035 |     9173 |    117120 |            7.83 |
 |   LUT as Distributed RAM |     0.010 |     3552 |     57600 |            6.17 |
-|   Register               |     0.003 |     8168 |    234240 |            3.49 |
+|   Register               |     0.003 |     8183 |    234240 |            3.49 |
 |   CARRY8                 |     0.003 |      538 |     14640 |            3.67 |
+|   BUFG                   |    <0.001 |        1 |        32 |            3.13 |
 |   Others                 |     0.000 |       21 |       --- |             --- |
 |   F7/F8 Muxes            |     0.000 |      772 |    117120 |            0.66 |
-| Signals                  |     0.066 |    18179 |       --- |             --- |
+| Signals                  |     0.064 |    18232 |       --- |             --- |
 | Block RAM                |     0.002 |        1 |       144 |            0.69 |
 | DSPs                     |     0.014 |       36 |      1248 |            2.88 |
 | Static Power             |     0.289 |          |           |                 |
-| Total                    |     0.466 |          |           |                 |
+| Total                    |     0.463 |          |           |                 |
 +--------------------------+-----------+----------+-----------+-----------------+
 
 
@@ -74,7 +75,7 @@ Table of Contents
 +------------------+-------------+-----------+-------------+------------+-------------+-------------+------------+
 | Source           | Voltage (V) | Total (A) | Dynamic (A) | Static (A) | Powerup (A) | Budget (A)  | Margin (A) |
 +------------------+-------------+-----------+-------------+------------+-------------+-------------+------------+
-| Vccint           |       0.720 |     0.314 |       0.245 |      0.069 |       NA    | Unspecified | NA         |
+| Vccint           |       0.720 |     0.309 |       0.241 |      0.069 |       NA    | Unspecified | NA         |
 | Vccint_io        |       0.850 |     0.035 |       0.000 |      0.035 |       NA    | Unspecified | NA         |
 | Vccbram          |       0.850 |     0.001 |       0.000 |      0.001 |       NA    | Unspecified | NA         |
 | Vccaux           |       1.800 |     0.077 |       0.000 |      0.077 |       NA    | Unspecified | NA         |
@@ -161,12 +162,12 @@ Table of Contents
 +--------------------------+-----------+
 | Name                     | Power (W) |
 +--------------------------+-----------+
-| attention_core_top_1A    |     0.177 |
+| attention_core_top_1A    |     0.174 |
 |   u_axi_lite_regs        |     0.010 |
-|   u_pipelined_adder_tree |     0.045 |
-|   u_scale_unit           |     0.023 |
-|   u_score_v_gemm         |     0.030 |
-|   u_skid_buffer_rx       |     0.005 |
+|   u_pipelined_adder_tree |     0.042 |
+|   u_scale_unit           |     0.024 |
+|   u_score_v_gemm         |     0.029 |
+|   u_skid_buffer_rx       |     0.004 |
 |   u_softmax_engine       |     0.030 |
 +--------------------------+-----------+
 

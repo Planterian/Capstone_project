@@ -200,4 +200,11 @@ module tb_score_v_gemm;
         $finish;
     end
 
+
+    // Setup waveform dumping for tools like GTKWave
+    initial begin
+        $dumpfile("tb_score_v_gemm.vcd");
+        $dumpvars(0, tb_score_v_gemm);
+    end
+
 endmodule
