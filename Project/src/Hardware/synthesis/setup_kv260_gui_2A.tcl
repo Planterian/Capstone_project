@@ -27,7 +27,7 @@ proc get_latest_ip_vlnv {ip_name default_vlnv} {
 }
 
 puts "================================================================="
-puts "  [1/6] INITIALIZING PROJECT FOR VIVADO GUI"
+puts "  ==> STEP 1/6: INITIALIZING PROJECT FOR VIVADO GUI"
 puts "================================================================="
 file mkdir $OUT_DIR
 
@@ -37,7 +37,7 @@ catch { close_project }
 create_project -force $PROJ_NAME $PROJ_DIR -part $PART_NAME
 
 puts "================================================================="
-puts "  [2/6] ADDING RTL SOURCES & EXP ROM INITIALIZATION HEX"
+puts "  ==> STEP 2/6: ADDING RTL SOURCES & EXP ROM INITIALIZATION HEX"
 puts "================================================================="
 # Separate synthesizable design RTL and simulation testbenches
 set all_sv   [glob -nocomplain "$RTL_DIR/*.sv"]
@@ -73,13 +73,13 @@ if {[file exists "$RTL_DIR/exp_rom_all_stages.hex"]} {
     file copy -force "$RTL_DIR/exp_rom_all_stages.hex" "$PROJ_DIR/exp_rom_all_stages.hex"
     puts "  -> Successfully registered and staged exp_rom_all_stages.hex"
 } else {
-    puts "[WARNING] exp_rom_all_stages.hex not found in $RTL_DIR!"
+    puts "*** WARNING: exp_rom_all_stages.hex not found in $RTL_DIR!"
 }
 
 update_compile_order -fileset sources_1
 
 puts "================================================================="
-puts "  [3/6] CONSTRUCTING BLOCK DESIGN: mha_system"
+puts "  ==> STEP 3/6: CONSTRUCTING BLOCK DESIGN: mha_system"
 puts "================================================================="
 create_bd_design "mha_system"
 
@@ -135,7 +135,7 @@ set_property -dict [list CONFIG.NUM_PORTS {2}] [get_bd_cells irq_concat]
 create_bd_cell -type module -reference attention_core_top_2A mha_core_0
 
 puts "================================================================="
-puts "  [4/6] WIRING BUSES, CLOCKS & INTERRUPTS"
+puts "  ==> STEP 4/6: WIRING BUSES, CLOCKS & INTERRUPTS"
 puts "================================================================="
 # Clock connections (150 MHz pl_clk0)
 set clk_pin [get_bd_pins zynq_ps/pl_clk0]
@@ -202,7 +202,7 @@ validate_bd_design
 save_bd_design
 
 puts "================================================================="
-puts "  [5/6] CREATING TOP-LEVEL HDL WRAPPER"
+puts "  ==> STEP 5/6: CREATING TOP-LEVEL HDL WRAPPER"
 puts "================================================================="
 set bd_file [get_files [get_property FILE_NAME [current_bd_design]]]
 set wrapper_path [make_wrapper -files $bd_file -top]
@@ -230,7 +230,7 @@ update_compile_order -fileset sources_1
 catch { open_bd_design [get_files mha_system.bd] }
 
 puts "================================================================="
-puts "  [6/6] GUI SETUP COMPLETE!"
+puts "  ==> STEP 6/6: GUI SETUP COMPLETE!"
 puts "  - Block Design 'mha_system' is now open in your GUI canvas."
 puts "  - Layout has been auto-arranged for clean screenshot capture."
 puts "  - You can now inspect IP settings, Address Editor, or click"

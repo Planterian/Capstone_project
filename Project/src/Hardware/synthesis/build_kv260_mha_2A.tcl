@@ -7,7 +7,7 @@
 # ==============================================================================
 
 # Use 4 threads to prevent laptop thermal throttling or freezing
-set_param general.maxThreads 4
+set_param general.maxThreads 2
 
 set PROJ_NAME   "mha_kv260_deploy"
 set PROJ_DIR    "./vivado_prj_2A"
@@ -26,7 +26,7 @@ proc get_latest_ip_vlnv {ip_name default_vlnv} {
 }
 
 puts "================================================================="
-puts "  [STEP 1/7] INITIALIZING VIVADO PROJECT: $PROJ_NAME"
+puts "  ==> STEP 1/7: INITIALIZING VIVADO PROJECT: $PROJ_NAME"
 puts "================================================================="
 file mkdir $OUT_DIR
 
@@ -36,7 +36,7 @@ catch { close_project }
 create_project -force $PROJ_NAME $PROJ_DIR -part $PART_NAME
 
 puts "================================================================="
-puts "  [STEP 2/7] IMPORTING SYSTEMVERILOG RTL SOURCES & EXP ROM HEX"
+puts "  ==> STEP 2/7: IMPORTING SYSTEMVERILOG RTL SOURCES & EXP ROM HEX"
 puts "================================================================="
 # Separate synthesizable design RTL and simulation testbenches
 set all_sv   [glob -nocomplain "$RTL_DIR/*.sv"]
@@ -72,14 +72,14 @@ if {[file exists "$RTL_DIR/exp_rom_all_stages.hex"]} {
     file copy -force "$RTL_DIR/exp_rom_all_stages.hex" "$PROJ_DIR/exp_rom_all_stages.hex"
     puts "  -> Successfully registered and staged exp_rom_all_stages.hex"
 } else {
-    puts "[ERROR] exp_rom_all_stages.hex NOT found in $RTL_DIR!"
+    puts "*** ERROR: exp_rom_all_stages.hex NOT found in $RTL_DIR!"
     exit 1
 }
 
 update_compile_order -fileset sources_1
 
 puts "================================================================="
-puts "  [STEP 3/7] BUILDING BLOCK DESIGN: mha_system"
+puts "  ==> STEP 3/7: BUILDING BLOCK DESIGN: mha_system"
 puts "================================================================="
 create_bd_design "mha_system"
 
@@ -135,7 +135,7 @@ set_property -dict [list CONFIG.NUM_PORTS {2}] [get_bd_cells irq_concat]
 create_bd_cell -type module -reference attention_core_top_2A mha_core_0
 
 puts "================================================================="
-puts "  [STEP 4/7] WIRING BUSES, CLOCKS & INTERRUPTS"
+puts "  ==> STEP 4/7: WIRING BUSES, CLOCKS & INTERRUPTS"
 puts "================================================================="
 # Clock connections (150 MHz pl_clk0)
 set clk_pin [get_bd_pins zynq_ps/pl_clk0]
@@ -201,7 +201,7 @@ validate_bd_design
 save_bd_design
 
 puts "================================================================="
-puts "  [STEP 5/7] GENERATING HDL WRAPPER & CONSTRAINTS"
+puts "  ==> STEP 5/7: GENERATING HDL WRAPPER & CONSTRAINTS"
 puts "================================================================="
 set bd_file [get_files [get_property FILE_NAME [current_bd_design]]]
 set wrapper_path [make_wrapper -files $bd_file -top]
@@ -226,18 +226,18 @@ set_property top mha_system_wrapper [current_fileset]
 update_compile_order -fileset sources_1
 
 puts "================================================================="
-puts "  [STEP 6/7] LAUNCHING SYNTHESIS & IMPLEMENTATION"
+puts "  ==> STEP 6/7: LAUNCHING SYNTHESIS & IMPLEMENTATION"
 puts "================================================================="
-launch_runs impl_1 -to_step write_bitstream -jobs 4
+launch_runs impl_1 -to_step write_bitstream -jobs 2
 wait_on_run impl_1
 
 if {[get_property PROGRESS [get_runs impl_1]] != "100%"} {
-    puts "[ERROR] Implementation failed! Check run log for details."
+    puts "*** ERROR: Implementation failed! Check run log for details."
     exit 1
 }
 
 puts "================================================================="
-puts "  [STEP 7/7] EXPORTING BITSTREAM & HARDWARE HANDOFF (.HWH / .XSA)"
+puts "  ==> STEP 7/7: EXPORTING BITSTREAM & HARDWARE HANDOFF (.HWH / .XSA)"
 puts "================================================================="
 file copy -force "$PROJ_DIR/$PROJ_NAME.runs/impl_1/mha_system_wrapper.bit" "$OUT_DIR/attention_core_top_2A.bit"
 file copy -force "$PROJ_DIR/$PROJ_NAME.runs/impl_1/mha_system_wrapper.bit" "$OUT_DIR/03_ivit_hw_accelerated/overlay/attention_core_top_2A.bit"

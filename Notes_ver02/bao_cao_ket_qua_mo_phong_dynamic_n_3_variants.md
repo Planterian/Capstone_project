@@ -96,3 +96,21 @@ Mục đích: Đảm bảo phần cứng chuyển đổi cấu hình thanh ghi C
    - Stage 4 ($N=16$) giảm từ ~210,000 cycles xuống còn **~1,759 cycles** (giảm 99.16% thời gian).
 2. **Khả năng triển khai End-to-End:**
    Cả 3 kiến trúc phần cứng (1A, 2A, 3B) đã hoàn toàn đồng bộ với logic phần mềm `pynq_multi_stage_attention_hook.py` (Phase 4). Tất cả 9 khối Transformer trong MobileViT-XXS giờ đây có thể được tăng tốc trực tiếp trên chip Kria KV260.
+
+
+---
+
+## 5. Báo Cáo Tổng Hợp Phần Cứng & Sinh Bitstream (Variant 2A - AMD Kria KV260)
+
+* **Thiết bị mục tiêu:** AMD Kria KV260 Vision AI Starter Kit (`xck26-sfvc784-2LV-c`)
+* **Công cụ EDA:** AMD Vivado Design Suite v2026.1 (64-bit) Batch Mode
+* **Thời gian thực thi:** 25 phút 35 giây (chạy giới hạn 2 luồng `-jobs 2` để đảm bảo nhiệt độ an toàn cho CPU laptop)
+* **Kết quả Design Rule Check (DRC):** **0 Errors, 0 Critical Warnings** (Hoàn toàn sạch DRC).
+* **Các file đầu ra (Hardware Artifacts):**
+  - Bitstream: `attention_core_top_2A.bit` (7,797,909 bytes)
+  - Hardware Handoff: `attention_core_top_2A.hwh` (337,592 bytes)
+  - Hardware Platform: `attention_core_top_2A.xsa` (1,267,181 bytes)
+* **Vị trí tự động đồng bộ sẵn sàng nạp lên KV260:**
+  - `Project/src/Software/`
+  - `Project/src/Software/03_ivit_hw_accelerated/overlay/` (Đầy đủ Overlay cho Phase 3)
+  - `Project/src/Software/04_all_9_transformers_hw/overlay/` (Đầy đủ Overlay cho Phase 4 - Toàn bộ 9 Transformer Layers)
