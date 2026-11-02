@@ -19,6 +19,8 @@ a.out
 .Xil/
 *.Xil/
 Project/src/Hardware/synthesis/.Xil/
+Project/src/Hardware/synthesis/vivado_prj_*/
+vivado_prj_*/
 mha_kv260_deploy.cache/
 mha_kv260_deploy.hw/
 mha_kv260_deploy.ip_user_files/
@@ -29,6 +31,7 @@ hd_visual/
 *.backup.jou
 *.backup.log
 *.log
+*.logfile
 vivado*.log
 vivado*.jou
 clockInfo.txt
@@ -101,3 +104,10 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+
+# ------------------------------------------------------------------------------
+# 6. LOCAL TESTING RUNTIME DUMPS & UNTRACKED DOCS
+# ------------------------------------------------------------------------------
+Project/src/Software/*.bin
+Project/src/Software/*.pdf
+

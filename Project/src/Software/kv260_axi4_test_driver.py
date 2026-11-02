@@ -13,6 +13,12 @@ Features:
 
 import os
 import sys
+
+# Ensure script runs in its own directory
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR:
+    os.chdir(SCRIPT_DIR)
+
 import time
 import numpy as np
 from pynq import Overlay, allocate
@@ -48,6 +54,13 @@ def main():
     print("==================================================================")
     print("  KRIA KV260 AXI4 HARDWARE TEST DRIVER: VARIANT 2A (DSP PACKING) ")
     print("==================================================================")
+    print(f"[INFO] Python Interpreter: {sys.executable}")
+    print(f"[INFO] XILINX_XRT: {os.environ.get('XILINX_XRT', 'NOT SET')}")
+    try:
+        from pynq import Device
+        print(f"[INFO] Available Devices: {Device.devices}")
+    except Exception as e:
+        print(f"[WARN] Device query notice: {e}")
 
     if not os.path.exists(BITSTREAM):
         print(f"[ERROR]: Bitstream '{BITSTREAM}' not found in current directory!")
@@ -64,7 +77,7 @@ def main():
 
     # Locate CSR (try common block design naming conventions)
     csr = None
-    for name in ["attention_core_top_2A_0", "attention_core_top_0", "axi_lite_regs_0"]:
+    for name in ["mha_core_0", "attention_core_top_2A_0", "attention_core_top_0", "axi_lite_regs_0"]:
         if hasattr(ol, name):
             csr_block = getattr(ol, name)
             csr = getattr(csr_block, "s_axi", csr_block)
@@ -73,8 +86,9 @@ def main():
     if csr is None:
         print("[WARN] CSR specific IP alias not directly identified. Searching IP dict...")
         for k in ol.ip_dict.keys():
-            if "attention" in k or "axi_lite" in k:
-                csr = getattr(ol, k).s_axi
+            if "mha" in k.lower() or "attention" in k.lower() or "axi_lite" in k.lower():
+                csr_block = getattr(ol, k)
+                csr = getattr(csr_block, "s_axi", csr_block)
                 print(f"  -> Found CSR IP block: {k}")
                 break
 

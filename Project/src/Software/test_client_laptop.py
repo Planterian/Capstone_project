@@ -17,10 +17,21 @@ import sys
 import argparse
 import subprocess
 
-def load_hex_bytes(filepath):
+def load_hex_bytes(filename):
     """Parses 2-digit hex values from PyTorch golden .hex vector file into raw bytes."""
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"Missing vector file: {filepath}")
+    search_paths = [
+        filename,
+        os.path.join(os.path.dirname(__file__), filename),
+        os.path.join(os.path.dirname(__file__), "..", "Hardware", "rtl_ver02_2A", filename),
+        os.path.join(os.path.dirname(__file__), "..", "..", "model_notebook", "ivit_surgery", "golden_vectors", filename)
+    ]
+    filepath = None
+    for p in search_paths:
+        if os.path.exists(p):
+            filepath = p
+            break
+    if filepath is None:
+        raise FileNotFoundError(f"Missing vector file: {filename} (searched: {search_paths})")
     with open(filepath, "r") as f:
         vals = [int(line.strip(), 16) for line in f if line.strip()]
     return vals
@@ -39,8 +50,9 @@ def main():
 
     kv260_target = f"{args.user}@{args.ip}"
 
-    # Build Jump Host flags if provided
-    jump_opt = f"-J {args.jump} " if args.jump else ""
+    # Build Jump Host flags if provided with auto-accept new host keys
+    ssh_opts = "-o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 "
+    jump_opt = f"-J {args.jump} {ssh_opts}" if args.jump else ssh_opts
 
     print("==================================================================")
     print("   MHA VARIANT 2A LAPTOP-TO-KV260 SSH/AXI4 TEST RUNNER")
@@ -69,7 +81,7 @@ def main():
 
     # 2. Check SSH connectivity via Jump Host
     print(f"\n[Step 2] Testing SSH connection to {kv260_target}...")
-    test_ssh_cmd = f"ssh {jump_opt}-o ConnectTimeout=8 {kv260_target} 'echo [KV260]: SSH Connection OK!'"
+    test_ssh_cmd = f"ssh {jump_opt}{kv260_target} echo KV260_SSH_CONNECTION_OK"
     print(f"  -> Executing: {test_ssh_cmd}")
     ret = os.system(test_ssh_cmd)
     if ret != 0:
@@ -79,7 +91,7 @@ def main():
 
     # 3. Create remote directory and sync Overlay files, Driver, and Data
     print(f"\n[Step 3] Syncing Overlay Bitstream, Driver, and Data to KV260 via SCP...")
-    os.system(f"ssh {jump_opt}{kv260_target} 'mkdir -p {args.remote_dir}'")
+    os.system(f"ssh {jump_opt}{kv260_target} mkdir -p {args.remote_dir}")
 
     bit_file = "attention_core_top_2A.bit"
     hwh_file = "attention_core_top_2A.hwh"
@@ -87,7 +99,7 @@ def main():
         print(f"[ERROR]: {bit_file} or {hwh_file} not found in current directory.")
         sys.exit(1)
 
-    files_to_send = f"input_qkv.bin kv260_axi4_test_driver.py {bit_file} {hwh_file}"
+    files_to_send = f"input_qkv.bin kv260_axi4_test_driver.py run_test.sh {bit_file} {hwh_file}"
     scp_cmd = f"scp {jump_opt}{files_to_send} {kv260_target}:{args.remote_dir}/"
     print(f"  -> Executing: {scp_cmd}")
     ret = os.system(scp_cmd)
@@ -96,9 +108,9 @@ def main():
         sys.exit(1)
     print("  -> Transferred Overlay (.bit, .hwh), Driver, and 'input_qkv.bin' successfully.")
 
-    # 4. Trigger remote hardware test on KV260 via SSH
+    # 4. Trigger remote hardware test on KV260 via SSH (using runner script in login shell)
     print(f"\n[Step 4] Triggering AXI4 Acceleration on KV260 via SSH...")
-    run_cmd = f"ssh {jump_opt}{kv260_target} 'cd {args.remote_dir} && python3 kv260_axi4_test_driver.py'"
+    run_cmd = f'ssh {jump_opt}{kv260_target} bash -l {args.remote_dir}/run_test.sh'
     print(f"  -> Executing: {run_cmd}\n")
     ret = os.system(run_cmd)
     if ret != 0:
