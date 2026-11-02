@@ -20,7 +20,7 @@ module tb_stage3_isolated_2A;
     localparam int C_S_AXI_ADDR_WIDTH = 8;
     localparam int C_AXIS_DATA_WIDTH  = 128;
     localparam int ARRAY_SIZE         = 4;
-    localparam int TEST_TOKENS        = 256;
+    localparam int TEST_TOKENS        = 64;   // STAGE 3: N = 64 tokens
     localparam int TEST_HEAD_DIM      = 20;  // STAGE 3: dk = 20
     localparam real CLK_PERIOD        = 5.0; // 200 MHz
 
@@ -150,7 +150,7 @@ module tb_stage3_isolated_2A;
         .C_S_AXI_ADDR_WIDTH (C_S_AXI_ADDR_WIDTH),
         .C_AXIS_DATA_WIDTH  (C_AXIS_DATA_WIDTH),
         .ARRAY_SIZE         (ARRAY_SIZE),
-        .MAX_TOKENS         (TEST_TOKENS),
+        .MAX_TOKENS         (256),
         .MAX_HEAD_DIM       (32)
     ) dut (
         .clk           (clk),
@@ -360,7 +360,7 @@ module tb_stage3_isolated_2A;
         $readmemh("k_matrix_st3.hex",           k_mem);
         $readmemh("v_matrix_st3.hex",           v_mem);
         $readmemh("golden_context_out_st3.hex", gold_context_mem);
-        $display("[TB INFO]: Loaded %0d tokens (dk=%0d) for Q, K, V (Expected Context: 5,120 bytes).", 
+        $display("[TB INFO]: Loaded %0d tokens (dk=%0d) for Q, K, V (Expected Context: 1,280 bytes).", 
                  TEST_TOKENS, TEST_HEAD_DIM);
 
         #(CLK_PERIOD * 5);
@@ -368,8 +368,8 @@ module tb_stage3_isolated_2A;
         $display("[TB INFO]: Reset Released.");
 
         // Step 2: Configure CSR Registers via AXI4-Lite for Stage 3
-        $display("[TB INFO]: Step 2 - Configuring CSR for Stage 3 (N=256, dk=20, H=1, M=21936, E=22)...");
-        axi_write_csr(8'h10, 32'd256);                   // CSR_SEQ_LEN = 256
+        $display("[TB INFO]: Step 2 - Configuring CSR for Stage 3 (N=64, dk=20, H=1, M=21936, E=22)...");
+        axi_write_csr(8'h10, 32'd64);                    // CSR_SEQ_LEN = 64
         axi_write_csr(8'h14, 32'd20);                    // CSR_HEAD_DIM = 20
         axi_write_csr(8'h18, 32'd1);                     // CSR_NUM_HEADS = 1
         axi_write_csr(8'h20, 32'd21936);                 // CSR_SCALE_M = 21936

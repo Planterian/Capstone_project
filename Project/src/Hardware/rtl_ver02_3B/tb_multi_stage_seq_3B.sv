@@ -20,6 +20,9 @@ module tb_multi_stage_seq_3B;
     localparam int C_AXIS_DATA_WIDTH  = 128;
     localparam int ARRAY_SIZE         = 4;
     localparam int TEST_TOKENS        = 256;
+    localparam int ST2_TOKENS         = 256;
+    localparam int ST3_TOKENS         = 64;
+    localparam int ST4_TOKENS         = 16;
     localparam real CLK_PERIOD        = 5.0; // 200 MHz
 
     logic                          clk;
@@ -64,15 +67,15 @@ module tb_multi_stage_seq_3B;
     logic [7:0] v_mem_st2   [0:(TEST_TOKENS * 16)-1];
     logic [7:0] ctx_mem_st2 [0:(TEST_TOKENS * 16)-1];
 
-    logic [7:0] q_mem_st3   [0:(TEST_TOKENS * 20)-1];
-    logic [7:0] k_mem_st3   [0:(TEST_TOKENS * 20)-1];
-    logic [7:0] v_mem_st3   [0:(TEST_TOKENS * 20)-1];
-    logic [7:0] ctx_mem_st3 [0:(TEST_TOKENS * 20)-1];
+    logic [7:0] q_mem_st3   [0:(ST3_TOKENS * 20)-1];
+    logic [7:0] k_mem_st3   [0:(ST3_TOKENS * 20)-1];
+    logic [7:0] v_mem_st3   [0:(ST3_TOKENS * 20)-1];
+    logic [7:0] ctx_mem_st3 [0:(ST3_TOKENS * 20)-1];
 
-    logic [7:0] q_mem_st4   [0:(TEST_TOKENS * 24)-1];
-    logic [7:0] k_mem_st4   [0:(TEST_TOKENS * 24)-1];
-    logic [7:0] v_mem_st4   [0:(TEST_TOKENS * 24)-1];
-    logic [7:0] ctx_mem_st4 [0:(TEST_TOKENS * 24)-1];
+    logic [7:0] q_mem_st4   [0:(ST4_TOKENS * 24)-1];
+    logic [7:0] k_mem_st4   [0:(ST4_TOKENS * 24)-1];
+    logic [7:0] v_mem_st4   [0:(ST4_TOKENS * 24)-1];
+    logic [7:0] ctx_mem_st4 [0:(ST4_TOKENS * 24)-1];
 
     // Verification Tracking State
     int current_stage = 2; // 2, 3, or 4
@@ -153,7 +156,7 @@ module tb_multi_stage_seq_3B;
                     byte_addr = row_idx * 20 + (is_second_beat ? (16 + b) : b);
                     dut_ctx   = $signed(m_axis_tdata[b*8 +: 8]);
 
-                    if (byte_addr < (TEST_TOKENS * 20)) begin
+                    if (byte_addr < (ST3_TOKENS * 20)) begin
                         exp_ctx = $signed(ctx_mem_st3[byte_addr]);
                         if (dut_ctx === exp_ctx) begin
                             stage_pass_count++;
@@ -167,9 +170,9 @@ module tb_multi_stage_seq_3B;
                     end
                 end
 
-                if (stage_egress_beats == (TEST_TOKENS * 2 - 1)) begin
+                if (stage_egress_beats == (ST3_TOKENS * 2 - 1)) begin
                     if (!m_axis_tlast) begin
-                        $display("[ERROR ST3]: m_axis_tlast was NOT asserted on beat 511!");
+                        $display("[ERROR ST3]: m_axis_tlast was NOT asserted on beat 127!");
                         stage_tlast_errors++;
                     end
                 end else if (m_axis_tlast) begin
@@ -195,7 +198,7 @@ module tb_multi_stage_seq_3B;
                     byte_addr = row_idx * 24 + (is_second_beat ? (16 + b) : b);
                     dut_ctx   = $signed(m_axis_tdata[b*8 +: 8]);
 
-                    if (byte_addr < (TEST_TOKENS * 24)) begin
+                    if (byte_addr < (ST4_TOKENS * 24)) begin
                         exp_ctx = $signed(ctx_mem_st4[byte_addr]);
                         if (dut_ctx === exp_ctx) begin
                             stage_pass_count++;
@@ -209,9 +212,9 @@ module tb_multi_stage_seq_3B;
                     end
                 end
 
-                if (stage_egress_beats == (TEST_TOKENS * 2 - 1)) begin
+                if (stage_egress_beats == (ST4_TOKENS * 2 - 1)) begin
                     if (!m_axis_tlast) begin
-                        $display("[ERROR ST4]: m_axis_tlast was NOT asserted on beat 511!");
+                        $display("[ERROR ST4]: m_axis_tlast was NOT asserted on beat 31!");
                         stage_tlast_errors++;
                     end
                 end else if (m_axis_tlast) begin
@@ -337,7 +340,7 @@ module tb_multi_stage_seq_3B;
     // Streaming tasks for Stage 3 (2 beats/token, dk=20)
     task stream_st3;
         // Stream Q
-        for (int i = 0; i < TEST_TOKENS; i++) begin
+        for (int i = 0; i < ST3_TOKENS; i++) begin
             @(posedge clk);
             s_axis_tvalid <= 1'b1;
             s_axis_tkeep  <= 16'hFFFF;
@@ -354,7 +357,7 @@ module tb_multi_stage_seq_3B;
             s_axis_tlast  <= 1'b0;
         end
         // Stream K
-        for (int i = 0; i < TEST_TOKENS; i++) begin
+        for (int i = 0; i < ST3_TOKENS; i++) begin
             @(posedge clk);
             s_axis_tvalid <= 1'b1;
             s_axis_tkeep  <= 16'hFFFF;
@@ -371,7 +374,7 @@ module tb_multi_stage_seq_3B;
             s_axis_tlast  <= 1'b0;
         end
         // Stream V
-        for (int i = 0; i < TEST_TOKENS; i++) begin
+        for (int i = 0; i < ST3_TOKENS; i++) begin
             @(posedge clk);
             s_axis_tvalid <= 1'b1;
             s_axis_tkeep  <= 16'hFFFF;
@@ -385,7 +388,7 @@ module tb_multi_stage_seq_3B;
             s_axis_tvalid <= 1'b1;
             s_axis_tkeep  <= 16'h000F;
             s_axis_tdata  <= {96'd0, v_mem_st3[i*20 + 19], v_mem_st3[i*20 + 18], v_mem_st3[i*20 + 17], v_mem_st3[i*20 + 16]};
-            s_axis_tlast  <= (i == TEST_TOKENS - 1);
+            s_axis_tlast  <= (i == ST3_TOKENS - 1);
         end
         @(posedge clk);
         s_axis_tvalid <= 1'b0;
@@ -395,7 +398,7 @@ module tb_multi_stage_seq_3B;
     // Streaming tasks for Stage 4 (2 beats/token, dk=24)
     task stream_st4;
         // Stream Q
-        for (int i = 0; i < TEST_TOKENS; i++) begin
+        for (int i = 0; i < ST4_TOKENS; i++) begin
             @(posedge clk);
             s_axis_tvalid <= 1'b1;
             s_axis_tkeep  <= 16'hFFFF;
@@ -413,7 +416,7 @@ module tb_multi_stage_seq_3B;
             s_axis_tlast  <= 1'b0;
         end
         // Stream K
-        for (int i = 0; i < TEST_TOKENS; i++) begin
+        for (int i = 0; i < ST4_TOKENS; i++) begin
             @(posedge clk);
             s_axis_tvalid <= 1'b1;
             s_axis_tkeep  <= 16'hFFFF;
@@ -431,7 +434,7 @@ module tb_multi_stage_seq_3B;
             s_axis_tlast  <= 1'b0;
         end
         // Stream V
-        for (int i = 0; i < TEST_TOKENS; i++) begin
+        for (int i = 0; i < ST4_TOKENS; i++) begin
             @(posedge clk);
             s_axis_tvalid <= 1'b1;
             s_axis_tkeep  <= 16'hFFFF;
@@ -548,7 +551,7 @@ module tb_multi_stage_seq_3B;
         // --------------------------------------------------------------------
         current_stage = 3;
         current_head_dim = 20;
-        expected_egress_beats = 512;
+        expected_egress_beats = ST3_TOKENS * 2;
         stage_pass_count = 0;
         stage_err_count = 0;
         stage_egress_beats = 0;
@@ -560,7 +563,7 @@ module tb_multi_stage_seq_3B;
         // Clear buffer before streaming
         axi_write_csr(8'h00, 32'd2); // Clear buffer pulse
         axi_write_csr(8'h00, 32'd0); // Deassert
-        axi_write_csr(8'h10, 32'd256);
+        axi_write_csr(8'h10, 32'd64);
         axi_write_csr(8'h14, 32'd20);
         axi_write_csr(8'h18, 32'd1);
         axi_write_csr(8'h20, 32'd21936);
@@ -579,7 +582,7 @@ module tb_multi_stage_seq_3B;
         st3_cycles = timeout_cycles;
         st3_pass   = stage_pass_count;
         st3_err    = stage_err_count;
-        $display(">>> [PHASE 2/3 DONE]: Stage 3 Finished in %0d cycles. Matched: %0d / 5120 (Errors: %0d)\n", 
+        $display(">>> [PHASE 2/3 DONE]: Stage 3 Finished in %0d cycles. Matched: %0d / 1280 (Errors: %0d)\n", 
                  st3_cycles, st3_pass, st3_err);
 
         // --------------------------------------------------------------------
@@ -587,7 +590,7 @@ module tb_multi_stage_seq_3B;
         // --------------------------------------------------------------------
         current_stage = 4;
         current_head_dim = 24;
-        expected_egress_beats = 512;
+        expected_egress_beats = ST4_TOKENS * 2;
         stage_pass_count = 0;
         stage_err_count = 0;
         stage_egress_beats = 0;
@@ -599,7 +602,7 @@ module tb_multi_stage_seq_3B;
         // Clear buffer before streaming
         axi_write_csr(8'h00, 32'd2); // Clear buffer pulse
         axi_write_csr(8'h00, 32'd0); // Deassert
-        axi_write_csr(8'h10, 32'd256);
+        axi_write_csr(8'h10, 32'd16);
         axi_write_csr(8'h14, 32'd24);
         axi_write_csr(8'h18, 32'd1);
         axi_write_csr(8'h20, 32'd18810);
@@ -618,7 +621,7 @@ module tb_multi_stage_seq_3B;
         st4_cycles = timeout_cycles;
         st4_pass   = stage_pass_count;
         st4_err    = stage_err_count;
-        $display(">>> [PHASE 3/3 DONE]: Stage 4 Finished in %0d cycles. Matched: %0d / 6144 (Errors: %0d)\n", 
+        $display(">>> [PHASE 3/3 DONE]: Stage 4 Finished in %0d cycles. Matched: %0d / 384 (Errors: %0d)\n", 
                  st4_cycles, st4_pass, st4_err);
 
         // --------------------------------------------------------------------
@@ -626,14 +629,14 @@ module tb_multi_stage_seq_3B;
         // --------------------------------------------------------------------
         total_pass_count = st2_pass + st3_pass + st4_pass;
         total_err_count  = st2_err + st3_err + st4_err;
-        total_egress_bytes = 4096 + 5120 + 6144;
+        total_egress_bytes = 4096 + 1280 + 384;
 
         $display("=======================================================================");
         $display("   GRAND MASTER SEQUENTIAL VERIFICATION REPORT (VARIANT 3B)");
         $display("=======================================================================");
         $display("   STAGE 2 (dk=16): %0d / 4,096 bytes matched (%0d cycles)", st2_pass, st2_cycles);
-        $display("   STAGE 3 (dk=20): %0d / 5,120 bytes matched (%0d cycles)", st3_pass, st3_cycles);
-        $display("   STAGE 4 (dk=24): %0d / 6,144 bytes matched (%0d cycles)", st4_pass, st4_cycles);
+        $display("   STAGE 3 (dk=20): %0d / 1,280 bytes matched (%0d cycles)", st3_pass, st3_cycles);
+        $display("   STAGE 4 (dk=24): %0d / 384 bytes matched (%0d cycles)", st4_pass, st4_cycles);
         $display("   --------------------------------------------------------------------");
         $display("   TOTAL BYTES VERIFIED           : %0d / %0d", total_pass_count, total_egress_bytes);
         $display("   TOTAL MISMATCHED SAMPLES       : %0d", total_err_count);

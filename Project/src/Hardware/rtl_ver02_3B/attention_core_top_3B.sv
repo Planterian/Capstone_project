@@ -349,6 +349,7 @@ module attention_core_top_3B #(
         .tile_col_idx   (reorder_tile_col),
         .drain_item_cnt (drain_item_cnt),
         .wr_data        (systolic_dot_stream),
+        .seq_len        (reg_seq_len[15:0]),
         .read_start     (reorder_read_start),
         .read_row_sel   (reorder_read_row_sel),
         .read_valid     (reorder_read_valid),
@@ -402,6 +403,7 @@ module attention_core_top_3B #(
         .out_valid  (softmax_out_valid),
         .out_prob   (softmax_prob_out),
         .busy       (softmax_busy),
+        .seq_len    (reg_seq_len[15:0]),
         .head_dim   (reg_head_dim[15:0]),
         .cfg_we     (cfg_lut_we),
         .cfg_addr   (cfg_lut_addr),
@@ -453,6 +455,7 @@ module attention_core_top_3B #(
         .prob_data     (softmax_prob_out),
         .prob_last     (softmax_out_valid && (v_tok_rd_idx == reg_seq_len - 1)),
         .v_vec         (v_vec_active),
+        .seq_len       (reg_seq_len[15:0]),
         .head_dim      (reg_head_dim[15:0]),
         .m_axis_tvalid (context_axis_tvalid),
         .m_axis_tdata  (context_axis_tdata),
@@ -491,6 +494,11 @@ module attention_core_top_3B #(
 
     assign reorder_tile_col     = tile_col_idx;
     assign reorder_read_row_sel = sm_sub_row;
+
+    logic [4:0]  max_tile_col_idx;
+    logic [5:0]  max_tile_row_blk;
+    assign max_tile_col_idx = (reg_seq_len == 16'd0) ? 5'd31 : 5'((reg_seq_len >> 3) - 1);
+    assign max_tile_row_blk = (reg_seq_len == 16'd0) ? 6'd63 : 6'((reg_seq_len >> 2) - 1);
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -606,7 +614,7 @@ module attention_core_top_3B #(
                 TILE_DRAIN: begin
                     // Wait for 32-item sequential tile drain into reorder_buffer_3B
                     if (systolic_drain_done) begin
-                        if (tile_col_idx == 5'd31) begin // All 32 horizontal tiles (256 cols) finished!
+                        if (tile_col_idx == max_tile_col_idx) begin // Dynamic horizontal tiles finished!
                             tile_col_idx <= '0;
                             sm_sub_row   <= '0;
                             state        <= SM_ROW_START;
@@ -636,7 +644,7 @@ module attention_core_top_3B #(
                     if (score_v_row_done && !softmax_busy) begin
                         if (sm_sub_row == 2'd3) begin
                             sm_sub_row <= '0;
-                            if (tile_row_blk == 6'd63) begin // All 64 row blocks (256 rows) finished!
+                            if (tile_row_blk == max_tile_row_blk) begin // Dynamic row blocks finished!
                                 tile_row_blk <= '0;
                                 state        <= MHA_HEAD_NEXT;
                             end else begin

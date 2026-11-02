@@ -32,6 +32,7 @@ module softmax_lut #(
     output logic                                busy,
 
     // Step 2.5: Multi-Stage and Reconfigurable LUT Interface
+    input  logic [15:0]                         seq_len,      // Dynamic sequence length (e.g., 256, 64, 16)
     input  logic [15:0]                         head_dim,     // 16 -> Stage 2 (0..255), 20 -> Stage 3 (256..511), 24 -> Stage 4 (512..767)
     input  logic                                cfg_we,       // Port B Write Enable from AXI-Lite
     input  logic [9:0]                          cfg_addr,     // Port B Word Address (0..1023)
@@ -54,6 +55,8 @@ module softmax_lut #(
     logic signed [IN_WIDTH-1:0] score_buffer [0:N_TOKENS-1];
 
     logic [8:0]                 cnt_reg;
+    logic [8:0]                 eff_seq_len;
+    assign eff_seq_len = (seq_len == 16'd0) ? 9'd256 : seq_len[8:0];
     logic signed [IN_WIDTH-1:0] s_max_reg;
     logic [ACC_WIDTH-1:0]       sum_exp_reg;
     logic [31:0]                inv_sum_reg;
@@ -154,7 +157,7 @@ module softmax_lut #(
                             s_max_reg <= in_score;
                         end
 
-                        if (cnt_reg == N_TOKENS - 1) begin
+                        if (cnt_reg == eff_seq_len - 1) begin
                             cnt_reg           <= '0;
                             pipe_valid        <= 1'b0;
                             pipe_valid_stage2 <= 1'b0;
@@ -168,7 +171,7 @@ module softmax_lut #(
                 ST_EXP_ACC: begin
                     // Stage 0 requests rom_addr, Stage 1 latches rom_data_exp and accumulates
                     pipe_valid_stage2 <= 1'b0;
-                    if (cnt_reg < N_TOKENS) begin
+                    if (cnt_reg < eff_seq_len) begin
                         pipe_valid <= 1'b1;
                         cnt_reg    <= cnt_reg + 1'b1;
                     end else begin
@@ -179,7 +182,7 @@ module softmax_lut #(
                         sum_exp_reg <= sum_exp_reg + {12'd0, rom_data_exp};
                     end
 
-                    if (cnt_reg == N_TOKENS && !pipe_valid) begin
+                    if (cnt_reg == eff_seq_len && !pipe_valid) begin
                         cnt_reg   <= '0;
                         state_reg <= ST_DIV_START;
                     end
@@ -224,7 +227,7 @@ module softmax_lut #(
 
                 ST_NORM_OUT: begin
                     // Stage 0 requests rom_addr, Stage 1 latches rom_data_exp & multiplies, Stage 2 shifts/clamps & outputs out_prob
-                    if (cnt_reg < N_TOKENS) begin
+                    if (cnt_reg < eff_seq_len) begin
                         pipe_valid <= 1'b1;
                         cnt_reg    <= cnt_reg + 1'b1;
                     end else begin
@@ -245,7 +248,7 @@ module softmax_lut #(
                         end
                     end
 
-                    if (cnt_reg == N_TOKENS && !pipe_valid && !pipe_valid_stage2) begin
+                    if (cnt_reg == eff_seq_len && !pipe_valid && !pipe_valid_stage2) begin
                         cnt_reg   <= '0;
                         state_reg <= ST_IDLE;
                     end
@@ -262,7 +265,7 @@ module softmax_lut #(
         logic signed [IN_WIDTH-1:0] delta_s;
         int                         idx;
 
-        idx = (cnt_reg < N_TOKENS) ? int'(cnt_reg) : (N_TOKENS - 1);
+        idx = (cnt_reg < eff_seq_len) ? int'(cnt_reg) : int'(eff_seq_len - 1);
         cur_score = score_buffer[idx];
         delta_s   = cur_score - s_max_reg;
 

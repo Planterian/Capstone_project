@@ -240,11 +240,15 @@ puts "================================================================="
 puts "  [STEP 7/7] EXPORTING BITSTREAM & HARDWARE HANDOFF (.HWH / .XSA)"
 puts "================================================================="
 file copy -force "$PROJ_DIR/$PROJ_NAME.runs/impl_1/mha_system_wrapper.bit" "$OUT_DIR/attention_core_top_2A.bit"
+file copy -force "$PROJ_DIR/$PROJ_NAME.runs/impl_1/mha_system_wrapper.bit" "$OUT_DIR/03_ivit_hw_accelerated/overlay/attention_core_top_2A.bit"
+file copy -force "$PROJ_DIR/$PROJ_NAME.runs/impl_1/mha_system_wrapper.bit" "$OUT_DIR/04_all_9_transformers_hw/overlay/attention_core_top_2A.bit"
 
 # Export HWH for PYNQ Overlay
 set hwh_source [glob -nocomplain "$PROJ_DIR/$PROJ_NAME.gen/sources_1/bd/mha_system/hw_handoff/*.hwh"]
 if {[llength $hwh_source] > 0} {
     file copy -force [lindex $hwh_source 0] "$OUT_DIR/attention_core_top_2A.hwh"
+    file copy -force [lindex $hwh_source 0] "$OUT_DIR/03_ivit_hw_accelerated/overlay/attention_core_top_2A.hwh"
+    file copy -force [lindex $hwh_source 0] "$OUT_DIR/04_all_9_transformers_hw/overlay/attention_core_top_2A.hwh"
     puts "  -> Exported: $OUT_DIR/attention_core_top_2A.hwh"
 }
 

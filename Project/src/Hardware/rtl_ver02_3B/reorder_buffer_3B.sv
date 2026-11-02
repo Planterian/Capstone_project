@@ -29,7 +29,8 @@ module reorder_buffer_3B #(
     input  logic [1:0]               read_row_sel,   // Row index within active 4-row block (0 to 3)
     output logic                     read_valid,
     output logic signed [DATA_WIDTH-1:0] read_data,
-    output logic                     read_done       // High on the 256th element of the row
+    input  logic [15:0]              seq_len,        // Dynamic sequence length (256, 64, 16)
+    output logic                     read_done       // High on the last element of the row
 );
 
     // 4 rows x 256 columns of INT32 scores (1,024 words total)
@@ -75,6 +76,8 @@ module reorder_buffer_3B #(
     rd_state_t rd_state;
     logic [7:0] rd_col_cnt;
     logic [1:0] active_row;
+    logic [8:0] eff_seq_len;
+    assign eff_seq_len = (seq_len == 16'd0) ? 9'd256 : seq_len[8:0];
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -102,7 +105,7 @@ module reorder_buffer_3B #(
                     read_valid <= 1'b1;
                     read_data  <= score_ram[active_row][rd_col_cnt];
 
-                    if (rd_col_cnt == ROW_LEN - 1) begin
+                    if (rd_col_cnt == eff_seq_len - 1) begin
                         read_done  <= 1'b1;
                         rd_col_cnt <= '0;
                         rd_state   <= RD_DONE;

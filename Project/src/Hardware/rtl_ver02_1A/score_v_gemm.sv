@@ -31,6 +31,7 @@ module score_v_gemm #(
 
     // Vector V[k, :] input for token k
     input  logic signed [7:0]                   v_vec [0:MAX_HEAD_DIM-1],
+    input  logic [15:0]                         seq_len,       // Dynamic sequence length (e.g., 256, 64, 16)
     input  logic [15:0]                         head_dim,      // 16, 20, 24, 32
 
     // Interface to AXI4-Stream TX Egress
@@ -48,6 +49,8 @@ module score_v_gemm #(
     logic signed [31:0] ctx_acc [0:MAX_HEAD_DIM-1];
     logic signed [7:0]  ctx_clamped [0:MAX_HEAD_DIM-1];
     logic [8:0]         row_cnt;
+    logic [8:0]         eff_seq_len;
+    assign eff_seq_len = (seq_len == 16'd0) ? 9'd256 : seq_len[8:0];
 
     initial begin
         for (int d = 0; d < MAX_HEAD_DIM; d++) begin
@@ -109,7 +112,7 @@ module score_v_gemm #(
                                         ctx_safe[7],  ctx_safe[6],  ctx_safe[5],  ctx_safe[4],
                                         ctx_safe[3],  ctx_safe[2],  ctx_safe[1],  ctx_safe[0]};
                         m_axis_tkeep = 16'hFFFF;
-                        m_axis_tlast = (head_dim <= 16'd16) && (row_cnt == MAX_TOKENS - 1);
+                        m_axis_tlast = (head_dim <= 16'd16) && (row_cnt == eff_seq_len - 1);
                     end
                     ST_OUT_BEAT1: begin
                         m_axis_tdata = {ctx_safe[31], ctx_safe[30], ctx_safe[29], ctx_safe[28],
@@ -122,7 +125,7 @@ module score_v_gemm #(
                             m_axis_tkeep = 16'h00FF;
                         else
                             m_axis_tkeep = 16'hFFFF;
-                        m_axis_tlast = (row_cnt == MAX_TOKENS - 1);
+                        m_axis_tlast = (row_cnt == eff_seq_len - 1);
                     end
                     default: begin
                         m_axis_tdata = '0;
@@ -138,22 +141,22 @@ module score_v_gemm #(
                     ST_OUT_BEAT0: begin
                         m_axis_tdata = {ctx_safe[7], ctx_safe[6], ctx_safe[5], ctx_safe[4],
                                         ctx_safe[3], ctx_safe[2], ctx_safe[1], ctx_safe[0]};
-                        m_axis_tlast = (head_dim <= 16'd8) && (row_cnt == MAX_TOKENS - 1);
+                        m_axis_tlast = (head_dim <= 16'd8) && (row_cnt == eff_seq_len - 1);
                     end
                     ST_OUT_BEAT1: begin
                         m_axis_tdata = {ctx_safe[15], ctx_safe[14], ctx_safe[13], ctx_safe[12],
                                         ctx_safe[11], ctx_safe[10], ctx_safe[9],  ctx_safe[8]};
-                        m_axis_tlast = (head_dim <= 16'd16) && (row_cnt == MAX_TOKENS - 1);
+                        m_axis_tlast = (head_dim <= 16'd16) && (row_cnt == eff_seq_len - 1);
                     end
                     ST_OUT_BEAT2: begin
                         m_axis_tdata = {ctx_safe[23], ctx_safe[22], ctx_safe[21], ctx_safe[20],
                                         ctx_safe[19], ctx_safe[18], ctx_safe[17], ctx_safe[16]};
-                        m_axis_tlast = (head_dim <= 16'd24) && (row_cnt == MAX_TOKENS - 1);
+                        m_axis_tlast = (head_dim <= 16'd24) && (row_cnt == eff_seq_len - 1);
                     end
                     ST_OUT_BEAT3: begin
                         m_axis_tdata = {ctx_safe[31], ctx_safe[30], ctx_safe[29], ctx_safe[28],
                                         ctx_safe[27], ctx_safe[26], ctx_safe[25], ctx_safe[24]};
-                        m_axis_tlast = (row_cnt == MAX_TOKENS - 1);
+                        m_axis_tlast = (row_cnt == eff_seq_len - 1);
                     end
                     default: begin
                         m_axis_tdata = 64'd0;
@@ -194,7 +197,7 @@ module score_v_gemm #(
                         if (AXIS_DATA_WIDTH == 128) begin
                             if (head_dim <= 16'd16) begin
                                 row_done <= 1'b1;
-                                if (row_cnt == MAX_TOKENS - 1) row_cnt <= '0;
+                                if (row_cnt == eff_seq_len - 1) row_cnt <= '0;
                                 else row_cnt <= row_cnt + 1'b1;
                                 for (int d = 0; d < MAX_HEAD_DIM; d++) ctx_acc[d] <= '0;
                                 state_reg <= ST_ACCUMULATE;
@@ -204,7 +207,7 @@ module score_v_gemm #(
                         end else begin
                             if (head_dim <= 16'd8) begin
                                 row_done <= 1'b1;
-                                if (row_cnt == MAX_TOKENS - 1) row_cnt <= '0;
+                                if (row_cnt == eff_seq_len - 1) row_cnt <= '0;
                                 else row_cnt <= row_cnt + 1'b1;
                                 for (int d = 0; d < MAX_HEAD_DIM; d++) ctx_acc[d] <= '0;
                                 state_reg <= ST_ACCUMULATE;
@@ -219,14 +222,14 @@ module score_v_gemm #(
                     if (m_axis_tready) begin
                         if (AXIS_DATA_WIDTH == 128) begin
                             row_done <= 1'b1;
-                            if (row_cnt == MAX_TOKENS - 1) row_cnt <= '0;
+                            if (row_cnt == eff_seq_len - 1) row_cnt <= '0;
                             else row_cnt <= row_cnt + 1'b1;
                             for (int d = 0; d < MAX_HEAD_DIM; d++) ctx_acc[d] <= '0;
                             state_reg <= ST_ACCUMULATE;
                         end else begin
                             if (head_dim <= 16'd16) begin
                                 row_done <= 1'b1;
-                                if (row_cnt == MAX_TOKENS - 1) row_cnt <= '0;
+                                if (row_cnt == eff_seq_len - 1) row_cnt <= '0;
                                 else row_cnt <= row_cnt + 1'b1;
                                 for (int d = 0; d < MAX_HEAD_DIM; d++) ctx_acc[d] <= '0;
                                 state_reg <= ST_ACCUMULATE;
@@ -241,7 +244,7 @@ module score_v_gemm #(
                     if (m_axis_tready) begin
                         if (head_dim <= 16'd24) begin
                             row_done <= 1'b1;
-                            if (row_cnt == MAX_TOKENS - 1) row_cnt <= '0;
+                            if (row_cnt == eff_seq_len - 1) row_cnt <= '0;
                             else row_cnt <= row_cnt + 1'b1;
                             for (int d = 0; d < MAX_HEAD_DIM; d++) ctx_acc[d] <= '0;
                             state_reg <= ST_ACCUMULATE;
@@ -254,7 +257,7 @@ module score_v_gemm #(
                 ST_OUT_BEAT3: begin
                     if (m_axis_tready) begin
                         row_done <= 1'b1;
-                        if (row_cnt == MAX_TOKENS - 1) row_cnt <= '0;
+                        if (row_cnt == eff_seq_len - 1) row_cnt <= '0;
                         else row_cnt <= row_cnt + 1'b1;
                         for (int d = 0; d < MAX_HEAD_DIM; d++) ctx_acc[d] <= '0;
                         state_reg <= ST_ACCUMULATE;

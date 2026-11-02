@@ -298,6 +298,8 @@ module attention_core_top_2A #(
 
     // Streaming controls for 128 Key pairs (256 keys total, multi-beat)
     logic [6:0]         k_pair_idx;
+    logic [6:0]         max_k_pair_idx;
+    assign max_k_pair_idx = (reg_seq_len == 16'd0) ? 7'd127 : 7'((reg_seq_len >> 1) - 1);
     logic [1:0]         k_sub_beat;
     logic               k_stream_valid;
     logic [1:0]         beats_per_pair_m1;
@@ -394,6 +396,7 @@ module attention_core_top_2A #(
         .out_valid  (softmax_out_valid),
         .out_prob   (softmax_prob_out),
         .busy       (softmax_busy),
+        .seq_len    (reg_seq_len[15:0]),
         .head_dim   (reg_head_dim[15:0]),
         .cfg_we     (cfg_lut_we),
         .cfg_addr   (cfg_lut_addr),
@@ -445,6 +448,7 @@ module attention_core_top_2A #(
         .prob_data     (softmax_prob_out),
         .prob_last     (softmax_out_valid && (v_tok_rd_idx == reg_seq_len - 1)),
         .v_vec         (v_vec_active),
+        .seq_len       (reg_seq_len[15:0]),
         .head_dim      (reg_head_dim[15:0]),
         .m_axis_tvalid (context_axis_tvalid),
         .m_axis_tdata  (context_axis_tdata),
@@ -533,7 +537,7 @@ module attention_core_top_2A #(
                         k_sub_beat <= k_sub_beat + 1'b1;
                     end else begin
                         k_sub_beat <= 2'b00;
-                        if (k_pair_idx == 7'd127) begin // 128 pairs * 2 = 256 keys
+                        if (k_pair_idx == max_k_pair_idx) begin // Dynamic termination: (N/2 - 1) pairs
                             k_pair_idx     <= '0;
                             k_stream_valid <= 1'b0;
                             mha_state      <= MHA_ROW_WAIT;

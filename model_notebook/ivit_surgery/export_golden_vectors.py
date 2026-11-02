@@ -201,10 +201,7 @@ def run_export_pipeline(ckpt_path: str, output_dirs: list):
         def make_hook():
             def hook_attn(module, inp, out):
                 x_in, sf_in = inp[0], inp[1]
-                # Đảm bảo N = 256 tokens cho mọi Stage để kiểm thử toàn diện dung lượng BRAM (Stress Testing)
-                if x_in.shape[1] < 256:
-                    reps = (256 // x_in.shape[1]) + 1
-                    x_in = x_in.repeat(1, reps, 1)[:, :256, :]
+                # Giữ nguyên số lượng tokens N tự nhiên của từng Stage (Stage 2: 256, Stage 3: 64, Stage 4: 16)
                 B, N, C = x_in.shape
                 H = module.num_attention_heads
                 dim = module.attention_head_size
