@@ -114,3 +114,20 @@ Mục đích: Đảm bảo phần cứng chuyển đổi cấu hình thanh ghi C
   - `Project/src/Software/`
   - `Project/src/Software/03_ivit_hw_accelerated/overlay/` (Đầy đủ Overlay cho Phase 3)
   - `Project/src/Software/04_all_9_transformers_hw/overlay/` (Đầy đủ Overlay cho Phase 4 - Toàn bộ 9 Transformer Layers)
+
+---
+
+## 6. Báo Cáo Kiểm Thử Đơn Vị Từng Khối Con Đa Tầng (Multi-Stage Sub-block Unit Tests)
+
+Để đảm bảo từng khối kiến trúc con độc lập đều đạt chuẩn xác 100% Bit-Exact trên cả 3 kích thước chuỗi token ($N \in \{256, 64, 16\}$), toàn bộ 4 testbench đơn vị con đã được nâng cấp thành testbench đa tầng (Multi-Stage Unit Testbenches) và chạy qua `run_verifications_2A.bat`:
+
+| Khối Phần Cứng (Unit Test) | File Testbench | Stage 2 ($N=256$) | Stage 3 ($N=64$) | Stage 4 ($N=16$) | Tổng Kiểm Tra | Lỗi Mismatch (0-LSB) | Trạng Thái |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1. DSP-Packed Adder Tree** | `tb_dsp_packed_adder_tree_2A.sv` | 65,536 scores | 4,096 scores | 256 scores | **69,888 scores** | **0** | **PASS** |
+| **2. Dyadic Rescaler Unit** | `tb_golden_scale_unit.sv` | 65,536 elements | 4,096 elements | 256 elements | **69,888 elements** | **0** | **PASS** |
+| **3. Hardware IntSoftmax** | `tb_golden_softmax_lut.sv` | 65,536 probs | 4,096 probs | 256 probs | **69,888 probs** | **0** | **PASS** |
+| **4. Score $\times$ V Context GEMM** | `tb_score_v_gemm.sv` | 4,096 bytes | 1,280 bytes | 384 bytes | **5,760 bytes** | **0** | **PASS** |
+| **5. Top Integration Core** | `tb_attention_core_2A.sv` | 4,096 bytes | - | - | **4,096 bytes** | **0** | **PASS** |
+
+*Kết quả suite runner:* `run_verifications_2A.bat` **ALL 5 VARIANT 2A VERIFICATIONS PASSED 100% BIT-EXACT!**
+*Đồng bộ:* Các testbench đơn vị `tb_golden_scale_unit.sv`, `tb_golden_softmax_lut.sv`, `tb_score_v_gemm.sv` cũng đã được đồng bộ hoàn toàn sang cả `rtl_ver02_1A` và `rtl_ver02_3B`.

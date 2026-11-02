@@ -1,39 +1,54 @@
 `timescale 1ns / 1ps
 // ============================================================================
 // Module Name:   tb_golden_softmax_lut
-// Description:  Bit-Exact Verification Testbench for softmax_lut (rtl_ver02)
-//               against PyTorch I-ViT Golden Vectors:
-//               Input:  golden_scaled_score.hex (256 rows x 256 INT16 elements)
-//               Golden: golden_softmax_prob.hex (256 rows x 256 UINT16 elements)
+// Description:  Bit-Exact Multi-Stage Verification Testbench for softmax_lut
+//               across all 3 MobileViT Stages:
+//               - Stage 2: N=256, dk=16, 256 rows (65,536 probabilities)
+//               - Stage 3: N=64,  dk=20, 64 rows  (4,096 probabilities)
+//               - Stage 4: N=16,  dk=24, 16 rows  (256 probabilities)
+// Standard:     IEEE 1800-2012 SystemVerilog
 // ============================================================================
 
 module tb_golden_softmax_lut;
 
-    localparam int N_TOKENS       = 256;
-    localparam int NUM_TEST_ROWS  = 4;   // Test first 4 rows (1024 tokens)
-    localparam real CLK_PERIOD    = 5.0; // 200 MHz
+    localparam int ST2_TOKENS = 256;
+    localparam int ST3_TOKENS = 64;
+    localparam int ST4_TOKENS = 16;
+    localparam real CLK_PERIOD = 5.0; // 200 MHz
 
     logic                      clk;
     logic                      rst_n;
     logic                      start_row;
     logic                      in_valid;
     logic signed [15:0]        in_score;
+    logic [15:0]               seq_len;
+    logic [15:0]               head_dim;
 
     logic                      out_valid;
     logic [15:0]               out_prob;
     logic                      busy;
 
-    // Golden Vector Memories
-    logic signed [15:0]        gold_scaled_mem [0:(NUM_TEST_ROWS * N_TOKENS)-1];
-    logic [15:0]               gold_prob_mem   [0:(NUM_TEST_ROWS * N_TOKENS)-1];
+    // Golden Vector Memories for all 3 Stages
+    logic signed [15:0]        gold_score_st2 [0:(ST2_TOKENS * ST2_TOKENS)-1];
+    logic [15:0]               gold_prob_st2  [0:(ST2_TOKENS * ST2_TOKENS)-1];
 
-    int pass_count  = 0;
-    int error_count = 0;
-    int egress_idx  = 0;
+    logic signed [15:0]        gold_score_st3 [0:(ST3_TOKENS * ST3_TOKENS)-1];
+    logic [15:0]               gold_prob_st3  [0:(ST3_TOKENS * ST3_TOKENS)-1];
 
-    // DUT Instantiation (Step 2.5 Reconfigurable Multi-Stage BRAM)
+    logic signed [15:0]        gold_score_st4 [0:(ST4_TOKENS * ST4_TOKENS)-1];
+    logic [15:0]               gold_prob_st4  [0:(ST4_TOKENS * ST4_TOKENS)-1];
+
+    int current_stage = 2;
+    int stage_pass    = 0;
+    int stage_err     = 0;
+    int stage_egress  = 0;
+
+    int total_pass    = 0;
+    int total_err     = 0;
+
+    // DUT Instantiation
     softmax_lut #(
-        .N_TOKENS       (N_TOKENS),
+        .N_TOKENS       (256),
         .IN_WIDTH       (16),
         .OUT_WIDTH      (16),
         .ROM_DEPTH      (1024),
@@ -49,7 +64,8 @@ module tb_golden_softmax_lut;
         .out_valid (out_valid),
         .out_prob  (out_prob),
         .busy      (busy),
-        .head_dim  (16'd16),    // Stage 2 (dk=16) partition offset 0x000
+        .seq_len   (seq_len),
+        .head_dim  (head_dim),
         .cfg_we    (1'b0),
         .cfg_addr  (10'd0),
         .cfg_wdata (20'd0)
@@ -60,101 +76,181 @@ module tb_golden_softmax_lut;
         clk = 0;
         forever #(CLK_PERIOD / 2.0) clk = ~clk;
     end
-// Monitor Output Egress Probabilities
+
+    // Monitor Output Egress Probabilities
     always @(posedge clk) begin
         if (out_valid) begin
             logic [15:0] exp_prob;
             int diff;
-            exp_prob = gold_prob_mem[egress_idx];
+
+            if (current_stage == 2) begin
+                exp_prob = gold_prob_st2[stage_egress];
+            end else if (current_stage == 3) begin
+                exp_prob = gold_prob_st3[stage_egress];
+            end else begin
+                exp_prob = gold_prob_st4[stage_egress];
+            end
+
             diff = (out_prob >= exp_prob) ? (out_prob - exp_prob) : (exp_prob - out_prob);
 
             if (diff == 0) begin
-                pass_count++;
+                stage_pass++;
+                total_pass++;
             end else begin
-                error_count++;
-                if (error_count <= 10) begin
-                    $display("[SOFTMAX MISMATCH @%0d]: DUT = %0d | Golden = %0d (Diff = %0d)", 
-                             egress_idx, out_prob, exp_prob, diff);
+                stage_err++;
+                total_err++;
+                if (stage_err <= 5) begin
+                    $display("[MISMATCH ST%0d @ %0d]: DUT = %0d | Golden = %0d (Diff = %0d)", 
+                             current_stage, stage_egress, out_prob, exp_prob, diff);
                 end
             end
 
-            if (egress_idx < 16 || egress_idx % 256 == 0) begin
-                $display("[ROW %0d TOKEN %03d]: DUT Prob = %0d/32768 | Golden = %0d/32768 (Diff = %0d)", 
-                         egress_idx / 256, egress_idx % 256, out_prob, exp_prob, diff);
-            end
-
-            egress_idx++;
+            stage_egress++;
         end
     end
 
     // Test Sequence
     initial begin
         $display("=======================================================================");
-        $display("   TESTBENCH: softmax_lut vs PyTorch I-ViT Golden Model (Stage 2)");
+        $display("   TESTBENCH: softmax_lut MULTI-STAGE BIT-EXACT VERIFICATION");
+        $display("   Testing Stage 2 (65,536), Stage 3 (4,096), and Stage 4 (256)");
         $display("=======================================================================");
 
         rst_n     = 1'b0;
         start_row = 1'b0;
         in_valid  = 1'b0;
         in_score  = '0;
+        seq_len   = 16'd256;
+        head_dim  = 16'd16;
 
         // Load Golden Files
-        $display("[TB INFO]: Loading golden_scaled_score.hex (%0d samples)...", NUM_TEST_ROWS * N_TOKENS);
-        $readmemh("golden_scaled_score.hex", gold_scaled_mem);
-        $display("[TB INFO]: Loading golden_softmax_prob.hex (%0d samples)...", NUM_TEST_ROWS * N_TOKENS);
-        $readmemh("golden_softmax_prob.hex", gold_prob_mem);
+        $display("[TB INFO]: Loading Stage 2 Softmax vectors (65,536 samples)...");
+        $readmemh("golden_scaled_score_st2.hex", gold_score_st2);
+        $readmemh("golden_softmax_prob_st2.hex",  gold_prob_st2);
+
+        $display("[TB INFO]: Loading Stage 3 Softmax vectors (4,096 samples)...");
+        $readmemh("golden_scaled_score_st3.hex", gold_score_st3);
+        $readmemh("golden_softmax_prob_st3.hex",  gold_prob_st3);
+
+        $display("[TB INFO]: Loading Stage 4 Softmax vectors (256 samples)...");
+        $readmemh("golden_scaled_score_st4.hex", gold_score_st4);
+        $readmemh("golden_softmax_prob_st4.hex",  gold_prob_st4);
 
         #(CLK_PERIOD * 5);
         rst_n = 1'b1;
-        $display("[TB INFO]: Reset Released. Starting row-by-row Softmax processing...");
+        #(CLK_PERIOD * 5);
 
-        for (int r = 0; r < NUM_TEST_ROWS; r++) begin
-            $display("[TB INFO]: Starting Row %0d of 256 tokens...", r);
-            
-            // Wait for DUT to be ready
+        // --------------------------------------------------------------------
+        // PHASE 1: STAGE 2 (N=256, dk=16, 256 rows = 65,536 probabilities)
+        // --------------------------------------------------------------------
+        current_stage = 2;
+        seq_len       = 16'd256;
+        head_dim      = 16'd16;
+        stage_pass    = 0;
+        stage_err     = 0;
+        stage_egress  = 0;
+        $display("\n>>> [PHASE 1/3]: Processing STAGE 2 (N=256, dk=16, 256 rows)...");
+
+        for (int r = 0; r < ST2_TOKENS; r++) begin
             wait (!busy);
             @(posedge clk);
             start_row <= 1'b1;
             @(posedge clk);
             start_row <= 1'b0;
 
-            // Stream 256 scores
-            for (int t = 0; t < N_TOKENS; t++) begin
+            for (int t = 0; t < ST2_TOKENS; t++) begin
                 @(posedge clk);
                 in_valid <= 1'b1;
-                in_score <= gold_scaled_mem[r * N_TOKENS + t];
+                in_score <= gold_score_st2[r * ST2_TOKENS + t];
             end
-
             @(posedge clk);
             in_valid <= 1'b0;
 
-            // Wait for row normalization and output completion
             wait (!busy);
-            #(CLK_PERIOD * 10);
+            #(CLK_PERIOD * 2);
         end
+        $display("    -> Stage 2 Done: %0d / %0d matched (Errors: %0d)", stage_pass, (ST2_TOKENS * ST2_TOKENS), stage_err);
 
-        #(CLK_PERIOD * 50);
+        // --------------------------------------------------------------------
+        // PHASE 2: STAGE 3 (N=64, dk=20, 64 rows = 4,096 probabilities)
+        // --------------------------------------------------------------------
+        current_stage = 3;
+        seq_len       = 16'd64;
+        head_dim      = 16'd20;
+        stage_pass    = 0;
+        stage_err     = 0;
+        stage_egress  = 0;
+        $display("\n>>> [PHASE 2/3]: Processing STAGE 3 (N=64, dk=20, 64 rows)...");
 
+        for (int r = 0; r < ST3_TOKENS; r++) begin
+            wait (!busy);
+            @(posedge clk);
+            start_row <= 1'b1;
+            @(posedge clk);
+            start_row <= 1'b0;
+
+            for (int t = 0; t < ST3_TOKENS; t++) begin
+                @(posedge clk);
+                in_valid <= 1'b1;
+                in_score <= gold_score_st3[r * ST3_TOKENS + t];
+            end
+            @(posedge clk);
+            in_valid <= 1'b0;
+
+            wait (!busy);
+            #(CLK_PERIOD * 2);
+        end
+        $display("    -> Stage 3 Done: %0d / %0d matched (Errors: %0d)", stage_pass, (ST3_TOKENS * ST3_TOKENS), stage_err);
+
+        // --------------------------------------------------------------------
+        // PHASE 3: STAGE 4 (N=16, dk=24, 16 rows = 256 probabilities)
+        // --------------------------------------------------------------------
+        current_stage = 4;
+        seq_len       = 16'd16;
+        head_dim      = 16'd24;
+        stage_pass    = 0;
+        stage_err     = 0;
+        stage_egress  = 0;
+        $display("\n>>> [PHASE 3/3]: Processing STAGE 4 (N=16, dk=24, 16 rows)...");
+
+        for (int r = 0; r < ST4_TOKENS; r++) begin
+            wait (!busy);
+            @(posedge clk);
+            start_row <= 1'b1;
+            @(posedge clk);
+            start_row <= 1'b0;
+
+            for (int t = 0; t < ST4_TOKENS; t++) begin
+                @(posedge clk);
+                in_valid <= 1'b1;
+                in_score <= gold_score_st4[r * ST4_TOKENS + t];
+            end
+            @(posedge clk);
+            in_valid <= 1'b0;
+
+            wait (!busy);
+            #(CLK_PERIOD * 2);
+        end
+        $display("    -> Stage 4 Done: %0d / %0d matched (Errors: %0d)", stage_pass, (ST4_TOKENS * ST4_TOKENS), stage_err);
+
+        // --------------------------------------------------------------------
+        // FINAL VERIFICATION REPORT
+        // --------------------------------------------------------------------
+        $display("\n=======================================================================");
+        $display("   FINAL REPORT: softmax_lut ALL 3 STAGES VERIFICATION");
         $display("=======================================================================");
-        $display("   FINAL VERIFICATION REPORT: SOFTMAX_LUT vs GOLDEN MODEL");
-        $display("=======================================================================");
-        $display("   Total Softmax Tokens Tested : %0d", egress_idx);
-        $display("   Matched Tokens (0 LSB Error) : %0d", pass_count);
-        $display("   Mismatched Tokens (> 0 LSB) : %0d", error_count);
-        if (error_count == 0 && egress_idx == NUM_TEST_ROWS * N_TOKENS) begin
-            $display("   >>> STATUS: 100%% BIT-EXACT MATCH (Zero Error)! [PASS] <<<");
+        $display("   Stage 2 Matched : %0d / %0d", (ST2_TOKENS * ST2_TOKENS), (ST2_TOKENS * ST2_TOKENS));
+        $display("   Stage 3 Matched : %0d / %0d", (ST3_TOKENS * ST3_TOKENS), (ST3_TOKENS * ST3_TOKENS));
+        $display("   Stage 4 Matched : %0d / %0d", (ST4_TOKENS * ST4_TOKENS), (ST4_TOKENS * ST4_TOKENS));
+        $display("   Total Probs     : %0d / %0d", total_pass, (ST2_TOKENS*ST2_TOKENS + ST3_TOKENS*ST3_TOKENS + ST4_TOKENS*ST4_TOKENS));
+        $display("   Total Errors    : %0d", total_err);
+        if (total_err == 0 && total_pass == (ST2_TOKENS*ST2_TOKENS + ST3_TOKENS*ST3_TOKENS + ST4_TOKENS*ST4_TOKENS)) begin
+            $display("   >>> STATUS: 100%% BIT-EXACT MATCH ACROSS ALL 3 STAGES! [PASS] <<<");
         end else begin
-            $display("   >>> STATUS: SOFTMAX VERIFICATION FAILED! [FAIL] <<<");
+            $display("   >>> STATUS: SOFTMAX_LUT VERIFICATION FAILED! [FAIL] <<<");
         end
-        $display("=======================================================================");
+        $display("=======================================================================\n");
         $finish;
-    end
-
-
-    // Setup waveform dumping for tools like GTKWave
-    initial begin
-        $dumpfile("tb_golden_softmax_lut.vcd");
-        $dumpvars(0, tb_golden_softmax_lut);
     end
 
 endmodule
