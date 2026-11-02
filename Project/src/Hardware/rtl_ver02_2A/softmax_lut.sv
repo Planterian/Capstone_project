@@ -56,7 +56,7 @@ module softmax_lut #(
 
     logic [8:0]                 cnt_reg;
     logic [8:0]                 eff_seq_len;
-    assign eff_seq_len = (seq_len == 16'd0) ? 9'd256 : seq_len[8:0];
+    logic [1:0]                 rom_stage_offset;
     logic signed [IN_WIDTH-1:0] s_max_reg;
     logic [ACC_WIDTH-1:0]       sum_exp_reg;
     logic [31:0]                inv_sum_reg;
@@ -78,15 +78,23 @@ module softmax_lut #(
 
     (* ram_style = "block" *) logic [ROM_DATA_WIDTH-1:0] exp_rom [0:ROM_DEPTH-1];
 
-    // Stage Partition Address Mapping (Port A)
-    always_comb begin
-        case (head_dim)
-            16'd16:  rom_addr_stage = {2'b00, rom_addr}; // Stage 2: Offset 0x000 (0..255)
-            16'd20:  rom_addr_stage = {2'b01, rom_addr}; // Stage 3: Offset 0x100 (256..511)
-            16'd24:  rom_addr_stage = {2'b10, rom_addr}; // Stage 4: Offset 0x200 (512..767)
-            default: rom_addr_stage = {2'b00, rom_addr}; // Default: Stage 2
-        endcase
+    // Quasi-static configuration register latching on idle or start_row (cuts long combinational path)
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            eff_seq_len      <= 9'd256;
+            rom_stage_offset <= 2'b00;
+        end else if (state_reg == ST_IDLE || start_row) begin
+            eff_seq_len <= (seq_len == 16'd0) ? 9'd256 : seq_len[8:0];
+            case (head_dim)
+                16'd16:  rom_stage_offset <= 2'b00; // Stage 2: Offset 0x000 (0..255)
+                16'd20:  rom_stage_offset <= 2'b01; // Stage 3: Offset 0x100 (256..511)
+                16'd24:  rom_stage_offset <= 2'b10; // Stage 4: Offset 0x200 (512..767)
+                default: rom_stage_offset <= 2'b00; // Default: Stage 2
+            endcase
+        end
     end
+
+    assign rom_addr_stage = {rom_stage_offset, rom_addr};
 
     // ROM Initialization
     initial begin
@@ -263,10 +271,10 @@ module softmax_lut #(
     always_comb begin
         logic signed [IN_WIDTH-1:0] cur_score;
         logic signed [IN_WIDTH-1:0] delta_s;
-        int                         idx;
+        logic [7:0]                 buf_idx;
 
-        idx = (cnt_reg < eff_seq_len) ? int'(cnt_reg) : int'(eff_seq_len - 1);
-        cur_score = score_buffer[idx];
+        buf_idx   = cnt_reg[7:0];
+        cur_score = score_buffer[buf_idx];
         delta_s   = cur_score - s_max_reg;
 
         if (delta_s < -255) begin

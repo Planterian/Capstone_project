@@ -714,26 +714,27 @@ Nhằm cung cấp góc nhìn toàn diện cho hội đồng thẩm định luậ
 
 ### 11.7. Báo Cáo Tổng Hợp & Đối Sánh OOC Synthesis Cả 3 Biến Thể Hỗ Trợ Dynamic N (Vivado 2026.1 trên AMD Kria KV260)
 
-Vào ngày **02/11/2026**, sau khi nâng cấp toàn bộ mã nguồn RTL lên phiên bản **v3.0 (Dynamic Token Length $N \in \{256, 64, 16\}$)**, toàn bộ 3 biến thể kiến trúc đã được đưa vào luồng tổng hợp và định tuyến thực tế (Out-of-Context Synthesis & PnR) trên công cụ **AMD Vivado v2026.1** nhắm mục tiêu chip **AMD Kria KV260 (xck26-sfvc784-2LV-c)** với xung nhịp thiết kế mục tiêu **200.0 MHz** ($T_{clk} = 5.0\text{ ns}$):
+Vào ngày **02/11/2026**, sau khi áp dụng toàn diện 2 giải pháp tối ưu hóa định thời (Solution 1: Khai báo `set_false_path` cho các thanh ghi quasi-static AXI-Lite; Solution 2: Chốt đồng bộ `eff_seq_len`, `rom_stage_offset` và đơn giản hóa địa chỉ truy xuất BRAM trong `softmax_lut.sv`), toàn bộ 3 biến thể kiến trúc v3.0 (Dynamic Token Length $N \in \{256, 64, 16\}$) đã được tái tổng hợp và định tuyến thực tế (Out-of-Context Synthesis & PnR) trên bộ công cụ **AMD Vivado v2026.1** cho chip **AMD Kria KV260 (xck26-sfvc784-2LV-c)** với xung nhịp thiết kế mục tiêu **200.0 MHz** ($T_{clk} = 5.0\text{ ns}$):
 
-| Tiêu Chí Kỹ Thuật Đánh Giá | Biến Thể 1A (Pure Fabric Tree) | Biến Thể 2A (DSP Packing Tree) | Biến Thể 3B (2D Systolic Array) | Khả Dụng Chip KV260 | Phân Tích Chuyên Sâu |
+| Tiêu Chí Kỹ Thuật Đánh Giá | Biến Thể 1A (Pure Fabric Tree) | Biến Thể 2A (DSP Packing Tree) | Biến Thể 3B (2D Systolic Array) | Khả Dụng Chip KV260 | Phân Tích Chuyên Sâu & Đối Sánh |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Logic LUTs (LUT as Logic)** | **8,901 (7.60%)** | **5,941 (5.07%)** | **23,727 (20.26%)** | 117,120 | 2A tiết kiệm 2,960 Logic LUTs (-33.2%) so với 1A; 3B tốn nhất do Reorder Buffer |
-| **LUTRAM (Memory LUT)** | **3,552 (6.17%)** | **4,736 (8.22%)** | **15,416 (26.76%)** | 57,600 | 3B dùng 15.4k LUTRAM cho Reorder Buffer (32Kb) |
-| **Tổng CLB LUTs** | **12,453 (10.63%)** | **10,677 (9.12%)** | **39,143 (33.42%)** | 117,120 | 2A chiếm ít diện tích logic fabric nhất (chỉ 9.12% chip KV260) |
-| **CLB Flip-Flops (FFs)** | **8,187 (3.50%)** | **7,348 (3.14%)** | **42,270 (18.05%)** | 234,240 | 3B có mật độ thanh ghi cao gấp 5.7x do mảng PE 2D & Reorder RAM |
-| **Khối DSP48E2** | **36 (2.88%)** | **52 (4.17%)** | **52 (4.17%)** | 1,248 | 1A dùng 32 DSP cho mảng nhân tree; 2A & 3B dùng 52 DSPs toàn core |
-| **Block RAM (RAMB36 Tile)** | **1 Tile (0.69%)** | **1 Tile (0.69%)** | **1 Tile (0.69%)** | 144 Tiles | Cả 3 biến thể đều chỉ dùng 1 BRAM cho bảng tra Softmax Exp ROM |
-| **Worst Negative Slack (WNS)** | **`-1.025 ns`** | **`-0.347 ns`** | **`-1.071 ns`** | $> 0\text{ ns}$ | 2A tiệm cận mục tiêu 200MHz nhất ($F_{max} = 187.02\text{ MHz}$) |
-| **Tần Số Cực Đại ($F_{max}$)** | **165.98 MHz** | **187.02 MHz** | **164.72 MHz** | Target 200MHz | 2A đạt $F_{max}$ cao nhất (vượt trội hơn 1A và 3B từ 21 ~ 22 MHz) |
-| **Tần Số Hoạt Động An Toàn** | **160.0 MHz** | **180.0 MHz** | **160.0 MHz** | 150 ~ 200 MHz | 2A vận hành an toàn ở 180 MHz; 1A & 3B vận hành an toàn ở 160 MHz |
-| **Worst Hold Slack (WHS)** | **`+0.007 ns` (MET)** | **`+0.011 ns` (MET)** | **`+0.015 ns` (MET)** | $> 0\text{ ns}$ | Đạt chuẩn an toàn Hold Time 100% trên cả 3 biến thể |
-| **Công Suất Động (Dynamic)** | **0.184 W** | **0.168 W** | **0.483 W** | - | 2A tiết kiệm điện nhất; 3B tiêu thụ động cao gấp 2.87x do mảng systolic |
-| **Công Suất Tĩnh (Static)** | **0.289 W** | **0.289 W** | **0.291 W** | - | Dòng rò rỉ đồng đều trên tiến trình 16nm UltraScale+ |
-| **Tổng Công Suất (Total Power)** | **0.473 W** | **0.457 W** | **0.774 W** | < 10 W | Cả 3 biến thể đều dưới 1W, cực kỳ tiết kiệm cho Edge AI |
-| **Nhiệt Độ Mối Nối (Junction)** | **26.1 °C** | **26.1 °C** | **26.8 °C** | $< 85.0\text{ }^\circ\text{C}$ | Margin an toàn nhiệt độ tuyệt đối (> 58 °C) |
+| **Logic LUTs (LUT as Logic)** | **8,851 (7.56%)** | **5,891 (5.03%)** | **23,572 (20.13%)** | 117,120 | 2A tiết kiệm 2,960 Logic LUTs (-33.4%) so với 1A; 3B tốn nhất do Reorder Buffer |
+| **LUTRAM (Memory LUT)** | **3,552 (6.17%)** | **4,740 (8.23%)** | **15,416 (26.76%)** | 57,600 | 3B dùng 15.4k LUTRAM cho Reorder Buffer (32Kb); 1A & 2A dùng cho Ingress RAM |
+| **Tổng CLB LUTs** | **12,403 (10.59%)** | **10,631 (9.08%)** | **38,988 (33.29%)** | 117,120 | **2A chiếm ít diện tích logic fabric nhất (chỉ 9.08% chip KV260)** |
+| **CLB Flip-Flops (FFs)** | **8,195 (3.50%)** | **7,366 (3.14%)** | **42,375 (18.09%)** | 234,240 | 3B có mật độ thanh ghi cao gấp 5.75x do mảng PE 2D & Reorder RAM |
+| **Khối DSP48E2** | **36 (2.88%)** | **52 (4.17%)** | **52 (4.17%)** | 1,248 | 1A dùng 0 DSP cho Stage 1 Tree; 2A & 3B dùng 52 DSPs toàn core |
+| **Block RAM (RAMB36 Tile)** | **1 Tile (0.69%)** | **1 Tile (0.69%)** | **1 Tile (0.69%)** | 144 Tiles | Cả 3 biến thể đều chỉ dùng đúng 1 BRAM cho bảng tra Softmax Exp ROM |
+| **Worst Negative Slack (WNS)** | **`-0.157 ns`** | **`+0.051 ns` (MET)** | **`-0.092 ns`** | $> 0\text{ ns}$ | **2A ĐÓNG TIMING 100% TẠI 200 MHz!** 1A và 3B cải thiện trên 81% ~ 91% |
+| **Total Negative Slack (TNS)** | **`-3.475 ns`** | **`0.000 ns` (0 Fail)** | **`-0.324 ns`** | $0.000\text{ ns}$ | 2A sạch 100% (0 fail); 3B chỉ còn 7/204k endpoints; 1A đạt 99.87% endpoints |
+| **Tần Số Cực Đại ($F_{max}$)** | **194.06 MHz** | **202.06 MHz** | **196.39 MHz** | Target 200MHz | **2A vượt mục tiêu 200 MHz**; 1A & 3B đều tiệm cận 195 MHz |
+| **Tần Số Hoạt Động An Toàn** | **190.0 MHz** | **200.0 MHz** | **190.0 MHz** | 150 ~ 200 MHz | Cả 3 biến thể đều đáp ứng tần số danh định siêu cao trên bo Kria KV260 |
+| **Worst Hold Slack (WHS)** | **`+0.007 ns` (MET)** | **`+0.016 ns` (MET)** | **`+0.009 ns` (MET)** | $> 0\text{ ns}$ | Đạt chuẩn an toàn Hold Time 100% trên cả 3 biến thể (0 Hold Violation) |
+| **Công Suất Động (Dynamic)** | **0.175 W** | **0.152 W** | **0.476 W** | - | **2A tiết kiệm điện năng động nhất**; 3B tiêu thụ động cao gấp 3.1x do mảng systolic |
+| **Công Suất Tĩnh (Static)** | **0.289 W** | **0.289 W** | **0.290 W** | - | Dòng rò rỉ đồng đều trên tiến trình 16nm UltraScale+ |
+| **Tổng Công Suất (Total Power)** | **0.464 W** | **0.441 W** | **0.767 W** | < 10 W | **Cả 3 biến thể đều dưới 0.8W**, cực kỳ mát mẻ cho Edge AI không quạt |
+| **Nhiệt Độ Mối Nối (Junction)** | **26.1 °C** | **26.0 °C** | **26.8 °C** | $< 85.0\text{ }^\circ\text{C}$ | Margin an toàn nhiệt độ tuyệt đối (> 58 °C so với ngưỡng quá nhiệt) |
 | **Design Rule Check (DRC)** | **0 Errors, 0 Warnings** | **0 Errors, 0 Warnings** | **0 Errors, 0 Warnings** | 0 Errors | Hoàn toàn sạch luật thiết kế trên cả 3 biến thể |
-| **Chu Kỳ Chuỗi 3 Stages** | **227,198 cycles** | **229,710 cycles** | **363,437 cycles** | - | 1A và 2A nhanh hơn 3B tới ~58% về thời gian trễ |
+| **Chu Kỳ Chuỗi 3 Stages** | **227,198 cycles** | **229,710 cycles** | **363,437 cycles** | - | 1A và 2A nhanh hơn 3B tới ~58% về thời gian trễ thực thi |
 | **Thời Gian Thực Thi (@ 200MHz)** | **1.136 ms** | **1.148 ms** | **1.817 ms** | - | Cả 3 đều đạt tốc độ khung hình ấn tượng |
 | **Tốc Độ Khung Hình (Attention FPS)**| **~880 FPS** | **~871 FPS** | **~550 FPS** | - | Vượt xa ngưỡng thời gian thực 30/60 FPS |
 | **Kiểm Thử Bit-Exact 3 Stages** | **5,760 / 5,760 B (100%)** | **5,760 / 5,760 B (100%)** | **5,760 / 5,760 B (100%)** | 100% | Khớp 0-LSB tuyệt đối với mô hình PyTorch |

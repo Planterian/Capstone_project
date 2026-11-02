@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
 ---------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2026.1 (win64) Build 6511674 Tue Jun 16 11:02:23 MDT 2026
-| Date         : Mon Nov  2 21:48:41 2026
+| Date         : Tue Nov  3 05:42:42 2026
 | Host         : DESKTOP-L58T74E running 64-bit major release  (build 9200)
 | Command      : report_utilization -hierarchical -file ./reports_1A/post_route_utilization_hier.rpt
 | Design       : attention_core_top_1A
@@ -22,14 +22,14 @@ Table of Contents
 +---------------------------+----------------------+------------+------------+---------+------+------+--------+--------+------+------------+
 |          Instance         |        Module        | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs | RAMB36 | RAMB18 | URAM | DSP Blocks |
 +---------------------------+----------------------+------------+------------+---------+------+------+--------+--------+------+------------+
-| attention_core_top_1A     |                (top) |      12453 |       8901 |    3552 |    0 | 8187 |      1 |      0 |    0 |         36 |
-|   (attention_core_top_1A) |                (top) |       3814 |        262 |    3552 |    0 |  479 |      0 |      0 |    0 |          0 |
-|   u_axi_lite_regs         |        axi_lite_regs |       2636 |       2636 |       0 |    0 |  462 |      0 |      0 |    0 |          0 |
-|   u_pipelined_adder_tree  | pipelined_adder_tree |       2681 |       2681 |       0 |    0 | 1510 |      0 |      0 |    0 |          0 |
-|   u_scale_unit            |           scale_unit |        237 |        237 |       0 |    0 |  114 |      0 |      0 |    0 |          2 |
+| attention_core_top_1A     |                (top) |      12403 |       8851 |    3552 |    0 | 8195 |      1 |      0 |    0 |         36 |
+|   (attention_core_top_1A) |                (top) |       3814 |        262 |    3552 |    0 |  477 |      0 |      0 |    0 |          0 |
+|   u_axi_lite_regs         |        axi_lite_regs |       2298 |       2298 |       0 |    0 |  437 |      0 |      0 |    0 |          0 |
+|   u_pipelined_adder_tree  | pipelined_adder_tree |       2954 |       2954 |       0 |    0 | 1510 |      0 |      0 |    0 |          0 |
+|   u_scale_unit            |           scale_unit |        238 |        238 |       0 |    0 |  114 |      0 |      0 |    0 |          2 |
 |   u_score_v_gemm          |         score_v_gemm |       1488 |       1488 |       0 |    0 | 1037 |      0 |      0 |    0 |         32 |
 |   u_skid_buffer_rx        |         axis_adapter |        135 |        135 |       0 |    0 |  260 |      0 |      0 |    0 |          0 |
-|   u_softmax_engine        |          softmax_lut |       1644 |       1644 |       0 |    0 | 4309 |      1 |      0 |    0 |          2 |
+|   u_softmax_engine        |          softmax_lut |       1660 |       1660 |       0 |    0 | 4344 |      1 |      0 |    0 |          2 |
 +---------------------------+----------------------+------------+------------+---------+------+------+--------+--------+------+------------+
 * Note: The sum of lower-level cells may be larger than their parent cells total, due to cross-hierarchy LUT combining
 

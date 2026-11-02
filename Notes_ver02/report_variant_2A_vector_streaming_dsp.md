@@ -320,29 +320,33 @@ $\implies$ **ALL 5 VARIANT 2A VERIFICATIONS PASSED 100% BIT-EXACT!**
 
 ---
 
-### 9.6. Kết Quả Tổng Hợp OOC Synthesis & PnR Vivado 2026.1 (Dynamic N RTL v3.0)
+### 9.6. Kết Quả Tổng Hợp OOC Synthesis & PnR Vivado 2026.1 (Dynamic N RTL v3.0 - Timing Closed @ 200 MHz)
 
-Vào ngày **02/11/2026**, kiến trúc Variant 2A đã được thực thi tổng hợp và định tuyến thực tế (Out-of-Context Synthesis & Implementation) trên bộ công cụ **Vivado v2026.1** cho chip **AMD Kria KV260 (xck26-sfvc784-2LV-c)** với xung nhịp thiết kế mục tiêu **200 MHz** (5.0 ns period):
+Vào ngày **02/11/2026**, kiến trúc Variant 2A đã được thực thi tổng hợp và định tuyến thực tế (Out-of-Context Synthesis & Implementation) trên bộ công cụ **Vivado v2026.1** cho chip **AMD Kria KV260 (xck26-sfvc784-2LV-c)** với xung nhịp thiết kế mục tiêu **200 MHz** (5.0 ns period), áp dụng toàn diện giải pháp triệt tiêu đường trễ (False Path XDC cho quasi-static CSRs + Chốt đồng bộ và đơn giản hóa địa chỉ BRAM trong `softmax_lut.sv`):
 
 | Tài Nguyên Phần Cứng | Đã Sử Dụng (Used) | Khả Dụng Trên KV260 | Tỷ Lệ Chiếm Dụng (%) | Nhận Xét & Phân Tích Kỹ Thuật |
 | :--- | :---: | :---: | :---: | :--- |
-| **Logic LUTs (LUT as Logic)** | **5,941** | 117,120 | **5.07%** | Tiết kiệm hơn đáng kể so với 1A (8,901 LUTs) nhờ DSP packing |
-| **LUTRAM (Memory LUT)** | **4,736** | 57,600 | **8.22%** | Phân bổ cho pipeline delay và Distributed RAM |
-| **Tổng CLB LUTs** | **10,677** | 117,120 | **9.12%** | Mức tiêu thụ tối ưu, tiết kiệm ~1.7k LUTs so với 1A |
-| **CLB Flip-Flops (FF)** | **7,348** | 234,240 | **3.14%** | Thanh ghi pipeline, zero-bubble serializer và FSM |
+| **Logic LUTs (LUT as Logic)** | **5,891** | 117,120 | **5.03%** | Tiết kiệm vượt trội so với 1A (8,851 LUTs) nhờ kỹ thuật DSP packing SIMD |
+| **LUTRAM (Memory LUT)** | **4,740** | 57,600 | **8.23%** | 4,736 Distributed RAM (Q, K, V Ingress BRAM) + 4 Shift Registers |
+| **Tổng CLB LUTs** | **10,631** | 117,120 | **9.08%** | Mức tiêu thụ tối ưu, chiếm chưa tới 10% tài nguyên logic của KV260 |
+| **CLB Flip-Flops (FF)** | **7,366** | 234,240 | **3.14%** | Thanh ghi pipeline, zero-bubble serializer và FSM điều khiển đa tầng |
 | **DSP48E2 Blocks** | **52** | 1,248 | **4.17%** | 8 DSPs cho GEMM 1 (`pe_slice_dsp_packing`) + 4 DSPs cho Scaler/Softmax + 40 DSPs cho GEMM 2 Score-V |
 | **Block RAM (RAMB36 Tile)**| **1 Tile** | 144 | **0.69%** | 1 RAMB36E2 cho bảng tra lũy thừa `exp_rom` của Softmax |
 | **UltraRAM (URAM)** | **0** | 64 | **0.00%** | Không sử dụng |
 
 #### Chỉ số Định Thời & Công Suất Thực Tế (Post-Route Timing & Power Summary):
-- **Worst Negative Slack (WNS) @ 200 MHz:** **`-0.347 ns`**
-  * *Tần số xung nhịp cực đại:* **$F_{max} = \frac{1000}{5.0 + 0.347} \approx \mathbf{187.02\text{ MHz}}$**. Hoàn toàn thỏa mãn an toàn ở tần số mục tiêu thực tế **180 MHz** và **150 MHz**.
-- **Worst Hold Slack (WHS):** **`+0.011 ns`** (**MET - Thỏa mãn hoàn toàn**).
+- **Worst Negative Slack (WNS) @ 200 MHz:** **`+0.051 ns`** (**TIMING CLOSURE MET 100%!** Toàn bộ 51,585 endpoints đều thỏa mãn timing, 0 lỗi vi phạm).
+- **Total Negative Slack (TNS):** **`0.000 ns`** (0 failing endpoints).
+- **Worst Hold Slack (WHS):** **`+0.016 ns`** (**MET - Thỏa mãn Hold Time hoàn hảo**).
+- **Total Hold Slack (THS):** **`0.000 ns`**.
 - **Worst Pulse Width Slack (WPWS):** **`+1.738 ns`** (**MET**).
-- **Tổng Công Suất Tiêu Thụ Trên Chip (Total On-Chip Power):** **`0.457 W`**
-  * *Dynamic Power:* `0.168 W` (36.8%)
-  * *Device Static Power:* `0.289 W` (63.2%)
-  * *Nhiệt độ mối nối chip (Junction Temperature):* `26.1 °C` (Margin an toàn tuyệt đối).
+- **Tần số xung nhịp cực đại ($F_{max}$):**
+  $$F_{max} = \frac{1000}{T_{clk} - \text{WNS}} = \frac{1000}{5.000 - 0.051} \approx \mathbf{202.06\text{ MHz}}$$
+  Vượt mục tiêu thiết kế 200 MHz, chứng minh tính khả thi tuyệt đối của Variant 2A khi vận hành ở tần số tối đa của KV260.
+- **Tổng Công Suất Tiêu Thụ Trên Chip (Total On-Chip Power):** **`0.441 W`**
+  * *Dynamic Power:* `0.152 W` (34.5%) - Mức công suất động thấp nhất trong cả 3 biến thể!
+  * *Device Static Power:* `0.289 W` (65.5%)
+  * *Nhiệt độ mối nối chip (Junction Temperature):* `26.0 °C` (Vận hành cực mát, chênh lệch chỉ 1.0°C so với môi trường 25°C).
 - **Design Rule Check (DRC):** **0 Errors, 0 Critical Warnings** (Hoàn toàn sạch luật thiết kế).
 
 ---

@@ -353,27 +353,32 @@ Vào ngày **02/11/2026**, kiến trúc Pure Fabric Variant 1A đã được nâ
 
 ---
 
-### 9.6. Kết Quả Tổng Hợp OOC Synthesis & PnR Vivado 2026.1 (Dynamic N RTL v3.0)
+### 9.6. Kết Quả Tổng Hợp OOC Synthesis & PnR Vivado 2026.1 (Dynamic N RTL v3.0 - Timing Optimization)
 
-Vào ngày **02/11/2026**, kiến trúc Variant 1A đã được thực thi tổng hợp và định tuyến thực tế (Out-of-Context Synthesis & Implementation) trên bộ công cụ **Vivado v2026.1** cho chip **AMD Kria KV260 (xck26-sfvc784-2LV-c)** với xung nhịp thiết kế mục tiêu **200 MHz** (5.0 ns period):
+Vào ngày **02/11/2026**, kiến trúc Variant 1A đã được thực thi tổng hợp và định tuyến thực tế (Out-of-Context Synthesis & Implementation) trên bộ công cụ **Vivado v2026.1** cho chip **AMD Kria KV260 (xck26-sfvc784-2LV-c)** với xung nhịp thiết kế mục tiêu **200 MHz** (5.0 ns period), áp dụng toàn diện giải pháp triệt tiêu đường trễ (False Path XDC cho quasi-static CSRs + Chốt đồng bộ và đơn giản hóa chỉ số BRAM trong `softmax_lut.sv`):
 
 | Tài Nguyên Phần Cứng | Đã Sử Dụng (Used) | Khả Dụng Trên KV260 | Tỷ Lệ Chiếm Dụng (%) | Nhận Xét & Phân Tích Kỹ Thuật |
 | :--- | :---: | :---: | :---: | :--- |
-| **Logic LUTs (LUT as Logic)** | **8,901** | 117,120 | **7.60%** | 32 bộ nhân INT8, cây cộng 5 tầng và logic điều khiển |
-| **LUTRAM (Memory LUT)** | **3,552** | 57,600 | **6.17%** | Phân bổ cho pipeline delay và Distributed RAM |
-| **Tổng CLB LUTs** | **12,453** | 117,120 | **10.63%** | Mức tiêu thụ vừa phải, phù hợp cho PL KV260 |
-| **CLB Flip-Flops (FF)** | **8,187** | 234,240 | **3.50%** | Thanh ghi pipeline 5 tầng cây cộng, skid buffer và FSM |
-| **DSP48E2 Blocks** | **36** | 1,248 | **2.88%** | 32 DSPs cho mảng nhân `pipelined_adder_tree` + 4 DSPs cho Scaler/Softmax |
+| **Logic LUTs (LUT as Logic)** | **8,851** | 117,120 | **7.56%** | 32 bộ nhân INT8 fabric, cây cộng nhị phân 5 tầng và FSM điều khiển |
+| **LUTRAM (Memory LUT)** | **3,552** | 57,600 | **6.17%** | Phân bổ cho pipeline delay và Ingress Q, K, V Distributed RAM |
+| **Tổng CLB LUTs** | **12,403** | 117,120 | **10.59%** | Mức tiêu thụ tối ưu trên fabric FPGA Kria KV260 |
+| **CLB Flip-Flops (FF)** | **8,195** | 234,240 | **3.50%** | Thanh ghi pipeline 5 tầng cây cộng, skid buffer và FSM điều khiển |
+| **DSP48E2 Blocks** | **36** | 1,248 | **2.88%** | 0 DSP cho Stage 1 Tree; 32 DSPs cho Score-V GEMM + 4 DSPs Scaler/Softmax |
 | **Block RAM (RAMB36 Tile)**| **1 Tile** | 144 | **0.69%** | 1 RAMB36E2 cho bảng tra lũy thừa `exp_rom` của Softmax |
 | **UltraRAM (URAM)** | **0** | 64 | **0.00%** | Không sử dụng |
 
 #### Chỉ số Định Thời & Công Suất Thực Tế (Post-Route Timing & Power Summary):
-- **Worst Negative Slack (WNS) @ 200 MHz:** **`-1.025 ns`**
-  * *Nguyên nhân WNS âm:* Đường trễ cực đại 16 mức logic phát sinh từ thanh ghi quasi-static `u_axi_lite_regs/slv_seq_len_reg_reg[10]` (được cấu hình một lần qua AXI-Lite trước khi kích hoạt lõi) đi tới cổng địa chỉ BRAM Softmax. Đây là đường quasi-static cấu hình, trong thực tế hệ thống chạy an toàn tại **$F_{max} = \frac{1000}{5.0 + 1.025} \approx \mathbf{165.98\text{ MHz}}$** (hoặc xung nhịp SoC chuẩn 150 MHz).
-- **Worst Hold Slack (WHS):** **`+0.007 ns`** (**MET - Thỏa mãn hoàn toàn**).
+- **Worst Negative Slack (WNS) @ 200 MHz:** **`-0.157 ns`**
+  * *Mức cải thiện:* Tăng từ vi phạm cũ $-1.025\text{ ns}$ lên **$-0.157\text{ ns}$** (cải thiện **84.7%** biên thời gian) nhờ loại bỏ 6 mức logic so sánh chuỗi dynamic `(cnt_reg < eff_seq_len)` và cắt đứt đường quasi-static từ `slv_seq_len_reg`.
+  * *Total Negative Slack (TNS):* **`-3.475 ns`** (chỉ còn 56 / 42,269 endpoints vi phạm nhỏ, tức **99.87% endpoints đạt chuẩn 200 MHz**).
+  * *Tần số xung nhịp cực đại:*
+    $$F_{max} = \frac{1000}{T_{clk} + |\text{WNS}|} = \frac{1000}{5.000 + 0.157} \approx \mathbf{194.06\text{ MHz}}$$
+    Đạt 97.0% tần số mục tiêu 200 MHz; vận hành an toàn tuyệt đối ở tần số danh định **190.0 MHz** và tần số chuẩn SoC **150.0 MHz**.
+- **Worst Hold Slack (WHS):** **`+0.007 ns`** (**MET - Thỏa mãn Hold Time 100%**).
+- **Total Hold Slack (THS):** **`0.000 ns`**.
 - **Worst Pulse Width Slack (WPWS):** **`+1.738 ns`** (**MET**).
-- **Tổng Công Suất Tiêu Thụ Trên Chip (Total On-Chip Power):** **`0.473 W`**
-  * *Dynamic Power:* `0.184 W` (38.9%)
-  * *Device Static Power:* `0.289 W` (61.1%)
-  * *Nhiệt độ mối nối chip (Junction Temperature):* `26.1 °C` (Margin an toàn cực cao, giới hạn tối đa 85 °C).
+- **Tổng Công Suất Tiêu Thụ Trên Chip (Total On-Chip Power):** **`0.464 W`**
+  * *Dynamic Power:* `0.175 W` (37.7%)
+  * *Device Static Power:* `0.289 W` (62.3%)
+  * *Nhiệt độ mối nối chip (Junction Temperature):* `26.1 °C` (Margin an toàn nhiệt độ tuyệt đối).
 - **Design Rule Check (DRC):** **0 Errors, 0 Critical Warnings** (Hoàn toàn sạch luật thiết kế).

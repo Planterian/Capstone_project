@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
 --------------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version      : Vivado v.2026.1 (win64) Build 6511674 Tue Jun 16 11:02:23 MDT 2026
-| Date              : Mon Nov  2 21:34:45 2026
+| Date              : Tue Nov  3 05:30:27 2026
 | Host              : DESKTOP-L58T74E running 64-bit major release  (build 9200)
 | Command           : report_timing_summary -file ./reports_1A/post_synth_timing.rpt
 | Design            : attention_core_top_1A
@@ -139,7 +139,7 @@ Table of Contents
 
     WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
     -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
-     -0.110       -0.613                      8                42238       -0.018      -54.509                   3081                42238        1.738        0.000                       0                 11741  
+      0.348        0.000                      0                42251       -0.018      -54.529                   3083                42251        1.738        0.000                       0                 11741  
 
 
 Timing constraints are not met.
@@ -162,7 +162,7 @@ clk    {0.000 2.500}        5.000           200.000
 
 Clock             WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
 -----             -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
-clk                -0.110       -0.613                      8                42238       -0.018      -54.509                   3081                42238        1.738        0.000                       0                 11741  
+clk                 0.348        0.000                      0                42251       -0.018      -54.529                   3083                42251        1.738        0.000                       0                 11741  
 
 
 ------------------------------------------------------------------------------------------------
@@ -193,27 +193,27 @@ Path Group    From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing 
 From Clock:  clk
   To Clock:  clk
 
-Setup :            8  Failing Endpoints,  Worst Slack       -0.110ns,  Total Violation       -0.613ns
-Hold  :         3081  Failing Endpoints,  Worst Slack       -0.018ns,  Total Violation      -54.509ns
+Setup :            0  Failing Endpoints,  Worst Slack        0.348ns,  Total Violation        0.000ns
+Hold  :         3083  Failing Endpoints,  Worst Slack       -0.018ns,  Total Violation      -54.529ns
 PW    :            0  Failing Endpoints,  Worst Slack        1.738ns,  Total Violation        0.000ns
 ---------------------------------------------------------------------------------------------------
 
 
 Max Delay Paths
 --------------------------------------------------------------------------------------
-Slack (VIOLATED) :        -0.110ns  (required time - arrival time)
-  Source:                 u_axi_lite_regs/slv_seq_len_reg_reg[10]/C
-                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[8]
+Slack (MET) :             0.348ns  (required time - arrival time)
+  Source:                 u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
                             (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[0]
+                            (rising edge-triggered cell DSP_OUTPUT clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Path Group:             clk
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
-  Data Path Delay:        4.521ns  (logic 1.773ns (39.217%)  route 2.748ns (60.783%))
-  Logic Levels:           16  (CARRY8=4 LUT2=2 LUT3=1 LUT4=1 LUT5=2 LUT6=4 MUXF7=1 MUXF8=1)
-  Clock Path Skew:        0.008ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    0.049ns = ( 5.049 - 5.000 ) 
-    Source Clock Delay      (SCD):    0.041ns
+  Data Path Delay:        4.480ns  (logic 4.077ns (91.004%)  route 0.403ns (8.996%))
+  Logic Levels:           7  (DSP_A_B_DATA=1 DSP_ALU=2 DSP_M_DATA=1 DSP_MULTIPLIER=1 DSP_OUTPUT=1 DSP_PREADD_DATA=1)
+  Clock Path Skew:        -0.051ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.055ns = ( 5.055 - 5.000 ) 
+    Source Clock Delay      (SCD):    0.106ns
     Clock Pessimism Removal (CPR):    0.000ns
   Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
     Total System Jitter     (TSJ):    0.071ns
@@ -226,63 +226,49 @@ Slack (VIOLATED) :        -0.110ns  (required time - arrival time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=11745, unset)        0.041     0.041    u_axi_lite_regs/clk
-                         FDCE                                         r  u_axi_lite_regs/slv_seq_len_reg_reg[10]/C
+                         net (fo=11745, unset)        0.106     0.106    u_softmax_engine/clk
+                         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
   -------------------------------------------------------------------    -------------------
-                         FDCE (Prop_FDCE_C_Q)         0.114     0.155 r  u_axi_lite_regs/slv_seq_len_reg_reg[10]/Q
-                         net (fo=8, unplaced)         0.135     0.290    u_axi_lite_regs/reg_seq_len[10]
-                         LUT4 (Prop_LUT4_I0_O)        0.152     0.442 r  u_axi_lite_regs/cnt_reg[8]_i_20/O
-                         net (fo=1, unplaced)         0.211     0.653    u_axi_lite_regs/cnt_reg[8]_i_20_n_0
-                         LUT5 (Prop_LUT5_I4_O)        0.058     0.711 r  u_axi_lite_regs/cnt_reg[8]_i_18/O
-                         net (fo=1, unplaced)         0.211     0.922    u_axi_lite_regs/cnt_reg[8]_i_18_n_0
-                         LUT6 (Prop_LUT6_I4_O)        0.058     0.980 r  u_axi_lite_regs/cnt_reg[8]_i_17/O
-                         net (fo=11, unplaced)        0.246     1.226    u_softmax_engine/cnt_reg_reg[8]_i_3_1
-                         LUT2 (Prop_LUT2_I1_O)        0.057     1.283 r  u_softmax_engine/cnt_reg[8]_i_12/O
-                         net (fo=1, unplaced)         0.026     1.309    u_softmax_engine/cnt_reg[8]_i_12_n_0
-                         CARRY8 (Prop_CARRY8_S[4]_CO[4])
-                                                      0.100     1.409 r  u_softmax_engine/cnt_reg_reg[8]_i_3/CO[4]
-                         net (fo=45, unplaced)        0.276     1.685    u_softmax_engine/CO[0]
-                         LUT3 (Prop_LUT3_I2_O)        0.058     1.743 r  u_softmax_engine/exp_rom_reg_bram_0_i_1431/O
-                         net (fo=64, unplaced)        0.286     2.029    u_softmax_engine/exp_rom_reg_bram_0_i_1431_n_0
-                         LUT6 (Prop_LUT6_I4_O)        0.056     2.085 r  u_softmax_engine/exp_rom_reg_bram_0_i_1103/O
-                         net (fo=1, unplaced)         0.040     2.125    u_softmax_engine/exp_rom_reg_bram_0_i_1103_n_0
-                         MUXF7 (Prop_MUXF7_I0_O)      0.106     2.231 r  u_softmax_engine/exp_rom_reg_bram_0_i_499/O
-                         net (fo=1, unplaced)         0.000     2.231    u_softmax_engine/exp_rom_reg_bram_0_i_499_n_0
-                         MUXF8 (Prop_MUXF8_I0_O)      0.036     2.267 r  u_softmax_engine/exp_rom_reg_bram_0_i_219/O
-                         net (fo=1, unplaced)         0.215     2.482    u_softmax_engine/exp_rom_reg_bram_0_i_219_n_0
-                         LUT6 (Prop_LUT6_I0_O)        0.152     2.634 r  u_softmax_engine/exp_rom_reg_bram_0_i_78/O
-                         net (fo=2, unplaced)         0.154     2.788    u_softmax_engine/exp_rom_reg_bram_0_i_78_n_0
-                         LUT6 (Prop_LUT6_I0_O)        0.152     2.940 r  u_softmax_engine/exp_rom_reg_bram_0_i_38/O
-                         net (fo=1, unplaced)         0.227     3.167    u_softmax_engine/score_buffer[0]
-                         CARRY8 (Prop_CARRY8_DI[0]_CO[7])
-                                                      0.204     3.371 r  u_softmax_engine/exp_rom_reg_bram_0_i_13/CO[7]
-                         net (fo=1, unplaced)         0.006     3.377    u_softmax_engine/exp_rom_reg_bram_0_i_13_n_0
-                         CARRY8 (Prop_CARRY8_CI_O[3])
-                                                      0.114     3.491 f  u_softmax_engine/exp_rom_reg_bram_0_i_47/O[3]
-                         net (fo=2, unplaced)         0.151     3.642    u_softmax_engine/rom_addr2[11]
-                         LUT2 (Prop_LUT2_I0_O)        0.144     3.786 r  u_softmax_engine/exp_rom_reg_bram_0_i_20/O
-                         net (fo=1, unplaced)         0.250     4.036    u_softmax_engine/exp_rom_reg_bram_0_i_20_n_0
-                         CARRY8 (Prop_CARRY8_DI[5]_CO[7])
-                                                      0.154     4.190 r  u_softmax_engine/exp_rom_reg_bram_0_i_12/CO[7]
-                         net (fo=8, unplaced)         0.115     4.305    u_softmax_engine/rom_addr1
-                         LUT5 (Prop_LUT5_I0_O)        0.058     4.363 r  u_softmax_engine/exp_rom_reg_bram_0_i_7/O
-                         net (fo=1, unplaced)         0.199     4.562    u_softmax_engine/exp_rom_reg_bram_0_i_7_n_0
-                         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[8]
+                         RAMB36E2 (Prop_RAMB36E2_CLKBWRCLK_DOUTBDOUT[7])
+                                                      1.305     1.411 f  u_softmax_engine/exp_rom_reg_bram_0/DOUTBDOUT[7]
+                         net (fo=3, unplaced)         0.389     1.800    u_softmax_engine/mult_full_reg0/A[7]
+                         DSP_A_B_DATA (Prop_DSP_A_B_DATA_A[7]_A2_DATA[7])
+                                                      0.258     2.058 r  u_softmax_engine/mult_full_reg0/DSP_A_B_DATA_INST/A2_DATA[7]
+                         net (fo=1, unplaced)         0.000     2.058    u_softmax_engine/mult_full_reg0/DSP_A_B_DATA.A2_DATA<7>
+                         DSP_PREADD_DATA (Prop_DSP_PREADD_DATA_A2_DATA[7]_A2A1[7])
+                                                      0.114     2.172 r  u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA_INST/A2A1[7]
+                         net (fo=1, unplaced)         0.000     2.172    u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA.A2A1<7>
+                         DSP_MULTIPLIER (Prop_DSP_MULTIPLIER_A2A1[7]_U[28])
+                                                      0.700     2.872 f  u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER_INST/U[28]
+                         net (fo=1, unplaced)         0.000     2.872    u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER.U<28>
+                         DSP_M_DATA (Prop_DSP_M_DATA_U[28]_U_DATA[28])
+                                                      0.067     2.939 r  u_softmax_engine/mult_full_reg0/DSP_M_DATA_INST/U_DATA[28]
+                         net (fo=1, unplaced)         0.000     2.939    u_softmax_engine/mult_full_reg0/DSP_M_DATA.U_DATA<28>
+                         DSP_ALU (Prop_DSP_ALU_U_DATA[28]_ALU_OUT[47])
+                                                      0.727     3.666 f  u_softmax_engine/mult_full_reg0/DSP_ALU_INST/ALU_OUT[47]
+                         net (fo=1, unplaced)         0.000     3.666    u_softmax_engine/mult_full_reg0/DSP_ALU.ALU_OUT<47>
+                         DSP_OUTPUT (Prop_DSP_OUTPUT_ALU_OUT[47]_PCOUT[47])
+                                                      0.167     3.833 r  u_softmax_engine/mult_full_reg0/DSP_OUTPUT_INST/PCOUT[47]
+                         net (fo=1, unplaced)         0.014     3.847    u_softmax_engine/mult_full_reg0__0/PCIN[47]
+                         DSP_ALU (Prop_DSP_ALU_PCIN[47]_ALU_OUT[0])
+                                                      0.739     4.586 r  u_softmax_engine/mult_full_reg0__0/DSP_ALU_INST/ALU_OUT[0]
+                         net (fo=1, unplaced)         0.000     4.586    u_softmax_engine/mult_full_reg0__0/DSP_ALU.ALU_OUT<0>
+                         DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[0]
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        5.000     5.000 r  <hidden>
                                                       0.000     5.000 r  clk
-                         net (fo=11745, unset)        0.049     5.049    u_softmax_engine/clk
-                         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-                         clock pessimism              0.000     5.049    <hidden>
-                         clock uncertainty           -0.135     4.914    <hidden>
-                         RAMB36E2 (Setup_RAMB36E2_CLKBWRCLK_ADDRBWRADDR[8])
-                                                     -0.462     4.452    u_softmax_engine/exp_rom_reg_bram_0
+                         net (fo=11745, unset)        0.055     5.055    u_softmax_engine/mult_full_reg0__0/CLK
+                         DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/CLK
+                         clock pessimism              0.000     5.055    <hidden>
+                         clock uncertainty           -0.135     4.920    <hidden>
+                         DSP_OUTPUT (Setup_DSP_OUTPUT_CLK_ALU_OUT[0])
+                                                      0.014     4.934    u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST
   -------------------------------------------------------------------
-                         required time                          4.452    <hidden>
-                         arrival time                          -4.562    <hidden>
+                         required time                          4.934    <hidden>
+                         arrival time                          -4.586    <hidden>
   -------------------------------------------------------------------
-                         slack                                 -0.110    <hidden>
+                         slack                                  0.348    <hidden>
 
 
 

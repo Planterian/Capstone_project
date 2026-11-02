@@ -12,3 +12,14 @@ create_clock -period 5.000 -name clk -waveform {0.000 2.500} [get_ports clk]
 set_clock_uncertainty 0.100 [get_clocks clk]
 
 # Out-Of-Context (OOC) Mode: No board I/O pin delays needed as this is an IP core module
+
+# ==============================================================================
+# Timing Exceptions: Quasi-Static Control Registers (Configured over AXI-Lite)
+# These registers are programmed once by driver/PS before inference begins and
+# remain static throughout active computation.
+# ==============================================================================
+set_false_path -from [get_cells -hierarchical *slv_seq_len_reg*]
+set_false_path -from [get_cells -hierarchical *slv_head_dim_reg*]
+set_false_path -from [get_cells -hierarchical *slv_scale_m_reg*]
+set_false_path -from [get_cells -hierarchical *slv_scale_e_reg*]
+
