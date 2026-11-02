@@ -1,230 +1,156 @@
-# Kiến Trúc MHA Level 0: Top-Level System Architecture, ASMD & Bandwidth Analysis
+# Kiến Trúc MHA Level 0 v2.0: Top-Level System Architecture, Control Plane & Bandwidth Analysis
 
-## 📋 KẾ HOẠCH PHÁT TRIỂN HỆ THỐNG TOP-DOWN HIERARCHY
-
-Toàn bộ hệ thống tăng tốc **Multi-Head Attention (MHA) Core** được chia làm 4 cấp độ từ ngoài vào trong:
-
-1. **LEVEL 0**: Top-Level System Architecture, Giao diện AXI4-Lite/AXI4-Stream, Bảng Định tuyến Tín hiệu Data/Control, Sơ đồ ASMD Chart Trung tâm, và Phân tích Băng thông Bus.
-2. **LEVEL 1**: Sub-system Bộ nhớ & Luồng Streaming (Ping-Pong BRAM Manager, Skid Buffer chống nghẽn Backpressure, FSM tráo con trỏ đệm).
-3. **LEVEL 2**: Compute Engine — GEMM & DSP Packing (Systolic MAC Array Output-Stationary, DSP48E2 $18 \times 27$-bit 2x INT8, Pipelined Adder Tree).
-4. **LEVEL 3**: Pipelines Phi tuyến & Activation (Scaler Unit dịch bit ASR 0-DSP, Hardware Softmax Engine, Re-quantization Dyadic Scaling).
+> **Dự án:** Tăng tốc Attention Core MobileViT-XXS trên AMD Kria KV260  
+> **Phiên bản:** v2.0 (Cập nhật chuẩn hóa theo RTL `rtl_ver02`)  
+> **Tài liệu gốc tham chiếu:** [`Notes/mha_level_0_kien_truc_top.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes/mha_level_0_kien_truc_top.md)
 
 ---
 
-## 🏛️ LEVEL 0: SYSTEM ARCHITECTURE, ASMD & BANDWIDTH MODEL
-
-### 1. Sơ đồ Khối Cấp Cao (Top-Level Architecture Block Diagram - attention_core_top.sv)
+## 1. SƠ ĐỒ KHỐI CẤP CAO (TOP-LEVEL SYSTEM BLOCK DIAGRAM)
 
 ```text
 ========================================================================================================================
                                 LEVEL 0: TOP-LEVEL RTL ARCHITECTURE (attention_core_top.sv)
 ========================================================================================================================
 
-       ARM Processing System (PS) / Host                                  AXI DMA Controller (Simple Mode)
-  +-------------------------------------------+                        +-------------------------------------+
-  | AXI4-Lite Master (Memory-Mapped)          |                        | MM2S (Read DDR4)   S2MM (Write DDR4)|
-  | Regs: 0x00=CTRL, 0x04=NBYTES, 0x10=N, ... |                        | Stream Master      Stream Slave     |
-  +---------------------+---------------------+                        +---------+------------------+--------+
-                        |                                                        |                  ^
-                        | AXI4-Lite Bus                                          | AXI4-Stream      | AXI4-Stream
-                        | (32-bit Control/Status)                                | RX (64-bit)      | TX (64-bit)
-                        v                                                        v                  |
-  +------------------------------------------------------------------------------------------------------------------+
-  | ATTENTION ACCELERATOR TOP SHELL (attention_core_top.sv)                                                          |
-  |                                                                                                                  |
-  |  +------------------------------------------------------------------------------------------------------------+  |
-  |  | CONTROL PATH: AXI4-Lite Slave Register File & Central ASMD Controller (axi_lite_regs.sv)                   |  |
-  |  |                                                                                                            |  |
-  |  |  Registers (CSR):                 Internal Control Signals:                                                |  |
-  |  |   - 0x00: CTRL/STATUS [START/DONE] - start_pulse  ──► [Start FSM]        - reg_nbytes ──► [Packet Size]    |  |
-  |  |   - 0x04: NBYTES                  - clear_buf    ──► [Reset Buffers]    - reg_tokens ──► [Seq Len N]       |  |
-  |  |   - 0x10: SEQ_LEN (N=196)         - core_busy    ◄── [Compute Status]   - reg_hdim   ──► [Head Dim d_k]    |  |
-  |  |   - 0x18: HEAD_DIM (d_k=32)       - done_pulse   ◄── [Pipeline Done]    - reg_heads  ──► [Num Heads H]     |  |
-  |  +-------------------------------------+----------------------------------------------------------------------+  |
-  |                                        |                                                                         |
-  |                                        | Control & Config Routing (start_tile, mode_sel, ping_pong_sel)          |
-  |                                        v                                                                         |
-  |  +------------------------------------------------------------------------------------------------------------+  |
-  |  | DATA PATH: PIPELINED MULTI-HEAD ATTENTION ENGINE                                                           |  |
-  |  |                                                                                                            |  |
-  |  |   AXI-Stream RX Adapter                                                                                    |  |
-  |  |   +-------------------+                                                                                    |  |
-  |  |   | axis_adapter_rx   |====/ (64-bit Internal Data Stream / Handshake Control) ===+                        |  |
-  |  |   +-------------------+   64                                                      |                        |  |
-  |  |                                                                                   v                        |  |
-  |  |                                                                     +----------------------------+         |  |
-  |  |                                                                     | Input Ping-Pong BRAM       |         |  |
-  |  |                                                                     | (ping_pong_bram_buffer.sv) |         |  |
-  |  |                                                                     | [Q_RAM] [K_RAM] [V_RAM]    |         |  |
-  |  |                                                                     +--------------+-------------+         |  |
-  |  |                                                                                    | (INT8 Vector)         |  |
-  |  |                                                                                    v                       |  |
-  |  |                                                                     +----------------------------+         |  |
-  |  |                                                                     | STAGE 1: QK^T GEMM Engine  |         |  |
-  |  |                                                                     | (systolic_mac_array.sv)    |         |  |
-  |  |                                                                     | [2x INT8 DSP Packing]      |         |  |
-  |  |                                                                     +--------------+-------------+         |  |
-  |  |                                                                                    | (INT32 Partial Sum)   |  |
-  |  |                                                                                    v                       |  |
-  |  |                                                                     +----------------------------+         |  |
-  |  |                                                                     | STAGE 2: Scaler Unit       |         |  |
-  |  |                                                                     | (scale_unit.sv)            |         |  |
-  |  |                                                                     | [ASR Shift 1/sqrt(d_k)]    |         |  |
-  |  |                                                                     +--------------+-------------+         |  |
-  |  |                                                                                    | (INT16 Scaled Score)  |  |
-  |  |                                                                                    v                       |  |
-  |  |                                                                     +----------------------------+         |  |
-  |  |                                                                     | STAGE 3: Hardware Softmax  |         |  |
-  |  |                                                                     | (softmax_lut.sv)           |         |  |
-  |  |                                                                     | [Max-Sub + Exp LUT + Div]  |         |  |
-  |  |                                                                     +--------------+-------------+         |  |
-  |  |                                                                                    | (INT8 Probability)    |  |
-  |  |                                                                                    v                       |  |
-  |  |                                                                     +----------------------------+         |  |
-  |  |                                                                     | STAGE 4: Score x V GEMM    |         |  |
-  |  |                                                                     | (systolic_mac_array.sv)    |         |  |
-  |  |                                                                     +--------------+-------------+         |  |
-  |  |                                                                                    | (INT8 Output Tokens)  |  |
-  |  |                                                                                    v                       |  |
-  |  |                                                                     +----------------------------+         |  |
-  |  |                                                                     | Output Ping-Pong Buffer    |         |  |
-  |  |                                                                     +--------------+-------------+         |  |
-  |  |                                                                                    |                       |  |
-  |  |   AXI-Stream TX Adapter                                                            |                       |  |
-  |  |   +-------------------+                                                            |                       |  |
-  |  |   | axis_adapter_tx   |<====/ (64-bit Internal Data / Handshake) =================-+                       |  |
-  |  |   +-------------------+   64                                                                               |  |
-  |  +------------------------------------------------------------------------------------------------------------+  |
-  +------------------------------------------------------------------------------------------------------------------+
+       ARM Cortex-A53 PS (PYNQ Driver / Linux Host)                     AXI Direct Memory Access (DMA Engine)
+  +----------------------------------------------------+          +-----------------------------------------------+
+  | AXI4-Lite Master (Memory-Mapped Bus)               |          | Simple DMA MM2S (Read DDR4) -> Stream Master  |
+  | Regs: 0x00=CTRL, 0x04=STATUS, 0x10=N, 0x14=dk, ... |          | Simple DMA S2MM (Write DDR4) <- Stream Slave  |
+  +-------------------------+--------------------------+          +-----------+-----------------------+-----------+
+                            |                                                 |                       ^
+                            | AXI4-Lite (32-bit Control / CSR)                | AXI4-Stream            | AXI4-Stream
+                            | (awaddr, wdata, araddr, rdata)                  | RX (128-bit Ingress)   | TX (128-bit Egress)
+                            v                                                 v                       |
+  +-------------------------------------------------------------------------------------------------------------------+
+  | ATTENTION CORE TOP-LEVEL SHELL (attention_core_top_*.sv)                                                          |
+  |                                                                                                                   |
+  |  +-------------------------------------------------------------------------------------------------------------+  |
+  |  | CONTROL PLANE: AXI4-Lite Register File & Sequential Head Controller (axi_lite_regs.sv)                      |  |
+  |  |   - 0x00: CONTROL [START, CLEAR_BUF, SOFT_RESET]  - 0x20: SCALE_M (16-bit signed mantissa: 27640)           |  |
+  |  |   - 0x04: STATUS  [BUSY, DONE, ERROR, BANK_SEL]   - 0x24: SCALE_E (5-bit shift exponent: 22)               |  |
+  |  |   - 0x10: SEQ_LEN (N in {256, 64, 16} dynamic)    - 0x40: LUT_WR_ADDR (10-bit BRAM ROM write address)       |  |
+  |  |   - 0x14: HEAD_DIM (d_k = 16, 20, 24)             - 0x44: LUT_WR_DATA (20-bit BRAM ROM write data)          |  |
+  |  |   - 0x18: NUM_HEADS (H = 4 sequential heads)                                                                |  |
+  |  +---------------------------------------------------+---------------------------------------------------------+  |
+  |                                                      |                                                            |
+  |                                                      | Control Wires: start_pulse, reg_head_dim, cfg_lut_*        |
+  |                                                      v                                                            |
+  |  +-------------------------------------------------------------------------------------------------------------+  |
+  |  | DATA PLANE: STREAMING ATTENTION PIPELINE                                                                    |  |
+  |  |                                                                                                             |  |
+  |  |  AXI-Stream RX Skid Buffer                                                                                  |  |
+  |  |  +------------------+                                                                                       |  |
+  |  |  | axis_adapter_rx  |===(128-bit Stream with Backpressure TVALID/TREADY/TLAST)===+                       |  |
+  |  |  +------------------+                                                           |                            |  |
+  |  |                                                                                 v                            |  |
+  |  |                                                             +---------------------------------------+        |  |
+  |  |                                                             | Ingress Multi-Bank Buffer             |        |  |
+  |  |                                                             | FSM nạp đủ Q -> K -> V (768 beats)    |        |  |
+  |  |                                                             | On-chip BRAM (q_mem, k_mem, v_mem)    |        |  |
+  |  |                                                             +-------------------+-------------------+        |  |
+  |  |                                                                                 |                            |  |
+  |  |                                                                                 v                            |  |
+  |  |                                                             +---------------------------------------+        |  |
+  |  |                                                             | STAGE 1: QK^T GEMM Engine             |        |  |
+  |  |                                                             | Nhân song song d_k chiều (INT32)      |        |  |
+  |  |                                                             +-------------------+-------------------+        |  |
+  |  |                                                                                 | (INT32 Raw Scores)         |  |
+  |  |                                                                                 v                            |  |
+  |  |                                                             +---------------------------------------+        |  |
+  |  |                                                             | STAGE 2: Dyadic Rescaler Unit         |        |  |
+  |  |                                                             | (Score x M) >>> E -> INT16 Clamped    |        |  |
+  |  |                                                             +-------------------+-------------------+        |  |
+  |  |                                                                                 | (INT16 Scaled Scores)      |  |
+  |  |                                                                                 v                            |  |
+  |  |                                                             +---------------------------------------+        |  |
+  |  |                                                             | STAGE 3: Reconfigurable Softmax Engine|        |  |
+  |  |                                                             | True Dual-Port 1024w BRAM Exp ROM     |        |  |
+  |  |                                                             | 32-step Restoring Divider -> UINT16   |        |  |
+  |  |                                                             +-------------------+-------------------+        |  |
+  |  |                                                                                 | (UINT16 Probabilities)     |  |
+  |  |                                                                                 v                            |  |
+  |  |                                                             +---------------------------------------+        |  |
+  |  |                                                             | STAGE 4: Score x V Context GEMM       |        |  |
+  |  |                                                             | Tích lũy 256 tokens, >>> 15, INT8 Out |        |  |
+  |  |                                                             +-------------------+-------------------+        |  |
+  |  |                                                                                 |                            |  |
+  |  |                                                                                 v                            |  |
+  |  |  AXI-Stream TX Interface                                                        |                            |  |
+  |  |  +------------------+                                                           |                            |  |
+  |  |  | m_axis_tdata     |<==========================================================+                            |  |
+  |  |  | 256 beats / head |                                                                                        |  |
+  |  |  +------------------+                                                                                        |  |
+  |  +-------------------------------------------------------------------------------------------------------------+  |
+  +-------------------------------------------------------------------------------------------------------------------+
 ```
 
-### 2. Bảng Mô Tả Tín Hiệu & Định Tuyến (Interface Signal & Routing Table)
+---
 
-| Nhóm Giao diện | Tên Tín hiệu (Signal) | Hướng | Độ rộng bit | Ý nghĩa Kỹ thuật & Định tuyến |
-| :--- | :--- | :--- | :--- | :--- |
-| **Clock & Reset** | `clk` | Input | 1 bit | Xung clock hệ thống PL (Tần số danh định 200 MHz). |
-| | `rst_n` | Input | 1 bit | Reset tích cực mức thấp (Asynchronous Assert, Sync Deassert). |
-| **AXI4-Lite Slave**<br />*(Control Plane)* | `s_axi_awaddr` | Input | 8 bits | Địa chỉ ghi Memory-Mapped (Offsets 0x00 - 0x1C). |
-| | `s_axi_awvalid` / `s_axi_awready` | In / Out | 1 bit | Handshake kênh địa chỉ ghi (Address Write). |
-| | `s_axi_wdata` | Input | 32 bits | Dữ liệu ghi cấu hình tham số từ CPU ARM. |
-| | `s_axi_wstrb` | Input | 4 bits | Strobe chọn byte ghi hợp lệ (Byte Enables). |
-| | `s_axi_wvalid` / `s_axi_wready` | In / Out | 1 bit | Handshake kênh dữ liệu ghi (Data Write). |
-| | `s_axi_bresp` / `s_axi_bvalid` / `s_axi_bready` | Out / In | 2 / 1 / 1 | Kênh phản hồi trạng thái ghi (Write Response). |
-| | `s_axi_araddr` / `s_axi_arvalid` / `s_axi_arready` | In / In / Out | 8 / 1 / 1 | Handshake kênh địa chỉ đọc (Address Read). |
-| | `s_axi_rdata` / `s_axi_rresp` / `s_axi_rvalid` / `s_axi_rready` | Out / In | 32 / 2 / 1 / 1 | Kênh trả dữ liệu đọc CSR (Read Data/Response). |
-| **AXI4-Stream RX**<br />*(Data Ingress)* | `s_axis_tdata` | Input | 64 bits | Payload tensor đầu vào ($8 \times \text{INT8}$ tokens $Q, K, V$). |
-| | `s_axis_tkeep` | Input | 8 bits | Strobe đánh dấu các lane byte hợp lệ. |
-| | `s_axis_tlast` | Input | 1 bit | Cờ đánh dấu word cuối cùng của Packet/Tile. |
-| | `s_axis_tvalid` / `s_axis_tready` | In / Out | 1 bit | Bắt tay ngắt luồng (Backpressure Handshake). |
-| **AXI4-Stream TX**<br />*(Data Egress)* | `m_axis_tdata` | Output | 64 bits | Payload tensor kết quả Attention ($8 \times \text{INT8}$ tokens). |
-| | `m_axis_tkeep` / `m_axis_tlast` | Output | 8 / 1 bit | Strobe byte và Cờ báo kết thúc packet đầu ra. |
-| | `m_axis_tvalid` / `m_axis_tready` | Out / In | 1 bit | Bắt tay đẩy dữ liệu ra AXI DMA S2MM. |
-| **Nội bộ (Internal Routing)** | `cfg_start_pulse` | Internal | 1 bit | Xung kích hoạt FSM bắt đầu tính toán. |
-| | `cfg_nbytes` / `cfg_tokens` / `cfg_hdim` | Internal | 32 bits | Kích thước Packet (bytes), $N=196$, $d_k=32$. |
-| | `core_busy` / `core_done` / `core_error` | Internal | 1 bit | Tín hiệu trạng thái FSM gửi ngược về CSR 0x00. |
+## 2. BẢN ĐỒ THANH GHI AXI4-LITE CSR (REGISTER MAP)
 
-### 3. Sơ đồ ASMD Chart Điều Khiển Trung Tâm (Central ASMD Chart)
+| Offset Địa chỉ | Tên Thanh Ghi | Quyền | Reset Value | Mô tả Kỹ Thuật |
+|:---:|:---|:---:|:---:|:---|
+| `0x00` | **CONTROL** | R/W | `0x0000_0000` | Bit [0]: START (tự động xóa sau 1 nhịp)<br>Bit [1]: CLEAR_BUF (xóa bộ đệm)<br>Bit [2]: SOFT_RESET (reset mềm) |
+| `0x04` | **STATUS** | RO | `0x0000_0000` | Bit [0]: BUSY (1 = Core đang tính toán)<br>Bit [1]: DONE (1 = Hoàn thành toàn bộ Heads)<br>Bit [2]: ERROR<br>Bit [3]: PP_BANK (Bank đang đọc) |
+| `0x08` | **NBYTES** | R/W | `0x0000_1000` | Tổng số bytes truyền nhận cho một giao dịch DMA |
+| `0x0C` | **CORE_ID** | RO | `0x5649_5432` | Mã định danh phần cứng (`"VIT2"`) |
+| `0x10` | **SEQ_LEN** | R/W | `0x0000_0100` | Chiều dài chuỗi token $N = 256$ (MobileViT-XXS) |
+| `0x14` | **HEAD_DIM** | R/W | `0x0000_0010` | Số chiều mỗi Head: `16` (Stage 2), `20` (Stage 3), `24` (Stage 4) |
+| `0x18` | **NUM_HEADS** | R/W | `0x0000_0004` | Số lượng Heads tuần tự: $H = 4$ |
+| `0x20` | **SCALE_M** | R/W | `0x0000_6BF8` | Hệ số nhân Dyadic Mantissa 16-bit (Stage 2 mặc định: $M = 27640$) |
+| `0x24` | **SCALE_E** | R/W | `0x0000_0016` | Số bit dịch Dyadic Exponent 5-bit (mặc định: $E = 22$) |
+| `0x40` | **LUT_WR_ADDR**| R/W | `0x0000_0000` | Địa chỉ nạp BRAM Softmax LUT Port B (0..1023) |
+| `0x44` | **LUT_WR_DATA**| R/W | `0x0000_0000` | Dữ liệu 20-bit ghi vào BRAM Exp ROM tại địa chỉ `LUT_WR_ADDR` |
 
-```text
-                                +-------------------+
-                                |     ST_RESET      |
-                                |  busy      = 0    |
-                                |  done_flag = 0    |
-                                |  error_flag= 0    |
-                                +---------+---------+
-                                          |
-                                          v
-                                +-------------------+
-                                |      ST_IDLE      | <--------------------+
-                                |  busy = 0         |                      |
-                                +---------+---------+                      |
-                                          |                                |
-                                   (start_pulse == 1)                      |
-                                    /           \                          |
-                                  YES            NO                        |
-                                  /                \                       |
-                                 v                  +----------------------+
-                       (reg_nbytes Valid?)
-                         /            \
-                        YES            NO
-                       /                \                    
-                      v                 v
-            +-------------------+     +-------------------+
-            |     ST_ACTIVE     |     |     ST_ERROR      |
-            | busy         = 1  |     | error_flag = 1    |
-            | remaining <= nbyte|     | busy       = 0    |
-            +---------+---------+     +---------+---------+
-                      |                         |
-                      v                         v
-            (Transfer_In Event?)          (Host Clear?)
-             /            \                 /          \       
-            YES             NO             YES         NO
-           /                \             /              \         
-          v                  v           v               v
-    [remaining <=       (Keep Wait)  ST_IDLE        ST_ERROR
-     remaining - 8]
-          |
-          v
-    (remaining == 0 || TLAST?)
-     /                  \
-     YES                NO
-   /                     \
-  v                       v
-+-------------------+  ST_ACTIVE
-|      ST_DONE      |
-| done_flag  <= 1   |
-| busy       <= 0   |
-+---------+---------+
-          |
-          v
-       ST_IDLE
+---
+
+```
+ ┌────────────────────────────────────────────────────────┐
+ │            Zynq UltraScale+ MPSoC (PS)                 │
+ │  - pl_clk0: 170MHz / 200MHz                            │
+ │  - M_AXI_HPM0_FPD (AXI Master điều khiển CSR & DMA)    │
+ │  - S_AXI_HP0_FPD  (AXI Slave nhận DMA đọc/ghi DDR4)    │
+ └──────────────┬────────────────────────▲────────────────┘
+                │                        │
+        [AXI SmartConnect]               │ (DMA Bus 128-bit)
+        ┌───────┴────────┐               │
+        │                │               │
+        ▼                ▼               │
+ ┌─────────────┐  ┌──────────────┐       │
+ │ AXI-Lite    │  │   AXI DMA    ├───────┘
+ │ Regs (CSR)  │  │  Controller  │
+ └──────┬──────┘  └──────┬───────┘
+        │                │
+        │                ├─► S_AXIS_MM2S (128-bit Stream nạp Q, K, V)
+        ▼                │
+ ┌───────────────────────▼───────────────┐
+ │       ATTENTION CORE IP (PL)          │
+ │  - Ingress: 128-bit Stream            │
+ │  - Egress : 128-bit Stream            │
+ └───────────────────────┬───────────────┘
+                         │
+                         └─► M_AXIS_S2MM (128-bit Stream trả Context Out về DMA)
 ```
 
-```verilog
-// Định nghĩa Trạng thái theo chuẩn Pong P. Chu
-typedef enum logic [2:0] {
-    ST_RESET  = 3'b000,
-    ST_IDLE   = 3'b001,
-    ST_ACTIVE = 3'b010,
-    ST_DONE   = 3'b011,
-    ST_ERROR  = 3'b100
-} state_t;
+## 3. PHÂN TÍCH BĂNG THÔNG & ĐỘ TRỄ (BANDWIDTH & LATENCY MODEL)
 
-state_t state_reg, state_next;
+### 3.1 Lưu lượng dữ liệu trên 1 Head ($N=256, d_k=16$ trên bus 128-bit Native):
+1. **Dữ liệu nạp Ingress (PS -> PL qua DMA MM2S):**
+   - Ma trận Q: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies \mathbf{256\text{ beats (128-bit)}}$.
+   - Ma trận K: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies \mathbf{256\text{ beats (128-bit)}}$.
+   - Ma trận V: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies \mathbf{256\text{ beats (128-bit)}}$.
+   - **Tổng lưu lượng Ingress:** $\mathbf{768\text{ beats}} = 12,288\text{ bytes}$ (giảm 50% số nhịp so với bus 64-bit).
+2. **Dữ liệu xuất Egress (PL -> PS qua DMA S2MM):**
+   - Ma trận Context Output: $256 \times 16 \text{ bytes} = 4,096\text{ bytes} \implies \mathbf{256\text{ beats (128-bit)}}$.
 
-// FSM Next-State & Register Transfer Logic
-always_comb begin
-    state_next = state_reg;
-    case (state_reg)
-        ST_IDLE: begin
-            if (start_pulse) begin
-                if (reg_nbytes > 0 && reg_nbytes <= 32'h03FFFFFF)
-                    state_next = ST_ACTIVE;
-                else
-                    state_next = ST_ERROR;
-            end
-        end
-        ST_ACTIVE: begin
-            if (input_fire && (remaining <= 8 || s_axis_tlast))
-                state_next = ST_DONE;
-            else if (framing_error)
-                state_next = ST_ERROR;
-        end
-        ST_DONE:  state_next = ST_IDLE;
-        ST_ERROR: if (clear_pulse) state_next = ST_IDLE;
-        default:  state_next = ST_IDLE;
-    endcase
-end
-```
+### 3.2 Chu kỳ thực thi thực tế (Verified Hardware Cycles):
+Tại tần số danh định **$200\text{ MHz}$** ($T_{\text{clk}} = 5.0\text{ ns}$) trên AMD Kria KV260:
+- **Variant 1A (Vector Streaming Fabric Tree, 0 DSP):**
+  - Chu kỳ đo được: **209,663 cycles / head** ($\approx 1.048\text{ ms}$, thông lượng $\approx 238.4\text{ FPS}$).
+- **Variant 2A (Even/Odd Streaming, 8 DSP Packing):**
+  - Chu kỳ đo được: **209,919 cycles / head** ($\approx 1.050\text{ ms}$, thông lượng $\approx 238.1\text{ FPS}$).
+- **Variant 3B (2D Systolic MAC Array, 16 DSPs):**
+  - Chu kỳ đo được: **337,216 cycles / head** ($\approx 1.686\text{ ms}$, thông lượng $\approx 148.2\text{ FPS}$).
+- Băng thông AXI4-Stream trung bình: $\approx 3.2\text{ GB/s}$ (tương thích hoàn hảo với cổng HP AXI 128-bit của Zynq UltraScale+).
 
-### 4. Bảng Tính Toán Thời Gian & Băng Thông Thực Tế Cho MobileViT-XXS
-
-Xét cấu hình mô hình tiêu chuẩn: Số Token $N = 196$, Chiều ẩn Head $d_k = 32$, Số Head $H = 2$, Kiểu dữ liệu $I_X \in \text{INT8}$ (1 byte/element):
-
-| Hạng mục Tính toán | Công thức Toán học | Giá trị Số học | Số Chu kỳ Clock ($C_{transfer}$) | Thời gian Truyền ($T_{time}$) |
-| ------ | ------ | ------ | ------ | ------ |
-| **Kích thước Ma trận $Q, K, V$** | $3 \times (N \times d_k) \times 1 \text{ byte}$ | $3 \times 196 \times 32 = 18,816 \text{ Bytes}$ | 2,352 beats ($64\text{-bit}$) | $11.76 \, \mu\text{s}$ (ở $\eta = 1.0$) |
-| **Kích thước Score Matrix ($QK^T$)** | $H \times (N \times N) \times 1 \text{ byte}$ | $2 \times 196 \times 196 = 76,832 \text{ Bytes}$ | *Lưu nội bộ On-Chip BRAM* | **$0.00 \, \mu\text{s}$ (Zero AXI Traffic)** |
-| **Kích thước Output Tokens** | $(N \times (H \cdot d_k)) \times 1 \text{ byte}$ | $196 \times 64 = 12,544 \text{ Bytes}$ | 1,568 beats ($64\text{-bit}$) | $7.84 \, \mu\text{s}$ (ở $\eta = 1.0$) |
-| **Tổng Dữ liệu Giao tiếp AXI** | $D_{total} = D_{in} + D_{out}$ | **$31,360 \text{ Bytes}$** | **3,920 beats** | **$19.60 \, \mu\text{s}$** |
-| **Tiết kiệm Băng thông Bus nhờ On-chip Score Buffer** | $\frac{D_{score}}{D_{total} + D_{score}}$ | **Tiết kiệm $71.0\%$ băng thông AXI** | Triệt tiêu 9,604 beats nạp DRAM | Giảm $48.02 \, \mu\text{s}$ trễ bus DRAM |

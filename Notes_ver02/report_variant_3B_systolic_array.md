@@ -349,3 +349,20 @@ Toàn bộ 5/5 bài kiểm tra trong [run_verifications_3B.bat](file:///c:/Users
 4. `tb_score_v_gemm.sv` (128-bit): **256 beats / 4,096 bytes khớp 100% [PASS]**.
 5. `tb_attention_core_3B.sv` (Top 128-bit): **4,096 / 4,096 bytes Egress khớp 100% [PASS]**, thực thi trong **337,216 chu kỳ xung nhịp**, cờ `m_axis_tlast` khẳng định chính xác tại beat 255.
 
+
+
+---
+
+### 10.5. Kế Hoạch & Kết Quả Nâng Cấp v3.0 (Dynamic Token Length $N \in \{256, 64, 16\}$)
+
+Vào ngày **02/11/2026**, kiến trúc 2D Systolic Array Variant 3B đã hoàn tất nâng cấp và thẩm định toàn diện lên phiên bản **v3.0**:
+- **Cải tiến RTL:** Cập nhật `attention_core_top_3B.sv`, `softmax_lut.sv`, `score_v_gemm.sv` tiếp nhận `reg_seq_len` (CSR `0x10`) và điều khiển dynamic loop bounds cho $N \in \{256, 64, 16\}$.
+- **Kết quả đo chu kỳ xung nhịp thực tế (Isolated Stage DV):**
+  * Stage 2 ($N=256, d_k=16$): **337,472 chu kỳ** (~1.69 ms @ 200MHz), 4,096 bytes Egress khớp 100% Bit-Exact (0-LSB).
+  * Stage 3 ($N=64, d_k=20$): **23,888 chu kỳ** (~119.44 $\mu$s @ 200MHz), 1,280 bytes Egress khớp 100% Bit-Exact. **Tăng tốc 14.13x** so với Stage 2!
+  * Stage 4 ($N=16, d_k=24$): **2,092 chu kỳ** (~10.46 $\mu$s @ 200MHz), 384 bytes Egress khớp 100% Bit-Exact. **Tăng tốc 161.32x** so với Stage 2!
+- **Chuỗi liên hoàn 3 tầng không reset phần cứng (`tb_multi_stage_seq_3B.sv`):**
+  * Tổng thời gian thực thi: **363,437 chu kỳ xung nhịp (~1.817 ms @ 200MHz)**.
+  * Tổng số bytes kiểm tra: **5,760 / 5,760 bytes (0-LSB Mismatch, PASS 100%)**.
+  * So với bản cũ cố định 256 tokens (1,036,721 cycles), thời gian thực thi giảm **64.9%** ($\approx 2.85\text{x}$ speedup)!
+- **Đồng bộ hóa Unit Test:** Các testbench đơn vị đa tầng `tb_golden_scale_unit.sv`, `tb_golden_softmax_lut.sv`, `tb_score_v_gemm.sv` đã đồng bộ hoàn chỉnh sang `rtl_ver02_3B`.

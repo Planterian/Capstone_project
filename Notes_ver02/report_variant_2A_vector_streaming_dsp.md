@@ -287,3 +287,50 @@ Toàn bộ 5/5 bài kiểm tra trong [run_verifications_2A.bat](file:///c:/Users
 4. `tb_score_v_gemm.sv` (128-bit): **256 beats / 4,096 bytes khớp 100% [PASS]**.
 5. `tb_attention_core_2A.sv` (Top 128-bit): **4,096 / 4,096 bytes Egress khớp 100% [PASS]**, thực thi trong **209,919 chu kỳ xung nhịp**, cờ `m_axis_tlast` khẳng định chính xác tại beat 255.
 
+
+
+---
+
+### 9.5. Kế Hoạch & Kết Quả Nâng Cấp v3.0 (Dynamic Token Length $N \in \{256, 64, 16\}$)
+
+Vào ngày **02/11/2026**, hệ thống được nâng cấp toàn diện lên phiên bản **v3.0** nhằm loại bỏ sự cưỡng ép token cố định $N=256$, thích ứng trọn vẹn với các tầng mạng thực tế của `apple/mobilevit-xx-small`.
+
+#### 1. Cải tiến phần cứng RTL Core
+- **Top Core (`attention_core_top_2A.sv`)**: Nối cổng CSR `reg_seq_len` (tại thanh ghi địa chỉ `0x10`) vào điều khiển biên giới hạn vòng lặp `max_k_pair_idx = (reg_seq_len >> 1) - 1`, chỉ số hàng Query `q_row_idx == reg_seq_len - 1`, và chỉ số nạp Value `v_tok_rd_idx == reg_seq_len - 1`.
+- **Softmax LUT (`softmax_lut.sv`)**: Tích hợp cờ kết thúc FSM động `eff_seq_len = (seq_len == 0) ? 256 : seq_len`, thay thế toàn bộ biên so sánh cứng `N_TOKENS` ở các trạng thái tìm Max, tính Exp Accumulator, và chuẩn hóa xác suất.
+- **Context GEMM (`score_v_gemm.sv`)**: Cập nhật điều kiện kích hoạt `m_axis_tlast = (row_cnt == eff_seq_len - 1) && ...`, đảm bảo không gây treo kênh DMA PL-to-PS trên KV260.
+
+#### 2. Kết Quả Thẩm Định Đa Tầng Của Biến Thể 2A (Isolated & Sequential Multi-Stage DV)
+- **Stage 2 ($N=256, d_k=16$):** 210,183 chu kỳ (~1.05 ms @ 200MHz), 4,096 bytes Egress khớp 100% Bit-Exact (0-LSB).
+- **Stage 3 ($N=64, d_k=20$):** **17,791 chu kỳ (~88.95 $\mu$s @ 200MHz)**, 1,280 bytes Egress khớp 100% Bit-Exact. **Tăng tốc 11.81x** so với Stage 2 (và tăng tốc 13.65x so với bản cũ v2.0)!
+- **Stage 4 ($N=16, d_k=24$):** **1,759 chu kỳ (~8.79 $\mu$s @ 200MHz)**, 384 bytes Egress khớp 100% Bit-Exact. **Tăng tốc 119.49x** so với Stage 2 (và tăng tốc 138.11x so với bản cũ v2.0)!
+- **Chuỗi liên hoàn 3 tầng không reset phần cứng (`tb_multi_stage_seq_2A.sv`):**
+  * Tổng thời gian thực thi: **229,710 chu kỳ xung nhịp (~1.148 ms @ 200MHz)**.
+  * Tổng số bytes kiểm tra: **5,760 / 5,760 bytes (0-LSB Mismatch)**.
+  * Tăng tốc tổng thể: **3.03 lần** so với bản cũ (giảm từ 695,790 cycles xuống còn 229,710 cycles).
+
+#### 3. Bảng Thẩm Định Bộ Testbench Khối Con Đa Tầng (Multi-Stage Sub-block Unit Tests)
+Bộ kiểm tra tự động `run_verifications_2A.bat` kiểm định 5/5 module con:
+1. `tb_dsp_packed_adder_tree_2A.sv`: **69,888 / 69,888 scores 100% Bit-Exact (0 Mismatch) [PASS]**
+2. `tb_golden_scale_unit.sv`: **69,888 / 69,888 elements 100% Bit-Exact (0 Mismatch) [PASS]**
+3. `tb_golden_softmax_lut.sv`: **69,888 / 69,888 probs 100% Bit-Exact (0 Mismatch) [PASS]**
+4. `tb_score_v_gemm.sv`: **5,760 / 5,760 context bytes 100% Bit-Exact (0 Mismatch) [PASS]**
+5. `tb_attention_core_2A.sv`: **4,096 / 4,096 bytes Top-level 100% Bit-Exact (0 Mismatch) [PASS]**
+$\implies$ **ALL 5 VARIANT 2A VERIFICATIONS PASSED 100% BIT-EXACT!**
+
+---
+
+## 10. TỔNG HỢP VẬT LÝ VÀ XUẤT BITSTREAM VIVADO 2026.1 TRÊN KRIA KV260
+
+- **Nền tảng phần cứng đích:** AMD Kria KV260 Vision AI Starter Kit (`xck26-sfvc784-2LV-c`).
+- **Thời gian tổng hợp:** 25 phút 35 giây (chạy an toàn 2 luồng `-jobs 2` bảo vệ nhiệt độ CPU laptop).
+- **Kết quả kiểm tra quy tắc thiết kế (DRC):** **0 Errors, 0 Critical Warnings**.
+- **Hardware Artifacts sinh ra:**
+  * `attention_core_top_2A.bit` (7,797,909 bytes)
+  * `attention_core_top_2A.hwh` (337,592 bytes)
+  * `attention_core_top_2A.xsa` (1,267,181 bytes)
+- **Đã đồng bộ sang thư mục phần mềm:**
+  * `Project/src/Software/`
+  * `Project/src/Software/03_ivit_hw_accelerated/overlay/`
+  * `Project/src/Software/04_all_9_transformers_hw/overlay/`
+Sẵn sàng cho việc thực thi hook Python offload toàn bộ 9 khối Transformer trên bo mạch thực tế.

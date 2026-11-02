@@ -32,15 +32,15 @@ Thuật toán Softmax số nguyên trong **I-ViT (Shiftmax)** được xây dự
                                      HARDWARE SOFTMAX ENGINE PIPELINE (softmax_lut.sv)
 ========================================================================================================================
 
-    in_score [15:0] (INT16, 256 tokens per row)
+    in_score [15:0] (INT16, N in {256, 64, 16} tokens per row)
           │
           +-------------------------------------------------------------+
           |                                                             |
           v                                                             v
     +-------------------------------------------+             +-----------------------------------+
     | Pass 1: Max-Finder Comparator & Buffer    |             | 1024-Word True Dual-Port BRAM     |
-    | - score_buffer [0..255]                   |             | (* ram_style = "block" *)         |
-    | - S_max = max(Score_0 .. Score_255)       |             | Port A: rom_addr_stage (Doc LUT)  |
+    | - score_buffer [0..N-1] (tối đa 255)       |             | (* ram_style = "block" *)         |
+    | - S_max = max(Score_0 .. Score_N-1)       |             | Port A: rom_addr_stage (Doc LUT)  |
     +---------------------+---------------------+             | Port B: cfg_addr, cfg_wdata (CSR) |
                           │                                   +-----------------+-----------------+
                           v  Delta = S_max - Score_i                            │

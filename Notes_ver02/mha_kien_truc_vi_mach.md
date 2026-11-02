@@ -26,8 +26,8 @@ Sơ đồ kết nối phân định ranh giới giữa **Processing System (ARM 
    +-------------------------------------------------------------------------------------------------------------------+
    | AXI4-Lite Slave Register File & Central Controller (axi_lite_regs.sv)                                             |
    |   - Reg 0x00: CONTROL [0: START, 1: CLEAR_BUF, 2: SOFT_RESET]  - Reg 0x18: NUM_HEADS (H = 4)                     |
-   |   - Reg 0x04: STATUS  [0: BUSY, 1: DONE, 2: ERROR, 3: PP_BANK] - Reg 0x20: SCALE_M (Dyadic Mantissa M = 27640)   |
-   |   - Reg 0x10: SEQ_LEN (N = 256)                                - Reg 0x24: SCALE_E (Dyadic Exponent E = 22)      |
+   |   - Reg 0x04: STATUS  [0: BUSY, 1: DONE, 2: ERROR, 3: PP_BANK] - Reg 0x20: SCALE_M (Dyadic Mantissa M)           |
+   |   - Reg 0x10: SEQ_LEN (N in {256, 64, 16} Dynamic)             - Reg 0x24: SCALE_E (Dyadic Exponent E = 22)      |
    |   - Reg 0x14: HEAD_DIM (d_k = 16, 20, 24)                      - Reg 0x40/0x44: BRAM LUT Reload Window (Step 2.5) |
    +---------------------------------------------------+---------------------------------------------------------------+
                                                        | (Control Signals: start_pulse, cfg_lut_*, reg_scale_*)
@@ -347,7 +347,7 @@ Ensure:  Context output token vector o_i = O[i, 0 : d_k-1] in INT8.
 
 | Hạng mục thiết kế | Phiên bản cũ (`Notes/`) | Phiên bản chuẩn hóa hiện tại (`Notes_ver02/`) | Lý do kỹ thuật / Căn cứ sửa đổi |
 |---|---|---|---|
-| **Mô hình mục tiêu** | ViT tiêu chuẩn ($N=196, d_k=32, H=12$) | **Apple MobileViT-XXS** ($N=256, d_k \in \{16, 20, 24\}, H=4$) | Khớp cấu trúc MobileViT trích xuất từ Hugging Face |
+| **Mô hình mục tiêu** | ViT tiêu chuẩn ($N=196, d_k=32, H=12$) | **Apple MobileViT-XXS** ($N \in \{256, 64, 16\}, d_k \in \{16, 20, 24\}, H=4$) | Khớp cấu trúc MobileViT trích xuất từ Hugging Face |
 | **Cơ chế thu phóng (Scaler)** | Dịch phải thuần túy $\text{ASR} \gg 2$ hoặc $3$ (0 DSPs) | **Dyadic Rescaler:** $(S \times M) \ggg E$ với $M=27640, E=22$ | $1/\sqrt{20}$ và $1/\sqrt{24}$ không thể biểu diễn bằng phép dịch bit |
 | **Độ phân giải Softmax** | UINT8 $[0, 255]$ (bộ chia xấp xỉ tổ hợp) | **UINT16 $[0, 32767]$** (Bộ chia lặp 32 chu kỳ khôi phục số dư) | Khớp 100% Bit-Exact với toán tử `IntSoftmax` của I-ViT |
 | **Bảng tra hàm mũ Exp ROM** | ROM tĩnh 256 từ (gán cứng $e^x$) | **True Dual-Port BRAM 1024 từ $\times$ 20-bit** có nạp lại qua CSR | Hỗ trợ 3 Stages linh hoạt thông qua phần mềm cấu hình |

@@ -29,7 +29,7 @@
   |  | CONTROL PLANE: AXI4-Lite Register File & Sequential Head Controller (axi_lite_regs.sv)                      |  |
   |  |   - 0x00: CONTROL [START, CLEAR_BUF, SOFT_RESET]  - 0x20: SCALE_M (16-bit signed mantissa: 27640)           |  |
   |  |   - 0x04: STATUS  [BUSY, DONE, ERROR, BANK_SEL]   - 0x24: SCALE_E (5-bit shift exponent: 22)               |  |
-  |  |   - 0x10: SEQ_LEN (N = 256 tokens)                - 0x40: LUT_WR_ADDR (10-bit BRAM ROM write address)       |  |
+  |  |   - 0x10: SEQ_LEN (N in {256, 64, 16} dynamic)    - 0x40: LUT_WR_ADDR (10-bit BRAM ROM write address)       |  |
   |  |   - 0x14: HEAD_DIM (d_k = 16, 20, 24)             - 0x44: LUT_WR_DATA (20-bit BRAM ROM write data)          |  |
   |  |   - 0x18: NUM_HEADS (H = 4 sequential heads)                                                                |  |
   |  +---------------------------------------------------+---------------------------------------------------------+  |

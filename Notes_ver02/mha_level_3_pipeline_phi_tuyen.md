@@ -42,10 +42,10 @@ Tầng xử lý phi tuyến biến đổi các điểm số tích vô hướng t
    +-------------------------------------------------------------------------------------------------------------------+
    | STAGE 4: SCORE x V CONTEXT GEMM ENGINE (score_v_gemm.sv)                                                          |
    |                                                                                                                   |
-   |   1. Tích lũy 256 tokens: ctx_acc[d] += prob_data * V[token_idx, d]  (32 bộ tích lũy song song)                  |
+   |   1. Tích lũy N tokens:   ctx_acc[d] += prob_data * V[token_idx, d]  (32 bộ tích lũy song song, N in {256, 64, 16}) |
    |   2. Chuẩn hóa dịch phải: ctx_shifted[d] = ctx_acc[d] >>> 15                                                      |
    |   3. Kẹp bão hòa INT8:    [-128, +127]                                                                            |
-   |   4. Đóng gói Egress:     16 bytes INT8 -> 1 beat 128-bit; Xuất 256 beats/head (Stage 2); tlast tại beat 255      |
+   |   4. Đóng gói Egress:     16B/beat; Xuất N beats (dk<=16) hoặc 2N beats (dk>16); tlast tại beat cuối               |
    +-------------------------------------------------------------------------------------------------------------------+
 ```
 
@@ -73,9 +73,10 @@ Tầng xử lý phi tuyến biến đổi các điểm số tích vô hướng t
   - Sử dụng tử số chuẩn hóa $2^{31} - 1$, đầu ra xác suất đạt chuẩn UINT16 $[0, 32767]$ khớp từng bit (0-LSB error) với mô hình PyTorch I-ViT.
 
 ### 2.3 Khối Context GEMM (`score_v_gemm.sv`) & Giao Diện AXI4-Stream TX 128-Bit
-- **32 Bộ tích lũy song song:** Tích lũy liên tục qua 256 tokens (`ctx_acc[d] += prob_data * V[k, d]`), dịch phải 15 bits và kẹp bão hòa số nguyên INT8 $[-128, +127]$.
-- **Đóng gói Egress Native 128-bit (`AXIS_DATA_WIDTH = 128`):**
-  - **Với Stage 2 ($d_k \le 16$):** Mỗi hàng context xuất trong đúng **1 beat duy nhất** (`ST_OUT_BEAT0` ghép 16 bytes `ctx_safe[15:0]`). Toàn bộ 256 hàng xuất trọn vẹn trong **256 beats / head**, tín hiệu `m_axis_tlast` kích hoạt tại beat thứ 255.
-  - **Với Stage 3 & 4 ($d_k \in \{20, 24, 32\}$):** Mỗi hàng xuất trong **2 beats** (`ST_OUT_BEAT0` 16 bytes thấp, `ST_OUT_BEAT1` 16 bytes cao kèm mask `m_axis_tkeep`). Xuất trọn vẹn trong **512 beats / head**, `m_axis_tlast` kích hoạt tại beat thứ 511.
+- **32 Bộ tích lũy song song:** Tích lũy liên tục qua $N$ tokens động (`ctx_acc[d] += prob_data * V[k, d]`, với $N \in \{256, 64, 16\}$ theo từng Stage), dịch phải 15 bits và kẹp bão hòa số nguyên INT8 $[-128, +127]$.
+- **Đóng gói Egress Native 128-bit (`AXIS_DATA_WIDTH = 128`) thích ứng Dynamic Sequence Length $N$:**
+  - **Với Stage 2 ($N=256, d_k = 16$):** Mỗi hàng context xuất trong đúng **1 beat duy nhất** (`ST_OUT_BEAT0` ghép 16 bytes `ctx_safe[15:0]`). Toàn bộ 256 hàng xuất trọn vẹn trong **256 beats / head**, tín hiệu `m_axis_tlast` kích hoạt chính xác tại beat thứ 255.
+  - **Với Stage 3 ($N=64, d_k = 20$):** Mỗi hàng xuất trong **2 beats** (`ST_OUT_BEAT0` 16 bytes thấp, `ST_OUT_BEAT1` 4 bytes cao kèm mask `m_axis_tkeep = 16'h000F`). Xuất trọn vẹn trong **128 beats / head** ($64 \times 2$), `m_axis_tlast` kích hoạt chính xác tại beat thứ 127.
+  - **Với Stage 4 ($N=16, d_k = 24$):** Mỗi hàng xuất trong **2 beats** (`ST_OUT_BEAT0` 16 bytes thấp, `ST_OUT_BEAT1` 8 bytes cao kèm mask `m_axis_tkeep = 16'h00FF`). Xuất trọn vẹn trong **32 beats / head** ($16 \times 2$), `m_axis_tlast` kích hoạt chính xác tại beat thứ 31.
 - Hỗ trợ đầy đủ tín hiệu bắt tay backpressure AXI-Stream Egress (`m_axis_tready` / `m_axis_tvalid`).
 

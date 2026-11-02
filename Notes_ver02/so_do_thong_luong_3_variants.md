@@ -649,3 +649,39 @@ Mọi chi tiết thiết kế và mã nguồn mô phỏng có thể được tra
 * So sánh chi tiết Adder Tree vs Zero-Bubble Serializer: [`so_sanh_adder_tree_vs_zero_bubble_serializer.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes_ver02/so_sanh_adder_tree_vs_zero_bubble_serializer.md)
 * Phân tích kiến trúc vi mạch tổng thể: [`mha_kien_truc_vi_mach.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes_ver02/mha_kien_truc_vi_mach.md)
 * Báo cáo kiểm toán và kế hoạch đồng bộ RTL: [`bao_cao_kiem_toan_va_ke_hoach_dong_bo_rtl_tai_lieu.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes_ver02/bao_cao_kiem_toan_va_ke_hoach_dong_bo_rtl_tai_lieu.md)
+
+
+---
+
+## 7. Mở Rộng: Phân Tích Thông Lượng Khi Thích Ứng Độ Dài Chuỗi Động $N \in \{256, 64, 16\}$ (Dynamic Token Scaling Analysis)
+
+### 7.1. Định Luật Tăng Tốc Bậc Hai $O(N^2)$ Trong Kiến Trúc MHA
+Thời gian trễ chu kỳ của bộ tăng tốc MHA chủ yếu bị chi phối bởi độ phức tạp tính toán của hai phép toán ma trận:
+1. Ma trận điểm số chú ý: $\mathbf{S} = \mathbf{Q} \times \mathbf{K}^T \implies N \times N$ phần tử tích vô hướng.
+2. Quá trình chuẩn hóa Softmax: $N$ hàng, mỗi hàng duyệt $N$ phần tử qua 3 lượt (Tìm Max, Tính Exp & Mẫu số, Chuẩn hóa xác suất) $\implies 3 \times N^2$ lượt truy xuất.
+3. Ma trận ngữ cảnh đầu ra: $\mathbf{O} = \mathbf{P} \times \mathbf{V} \implies N \times d_k$ phần tử, mỗi phần tử tích lũy qua $N$ tokens.
+
+Do đó, độ trễ chu kỳ xung nhịp tổng thể giảm theo bậc hai khi chuyển từ Stage 2 sang Stage 3 và Stage 4:
+
+$$\text{Tỷ số suy giảm điểm số: } \frac{N_{\text{st2}}^2}{N_{\text{st3}}^2} = \frac{256^2}{64^2} = 16\text{ lần}; \quad \frac{N_{\text{st2}}^2}{N_{\text{st4}}^2} = \frac{256^2}{16^2} = 256\text{ lần}$$
+
+### 7.2. Bảng Đối Soát Chu Kỳ Lý Thuyết & Thực Đo Trên Variant 2A (@ 200 MHz)
+
+| Tầng Transformer | Kích Thước $N$ | Chiều $d_k$ | Số Điểm Số $N^2$ | Chu Kỳ Đo Thực Tế | Thời Gian Trễ | Tốc Độ Suy Luận |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Stage 2 (2 Layers)** | 256 | 16 | 65,536 | **210,183 cyc** | **1.051 ms** | ~951 heads/giây |
+| **Stage 3 (4 Layers)** | 64 | 20 | 4,096 | **17,791 cyc** | **88.95 $\mu$s** | ~11,241 heads/giây (**11.8x**) |
+| **Stage 4 (3 Layers)** | 16 | 24 | 256 | **1,759 cyc** | **8.79 $\mu$s** | ~113,700 heads/giây (**119.5x**) |
+
+### 7.3. Tổng Thời Gian Chạy Cho Toàn Bộ 9 Khối Transformer Trong MobileViT-XXS
+
+Trong mô hình MobileViT-XXS hoàn chỉnh ($H = 4\text{ heads/khối}$):
+- **Stage 2 (2 khối $\times$ 4 heads = 8 heads):** $8 \times 210,183 = 1,681,464\text{ cycles} \approx \mathbf{8.41\text{ ms}}$
+- **Stage 3 (4 khối $\times$ 4 heads = 16 heads):** $16 \times 17,791 = 284,656\text{ cycles} \approx \mathbf{1.42\text{ ms}}$
+- **Stage 4 (3 khối $\times$ 4 heads = 12 heads):** $12 \times 1,759 = 21,108\text{ cycles} \approx \mathbf{0.11\text{ ms}}$
+
+$$\text{Tổng chu kỳ 36 Attention Heads: } 1,681,464 + 284,656 + 21,108 = \mathbf{1,987,228\text{ cycles}}$$
+$$\text{Tổng thời gian tăng tốc MHA cho 1 khung hình: } \mathbf{9.94\text{ ms}} \implies \mathbf{\approx 100.6\text{ FPS}}$$
+
+> **Ý nghĩa thực tiễn cho Luận văn tốt nghiệp:**
+> Nếu không có cơ chế **Dynamic Token Sizing $N$**, 36 heads tính toán với $N=256$ cố định sẽ tiêu tốn $36 \times 210,000 \approx 7.56\text{ triệu chu kỳ} \approx 37.8\text{ ms}$ (chỉ đạt ~26 FPS). Nhờ hỗ trợ dynamic $N$, tổng thời gian trễ của toàn bộ 9 khối Attention trong mạng được **cắt giảm tới 73.7%**, đưa thông lượng xử lý của mô hình vượt ngưỡng thời gian thực (Real-Time > 100 FPS) trên nền tảng nhúng AMD Kria KV260!
