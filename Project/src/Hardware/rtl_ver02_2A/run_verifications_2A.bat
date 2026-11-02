@@ -42,7 +42,7 @@ if %ERRORLEVEL% NEQ 0 goto error
 if %ERRORLEVEL% NEQ 0 goto error
 
 echo.
-echo [5/5] Running Full Top Integration: Attention Core 2A Top (4,096 context bytes)...
+echo [5/5] Running Multi-Stage Top Integration: Attention Core 2A Top (3 Stages: 5,760 context bytes)...
 %IVERILOG% -g2012 -o tb_top_2a.vvp tb_attention_core_2A.sv attention_core_top_2A.sv axi_lite_regs.sv axis_adapter.sv ping_pong_bram_buffer.sv pe_slice_dsp_packing.sv dsp_packed_adder_tree.sv scale_unit.sv softmax_lut.sv score_v_gemm.sv
 if %ERRORLEVEL% NEQ 0 goto error
 %VVP% tb_top_2a.vvp

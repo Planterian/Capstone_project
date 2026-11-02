@@ -343,4 +343,37 @@ Vào ngày **02/11/2026**, kiến trúc Pure Fabric Variant 1A đã được nâ
   * Tổng thời gian thực thi: **227,198 chu kỳ xung nhịp (~1.136 ms @ 200MHz)**.
   * Tổng số bytes kiểm tra: **5,760 / 5,760 bytes (0-LSB Mismatch, PASS 100%)**.
   * So với bản cố định 256 tokens (629,486 cycles), thời gian thực thi giảm **63.9%** ($\approx 2.77\text{x}$ speedup)!
-- **Đồng bộ hóa Unit Test:** Các testbench đơn vị đa tầng `tb_golden_scale_unit.sv`, `tb_golden_softmax_lut.sv`, `tb_score_v_gemm.sv` đã đồng bộ hoàn chỉnh sang `rtl_ver02_1A`.
+- **Đồng bộ hóa Unit Test:** Toàn bộ bộ testbench đơn vị đa tầng đã được đồng bộ và kiểm chứng toàn diện:
+  * `tb_pipelined_adder_tree_1A.sv` ($N=32$ tree): **69,888 / 69,888 scores 100% Bit-Exact (0 Mismatch) [PASS]** ($65,536 + 4,096 + 256$ scores trên cả 3 Stages $N \in \{256, 64, 16\}$).
+  * `tb_golden_scale_unit.sv`: **69,888 / 69,888 scores 100% Bit-Exact (0 Mismatch) [PASS]**.
+  * `tb_golden_softmax_lut.sv`: **69,888 / 69,888 probs 100% Bit-Exact (0 Mismatch) [PASS]**.
+  * `tb_score_v_gemm.sv`: **5,760 / 5,760 context bytes 100% Bit-Exact (0 Mismatch) [PASS]**.
+  * `tb_attention_core_1A.sv`: **4,096 / 4,096 bytes Egress 100% Bit-Exact (0 Mismatch) [PASS]**.
+  $\implies$ **ALL 5 VARIANT 1A VERIFICATIONS PASSED 100% BIT-EXACT!**
+
+---
+
+### 9.6. Kết Quả Tổng Hợp OOC Synthesis & PnR Vivado 2026.1 (Dynamic N RTL v3.0)
+
+Vào ngày **02/11/2026**, kiến trúc Variant 1A đã được thực thi tổng hợp và định tuyến thực tế (Out-of-Context Synthesis & Implementation) trên bộ công cụ **Vivado v2026.1** cho chip **AMD Kria KV260 (xck26-sfvc784-2LV-c)** với xung nhịp thiết kế mục tiêu **200 MHz** (5.0 ns period):
+
+| Tài Nguyên Phần Cứng | Đã Sử Dụng (Used) | Khả Dụng Trên KV260 | Tỷ Lệ Chiếm Dụng (%) | Nhận Xét & Phân Tích Kỹ Thuật |
+| :--- | :---: | :---: | :---: | :--- |
+| **Logic LUTs (LUT as Logic)** | **8,901** | 117,120 | **7.60%** | 32 bộ nhân INT8, cây cộng 5 tầng và logic điều khiển |
+| **LUTRAM (Memory LUT)** | **3,552** | 57,600 | **6.17%** | Phân bổ cho pipeline delay và Distributed RAM |
+| **Tổng CLB LUTs** | **12,453** | 117,120 | **10.63%** | Mức tiêu thụ vừa phải, phù hợp cho PL KV260 |
+| **CLB Flip-Flops (FF)** | **8,187** | 234,240 | **3.50%** | Thanh ghi pipeline 5 tầng cây cộng, skid buffer và FSM |
+| **DSP48E2 Blocks** | **36** | 1,248 | **2.88%** | 32 DSPs cho mảng nhân `pipelined_adder_tree` + 4 DSPs cho Scaler/Softmax |
+| **Block RAM (RAMB36 Tile)**| **1 Tile** | 144 | **0.69%** | 1 RAMB36E2 cho bảng tra lũy thừa `exp_rom` của Softmax |
+| **UltraRAM (URAM)** | **0** | 64 | **0.00%** | Không sử dụng |
+
+#### Chỉ số Định Thời & Công Suất Thực Tế (Post-Route Timing & Power Summary):
+- **Worst Negative Slack (WNS) @ 200 MHz:** **`-1.025 ns`**
+  * *Nguyên nhân WNS âm:* Đường trễ cực đại 16 mức logic phát sinh từ thanh ghi quasi-static `u_axi_lite_regs/slv_seq_len_reg_reg[10]` (được cấu hình một lần qua AXI-Lite trước khi kích hoạt lõi) đi tới cổng địa chỉ BRAM Softmax. Đây là đường quasi-static cấu hình, trong thực tế hệ thống chạy an toàn tại **$F_{max} = \frac{1000}{5.0 + 1.025} \approx \mathbf{165.98\text{ MHz}}$** (hoặc xung nhịp SoC chuẩn 150 MHz).
+- **Worst Hold Slack (WHS):** **`+0.007 ns`** (**MET - Thỏa mãn hoàn toàn**).
+- **Worst Pulse Width Slack (WPWS):** **`+1.738 ns`** (**MET**).
+- **Tổng Công Suất Tiêu Thụ Trên Chip (Total On-Chip Power):** **`0.473 W`**
+  * *Dynamic Power:* `0.184 W` (38.9%)
+  * *Device Static Power:* `0.289 W` (61.1%)
+  * *Nhiệt độ mối nối chip (Junction Temperature):* `26.1 °C` (Margin an toàn cực cao, giới hạn tối đa 85 °C).
+- **Design Rule Check (DRC):** **0 Errors, 0 Critical Warnings** (Hoàn toàn sạch luật thiết kế).

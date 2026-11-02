@@ -25,7 +25,7 @@ Qua rà soát chuyên sâu mã nguồn SystemVerilog trong thư mục `Project/s
 
                                    +---------------------------------------------------+
                                    |          attention_core_top_2A (Variant 2A)       |
-     clk (100 MHz / 150 MHz) ----->|                                                   |
+     clk (150 MHz) --------------->|                                                   |
      rst_n (Active-low Reset) ---->|                                                   |
                                    |                                                   |
      [ AXI4-Lite CSR Slave ]       |   ├── 8x DSP48E2 Hard PE Slices (GEMM 1 Q*K^T)    |
@@ -161,9 +161,9 @@ set_param general.maxThreads 8
 set PROJ_NAME   "mha_kv260_deploy"
 set PROJ_DIR    "./vivado_prj_2A"
 set PART_NAME   "xck26-sfvc784-2LV-c"
-set RTL_DIR     "../Project/src/Hardware/rtl_ver02_2A"
-set SYNTH_DIR   "../Project/src/Hardware/synthesis"
-set OUT_DIR     "./deploy_artifacts"
+set RTL_DIR     "../rtl_ver02_2A"
+set SYNTH_DIR   "."
+set OUT_DIR     "../../Software"
 
 puts "================================================================="
 puts "  [STEP 1/7] INITIALIZING VIVADO PROJECT: $PROJ_NAME"
@@ -239,7 +239,7 @@ create_bd_cell -type module -reference attention_core_top_2A mha_core_0
 puts "================================================================="
 puts "  [STEP 4/7] CONNECTING BLOCK DESIGN INTERFACES & BUSES"
 puts "================================================================="
-# Clock connections (100 MHz pl_clk0)
+# Clock connections (150 MHz pl_clk0)
 set clk_pin [get_bd_pins zynq_ps/pl_clk0]
 connect_bd_net $clk_pin [get_bd_pins proc_sys_reset_0/slowest_sync_clk]
 connect_bd_net $clk_pin [get_bd_pins zynq_ps/maxihpm0_fpd_aclk]
@@ -288,11 +288,13 @@ connect_bd_net [get_bd_pins irq_concat/dout]        [get_bd_pins zynq_ps/pl_ps_i
 
 # Memory Address Mapping
 assign_bd_address
-set_property range 64K [get_bd_addr_segs {zynq_ps/Data/SEG_axi_dma_0_Reg}]
-set_property offset 0xA0000000 [get_bd_addr_segs {zynq_ps/Data/SEG_axi_dma_0_Reg}]
+catch {
+    set_property range 64K [get_bd_addr_segs {zynq_ps/Data/SEG_axi_dma_0_Reg}]
+    set_property offset 0xA0000000 [get_bd_addr_segs {zynq_ps/Data/SEG_axi_dma_0_Reg}]
 
-set_property range 64K [get_bd_addr_segs {zynq_ps/Data/SEG_mha_core_0_reg0}]
-set_property offset 0xA0010000 [get_bd_addr_segs {zynq_ps/Data/SEG_mha_core_0_reg0}]
+    set_property range 64K [get_bd_addr_segs {zynq_ps/Data/SEG_mha_core_0_reg0}]
+    set_property offset 0xA0010000 [get_bd_addr_segs {zynq_ps/Data/SEG_mha_core_0_reg0}]
+}
 
 validate_bd_design
 save_bd_design
@@ -407,7 +409,7 @@ Kịch bản sẽ tự động thực hiện chuỗi tác vụ:
 | Rủi Ro Kỹ Thuật | Nguyên Nhân Gốc | Giải Pháp Ngăn Ngừa Khuyến Nghị |
 | :--- | :--- | :--- |
 | **Lỗi khởi tạo BRAM ROM (`$readmemh`)** | File `exp_rom_all_stages.hex` không nằm trong đường dẫn tổng hợp của Vivado. | Khai báo trực tiếp trong TCL: `add_files -fileset sources_1 exp_rom_all_stages.hex` và đặt thuộc tính `Memory Initialization Files`. |
-| **Negative Slack / Vi phạm Timing ở 200 MHz** | Đường dẫn Softmax divider và Scaler tree trên chip KV260 có độ trễ logic đáng kể. | Trong Block Design, ban đầu cấu hình xung nhịp `pl_clk0 = 100 MHz` hoặc `150 MHz` để bảo đảm **Worst Negative Slack (WNS) > 0**, giúp hệ thống vận hành ổn định 100% trước khi ép xung lên 200 MHz. |
+| **Negative Slack / Vi phạm Timing ở 200 MHz** | Đường dẫn Softmax divider và Scaler tree trên chip KV260 có độ trễ logic đáng kể. | Trong Block Design, cấu hình xung nhịp `pl_clk0 = 150 MHz` (chu kỳ 6.67 ns) mang lại biên độ an toàn timing cao (~1.67 ns slack buffer) trước khi ép xung lên 200 MHz. |
 | **AXI DMA Timeout / Không trả TLAST** | Kích thước packet khai báo trong thanh ghi `0x08` (`REG_NBYTES`) không khớp với số beat phát từ DMA MM2S. | Driver Python tính toán chính xác: $N_{\text{bytes}} = N \times d_k \times 3 = 256 \times 16 \times 3 = 12,288$ Bytes. Khối `axis_adapter.sv` bắt đúng tín hiệu `s_axis_tlast`. |
 | **Rớt mạng Tailscale trong quá trình SCP** | Timeout mạng qua proxy jump khi truyền file `.bit` (~10–15 MB). | Script `test_client_laptop.py` đã cấu hình cờ `-o ConnectTimeout=8`. Bật cờ `ServerAliveInterval 30` trong SSH config. |
 

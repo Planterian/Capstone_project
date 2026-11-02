@@ -171,8 +171,8 @@ Bộ tăng tốc phần cứng MHA trên PL là một **Single-Head Attention En
 
 | Tham số Phần cứng | Stage 2 | Stage 3 | Stage 4 |
 | :--- | :---: | :---: | :---: |
-| **Giá trị thanh ghi `REG_SEQ_LEN` (`0x14`)** | `16'd256` | `16'd64` | `16'd16` |
-| **Giá trị thanh ghi `REG_HEAD_DIM` (`0x18`)** | `16'd16` | `16'd20` | `16'd24` |
+| **Giá trị thanh ghi `REG_SEQ_LEN` (`0x10`)** | `16'd256` | `16'd64` | `16'd16` |
+| **Giá trị thanh ghi `REG_HEAD_DIM` (`0x14`)** | `16'd16` | `16'd20` | `16'd24` |
 | **Chiều rộng Bus AXI Stream** | 128-bit (16 Bytes) | 128-bit (16 Bytes) | 128-bit (16 Bytes) |
 | **Số Beats AXI cho mỗi Token** | **1 Beat** (16 B) | **2 Beats** (16 B + 4 B data + 12 B pad) | **2 Beats** (16 B + 8 B data + 8 B pad) |
 | **Tổng số Bytes ma trận Q (hoặc K, V) mỗi Head** | $256 \times 16 = \mathbf{4,096 \text{ Bytes}}$ | $64 \times 32 = \mathbf{2,048 \text{ Bytes}}$ | $16 \times 32 = \mathbf{512 \text{ Bytes}}$ |
@@ -193,5 +193,4 @@ Bộ tăng tốc phần cứng MHA trên PL là một **Single-Head Attention En
      - Stage 3: $64 \times 20$ (đệm căn lề 32 bytes/token trên bus 128-bit)
      - Stage 4: $16 \times 24$ (đệm căn lề 32 bytes/token trên bus 128-bit)
 2. **Về RTL Core:**
-   - Các bộ đếm hàng, FSM Softmax (`softmax_lut.sv`) và bộ kiểm soát TLAST (`score_v_gemm.sv`) **bắt buộc phải sử dụng giá trị `reg_seq_len` cấu hình động** từ AXI-Lite Reg `0x14` thay vì dùng hằng số biên dịch `MAX_TOKENS = 256`.
-
+   - Các bộ đếm hàng, FSM Softmax (`softmax_lut.sv`) và bộ kiểm soát TLAST (`score_v_gemm.sv`) **bắt buộc phải sử dụng giá trị `reg_seq_len` cấu hình động** từ AXI-Lite Reg `0x10` (`REG_SEQ_LEN`) và `reg_head_dim` từ AXI-Lite Reg `0x14` (`REG_HEAD_DIM`) thay vì dùng hằng số biên dịch `MAX_TOKENS = 256`.

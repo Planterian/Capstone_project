@@ -39,7 +39,7 @@ Mạng nơ-ron **Apple MobileViT-XXS** kết hợp ưu điểm của mạng tíc
   +---------------------------------------------------------------------------------------------------+
   | TRANSFORMER BLOCK 2 (STAGE 3)                                                                     |
   | - Số lượng Transformer Layers : 4 layers                                                          |
-  | - Số lượng Tokens (N)         : 256 tokens (không gian 16x16)                                     |
+  | - Số lượng Tokens (N)         : 64 tokens (kích thước patch 2x2 trên bản đồ 16x16: 16*16/4 = 64)  |
   | - Kích thước kênh ẩn (C)      : 80 channels                                                       |
   | - Số lượng Heads (H)          : 4 heads                                                           |
   | - Chiều mỗi Head (d_k)        : 20 dimensions (C / H = 80 / 4)                                    |
@@ -54,7 +54,7 @@ Mạng nơ-ron **Apple MobileViT-XXS** kết hợp ưu điểm của mạng tíc
   +---------------------------------------------------------------------------------------------------+
   | TRANSFORMER BLOCK 3 (STAGE 4)                                                                     |
   | - Số lượng Transformer Layers : 3 layers                                                          |
-  | - Số lượng Tokens (N)         : 256 tokens (không gian 16x16)                                     |
+  | - Số lượng Tokens (N)         : 16 tokens (kích thước patch 2x2 trên bản đồ 8x8: 8*8/4 = 16)      |
   | - Kích thước kênh ẩn (C)      : 96 channels                                                       |
   | - Số lượng Heads (H)          : 4 heads                                                           |
   | - Chiều mỗi Head (d_k)        : 24 dimensions (C / H = 96 / 4)                                    |
@@ -81,26 +81,26 @@ sequenceDiagram
     participant CORE as Attention Core Pipeline
     participant EGR as AXI-Stream Egress
 
-    Note over TB,EGR: GIAI ĐOẠN 1: KIỂM THỬ STAGE 2 (dk = 16) - 128-bit Bus
-    TB->>CSR: Ghi 0x14 = 16, 0x20 = 27640, 0x24 = 22
+    Note over TB,EGR: GIAI ĐOẠN 1: KIỂM THỬ STAGE 2 (N = 256, dk = 16) - 128-bit Bus
+    TB->>CSR: Ghi 0x10 = 256, 0x14 = 16, 0x20 = 27640, 0x24 = 22
     TB->>ING: Stream Q, K, V (Stage 2 - 768 beats 128-bit)
     TB->>CSR: Ghi 0x00 = 1 (START)
     CORE->>EGR: Xuất 256 beats 128-bit (4,096 bytes Context Out)
     EGR-->>TB: Đối soát 4,096 mẫu -> PASS 100%
 
-    Note over TB,EGR: GIAI ĐOẠN 2: KIỂM THỬ STAGE 3 (dk = 20) - 128-bit Token-Aligned
-    TB->>CSR: Ghi 0x14 = 20, 0x20 = 21936, 0x24 = 22
-    TB->>ING: Stream Q, K, V (Stage 3 - 1,536 beats 128-bit)
+    Note over TB,EGR: GIAI ĐOẠN 2: KIỂM THỬ STAGE 3 (N = 64, dk = 20) - 128-bit Token-Aligned
+    TB->>CSR: Ghi 0x10 = 64, 0x14 = 20, 0x20 = 21936, 0x24 = 22
+    TB->>ING: Stream Q, K, V (Stage 3 - 384 beats 128-bit)
     TB->>CSR: Ghi 0x00 = 1 (START)
-    CORE->>EGR: Xuất 512 beats 128-bit (5,120 bytes Context Out)
-    EGR-->>TB: Đối soát 5,120 mẫu -> PASS 100%
+    CORE->>EGR: Xuất 128 beats 128-bit (1,280 bytes Context Out)
+    EGR-->>TB: Đối soát 1,280 mẫu -> PASS 100%
 
-    Note over TB,EGR: GIAI ĐOẠN 3: KIỂM THỬ STAGE 4 (dk = 24) - 128-bit Token-Aligned
-    TB->>CSR: Ghi 0x14 = 24, 0x20 = 18810, 0x24 = 22
-    TB->>ING: Stream Q, K, V (Stage 4 - 1,536 beats 128-bit)
+    Note over TB,EGR: GIAI ĐOẠN 3: KIỂM THỬ STAGE 4 (N = 16, dk = 24) - 128-bit Token-Aligned
+    TB->>CSR: Ghi 0x10 = 16, 0x14 = 24, 0x20 = 18810, 0x24 = 22
+    TB->>ING: Stream Q, K, V (Stage 4 - 96 beats 128-bit)
     TB->>CSR: Ghi 0x00 = 1 (START)
-    CORE->>EGR: Xuất 512 beats 128-bit (6,144 bytes Context Out)
-    EGR-->>TB: Đối soát 6,144 mẫu -> PASS 100%
+    CORE->>EGR: Xuất 32 beats 128-bit (384 bytes Context Out)
+    EGR-->>TB: Đối soát 384 mẫu -> PASS 100%
 ```
 
 ---
@@ -126,6 +126,6 @@ C:\iverilog\bin\vvp.exe tb_all_stages.vvp
 ```
 
 ### Bước 3: Tiêu chuẩn Nghiệm thu Toàn diện (Pass Criteria)
-- Toàn bộ $4,096 + 5,120 + 6,144 = 15,360$ bytes của cả 3 Stages đều đạt **0-LSB Error (100% Bit-Exact)**.
+- Toàn bộ $4,096 + 1,280 + 384 = \mathbf{5,760\text{ bytes}}$ của cả 3 Stages đều đạt **0-LSB Error (100% Bit-Exact)**.
 - Tín hiệu `m_axis_tlast` khẳng định chính xác ở beat cuối cùng của từng Stage.
 - Thời gian đóng gói trên AMD Vivado đạt $\text{WNS} \ge 0.000\text{ ns}$ tại 200 MHz.

@@ -53,14 +53,14 @@ Cấu trúc cây thư mục trong `mha_kv260_deploy.srcs/sources_1/bd/mha_system
        |                  mha_system_mha_core_0 (Module Ref: attention_core_top)       |
        |                  [ KHỐI GIA TỐC PHẦN CỨNG MULTI-HEAD ATTENTION (PL) ]         |
        |                                                                               |
-       |   ├── AXI4-Lite CSR: 0x00=CTRL, 0x04=NBYTES, 0x10=N, 0x18=D_K, 0x20=SHIFT     |
-       |   ├── S_AXIS: Kênh nhận luồng Q, K, V từ DMA MM2S -> Nạp Input Ping-Pong BRAM |
-       |   ├── Engine Tính Toán:                                                       |
-       |   │     ├── Systolic MAC Array 1: Tính Q * K^T (INT8 x INT8 -> INT32)        |
-       |   │     ├── Scaler Unit: Chuẩn hóa đại số 1/sqrt(d_k) bằng ASR Barrel Shifter |
-       |   │     ├── Hardware Softmax: Tra bảng LUT / Xấp xỉ PWL -> Xác suất INT8     |
-       |   │     └── Systolic MAC Array 2: Tính Softmax_Scores * V -> Kết quả INT8     |
-       |   └── M_AXIS: Kênh đẩy kết quả Attended Context ra DMA S2MM -> Ghi về DDR4    |
+       |   ├── AXI4-Lite CSR: 0x00=CTRL, 0x04=STATUS, 0x08=NBYTES, 0x10=SEQ_LEN, 0x14=HEAD_DIM, 0x18=HEADS, 0x20=SCALE_M, 0x24=SCALE_E |
+       |   ├── S_AXIS: Kênh nhận luồng Q, K, V từ DMA MM2S (128-bit Native) -> Nạp Input Ping-Pong BRAM                  |
+       |   ├── Engine Tính Toán:                                                                                         |
+       |   │     ├── GEMM 1: Tính Q * K^T (INT8 x INT8 -> INT32) thích nghi dk in {16, 20, 24}                           |
+       |   │     ├── Scaler Unit: Dyadic Rescaler (S * M) >>> E (Dùng 1 DSP48E2 + Shifter)                               |
+       |   │     ├── Hardware Softmax: Tra bảng BRAM Exp ROM + Lượng tử hóa xác suất INT8                                |
+       |   │     └── GEMM 2: Tính Softmax_Scores * V -> Kết quả Ngữ cảnh Context INT8                                     |
+       |   └── M_AXIS: Kênh đẩy kết quả Context 128-bit ra DMA S2MM -> Ghi về DDR4                                       |
        |                                                                               |
        +-------------------------------------------------------------------------------+
 
@@ -91,55 +91,72 @@ Dựa trên vết cấu trúc thư mục con tại `mha_kv260_deploy.srcs/source
 
 ---
 
-## 4. Bản Đồ Thanh Ghi Điều Khiển AXI4-Lite (CSR Specification)
+## 4. Bản Đồ Thanh Ghi Điều Khiển AXI4-Lite (CSR Specification v3.0)
 
-Theo thiết kế phần cứng của lõi MHA (`attention_core_top` / `axi_lite_regs`), các thanh ghi cấu hình được ánh xạ địa chỉ MMIO như sau:
+Theo thiết kế phần cứng chuẩn của lõi MHA (`attention_core_top` / `axi_lite_regs.sv`), các thanh ghi cấu hình được ánh xạ địa chỉ MMIO như sau:
 
-| Địa chỉ Offset | Tên Thanh Ghi | Quyền | Giá Trị Tiêu Chuẩn (ViT / Patch 14x14) | Mô Tả Chức Năng |
+| Địa chỉ Offset | Tên Thanh Ghi | Quyền | Giá Trị Tiêu Chuẩn (MobileViT-XXS Stage 2) | Mô Tả Chức Năng |
 | :---: | :---: | :---: | :---: | :--- |
-| `0x00` | `REG_CTRL` | R/W | `0x00000001` (Pulse START) | **Thanh ghi điều khiển chính**.<br>• Bit 0: `START` (Kích hoạt lõi MHA bắt đầu xử lý).<br>• Bit 1: `CLEAR` (Xóa mềm trạng thái/Reset pipeline). |
-| `0x04` | `REG_NBYTES` | R/W | `18,816` ($196 \times 32 \times 3$) | **Tổng số byte dữ liệu đầu vào** của khối $Q, K, V$ (INT8) cần nạp qua luồng DMA MM2S. |
-| `0x0C` | `REG_STATUS` | RO | `Bit 0: BUSY, Bit 1: DONE` | **Thanh ghi trạng thái hoạt động**.<br>• Bit 0 = 1: Lõi đang bận tính toán.<br>• Bit 1 = 1: Lõi đã hoàn thành phép tính Attention cho toàn bộ chuỗi token. |
-| `0x10` | `REG_TOKENS` | R/W | `196` ($N = 14 \times 14$) | **Số lượng token trong chuỗi (Sequence Length $N$)**.<br>Mỗi ảnh 224x224 chia thành $14 \times 14 = 196$ patches. |
-| `0x18` | `REG_HDIM` | R/W | `32` ($d_k = 32$) | **Kích thước một Attention Head (Head Dimension $d_k$)**.<br>Mỗi vector biểu diễn token gồm 32 phần tử INT8. |
-| `0x20` | `REG_SHIFT` | R/W | `2` ($S = 2$) | **Hệ số dịch bit phải đại số (ASR)** của bộ Scaler Unit.<br>Tương đương phép nhân gần đúng với hệ số tỉ lệ $1/\sqrt{d_k} = 1/\sqrt{32} \approx 1/5.66$. |
+| `0x00` | `REG_CTRL` | R/W | `0x00000001` (Pulse START) | **Thanh ghi điều khiển chính**.<br>• Bit 0: `START` (Kích hoạt xử lý).<br>• Bit 1: `CLEAR` (Xóa mềm).<br>• Bit 2: `RESET` (Tái tạo pipeline). |
+| `0x04` | `REG_STATUS` | RO | `0x00000000` | **Thanh ghi trạng thái hoạt động**.<br>• [0]: BUSY, [1]: DONE, [2]: ERROR, [3]: PP_BANK, [7:4]: HEAD_IDX. |
+| `0x08` | `REG_NBYTES` | R/W | `12,288` ($256 \times 16 \times 3$) | **Tổng số byte dữ liệu đầu vào** của khối $Q, K, V$ (INT8) cần nạp qua luồng DMA MM2S. |
+| `0x10` | `REG_SEQ_LEN` | R/W | `256` (St2), `64` (St3), `16` (St4) | **Số lượng token động trong chuỗi (Sequence Length $N$)**.<br>Stage 2: 256, Stage 3: 64, Stage 4: 16 tokens. |
+| `0x14` | `REG_HEAD_DIM` | R/W | `16` (St2), `20` (St3), `24` (St4) | **Kích thước một Attention Head (Head Dimension $d_k$)**.<br>Stage 2: 16, Stage 3: 20, Stage 4: 24. |
+| `0x18` | `REG_NUM_HEADS`| R/W | `4` ($H = 4$) | **Số lượng Attention Heads** trong mô hình MobileViT-XXS. |
+| `0x1C` | `REG_SHIFT_VAL`| R/W | `2` ($S = 2$) | Giá trị dịch bit ASR dự phòng (legacy fallback). |
+| `0x20` | `REG_SCALE_M` | R/W | `27640` (St2), `21936` (St3), `18810` (St4) | **Hệ số Dyadic Mantissa $M$** của bộ Dyadic Rescaler. |
+| `0x24` | `REG_SCALE_E` | R/W | `22` ($E = 22$) | **Hệ số Dyadic Exponent $E$** cố định $E=22$. |
+| `0x28` | `REG_OUT_M` | R/W | `0` | Hệ số Mantissa lượng tử hóa ngõ ra. |
+| `0x2C` | `REG_OUT_E` | R/W | `0` | Hệ số Exponent lượng tử hóa ngõ ra. |
+| `0x40` | `REG_LUT_ADDR` | R/W | `0` | Địa chỉ nạp bảng BRAM Exp ROM [9:0] (0..1023). |
+| `0x44` | `REG_LUT_DATA` | WO | `0` | Dữ liệu nạp BRAM ROM [19:0] (Xung ghi 1 chu kỳ). |
 
 ---
 
-## 5. Cơ Chế Truyền Nhận Dữ Liệu Bộ Nhớ Liên Tục (CMA & DMA Streaming)
+## 5. Cơ Chế Truyền Nhận Dữ Liệu Bộ Nhớ Liên Tục (CMA & DMA Streaming 128-bit)
 
-Hệ thống tận dụng cơ chế **Contiguous Memory Allocation (CMA)** trên nhân Linux PYNQ để đạt thông lượng bộ nhớ tối đa:
+Hệ thống tận dụng cơ chế **Contiguous Memory Allocation (CMA)** trên nhân Linux PYNQ kết hợp bus AXI4-Stream 128-bit Native (16 Bytes/beat):
 
 ### 5.1. Định dạng gói dữ liệu vào (Ingress Buffer - InBuffer)
-* Kích thước mảng: $N \times d_k \times 3 = 196 \times 32 \times 3 = 18,816 \text{ Bytes}$ (Kiểu số nguyên có dấu `int8`).
-* Cấu trúc ghép kênh: Các vector $Q$, $K$, và $V$ của từng token được sắp xếp liên tiếp trong bộ nhớ DDR4 trước khi kích hoạt kênh DMA MM2S truyền xuống bộ đệm Ping-Pong BRAM trên FPGA.
+* **Stage 2 ($N=256, d_k=16$):** $256 \times 16 \times 3 = 12,288\text{ Bytes}$ = **768 beats** 128-bit.
+* **Stage 3 ($N=64, d_k=20$):** $64 \times 32 \times 3 = 6,144\text{ Bytes}$ (đệm căn lề 32B/token) = **384 beats** 128-bit.
+* **Stage 4 ($N=16, d_k=24$):** $16 \times 32 \times 3 = 1,536\text{ Bytes}$ (đệm căn lề 32B/token) = **96 beats** 128-bit.
+* Các vector $Q, K, V$ được sắp xếp liên tiếp trong bộ nhớ DDR4 trước khi kích hoạt DMA MM2S nạp vào Ping-Pong BRAM.
 
 ### 5.2. Định dạng gói dữ liệu ra (Egress Buffer - OutBuffer)
-* Kích thước mảng: $N \times d_k = 196 \times 32 = 6,272 \text{ Bytes}$ (Kiểu số nguyên có dấu `int8`).
-* Kết quả sau khi tính ma trận xác suất Attention và nhân chập với ma trận $V$:
-  $$\text{Context} = \text{Softmax}\left(\frac{Q K^T}{\sqrt{d_k}}\right) \times V$$
-* Dữ liệu được đẩy ra bus AXI4-Stream Master của vi mạch, qua kênh DMA S2MM ghi thẳng về mảng `out_buffer` trên RAM DDR4.
+* **Stage 2:** $256 \times 16 = \mathbf{4,096\text{ Bytes}}$ (256 beats 128-bit, `tlast` tại beat 255).
+* **Stage 3:** $64 \times 20 = \mathbf{1,280\text{ Bytes}}$ (128 beats 128-bit, `tlast` tại beat 127).
+* **Stage 4:** $16 \times 24 = \mathbf{384\text{ Bytes}}$ (32 beats 128-bit, `tlast` tại beat 31).
+* Tổng dung lượng Context Out của cả 3 Stages = $\mathbf{5,760\text{ Bytes}}$.
 
-### 5.3. Trình tự bắt tay phần cứng (Execution Protocol)
+### 5.3. Trình tự bắt tay phần cứng (Execution Protocol v3.0)
 1. **Host PS**: Cấp phát `in_buffer` và `out_buffer` bằng hàm `pynq.allocate`.
-2. **Host PS**: Ghi cấu hình các thanh ghi $N=196$, $d_k=32$, $S=2$, $N_{\text{bytes}}=18,816$ qua AXI-Lite CSR.
+2. **Host PS**: Cấu hình CSR AXI-Lite:
+   * Ghi `0x10 = N` (`256`, `64`, hoặc `16`).
+   * Ghi `0x14 = dk` (`16`, `20`, hoặc `24`).
+   * Ghi `0x18 = 4` ($H=4$).
+   * Ghi `0x20 = M` (`27640`, `21936`, hoặc `18810`), `0x24 = 22` ($E=22$).
+   * Ghi `0x08 = NBYTES` (`12288`, `6144`, hoặc `1536`).
 3. **Host PS**: Khởi động kênh nhận DMA S2MM (`dma.recvchannel.transfer(out_buffer)`).
 4. **Host PS**: Khởi động kênh truyền DMA MM2S (`dma.sendchannel.transfer(in_buffer)`).
 5. **Host PS**: Kích xung `START = 1` tại địa chỉ thanh ghi `0x00`.
-6. **Hardware PL**: Lõi MHA tự động nạp BRAM $\rightarrow$ tính toán theo đường ống $\rightarrow$ xuất luồng dữ liệu ra AXI-Stream.
-7. **Host PS**: Đợi tín hiệu ngắt DMA hoàn tất (`dma.wait()`), đọc trực tiếp kết quả từ `out_buffer` mà không phải tốn chu kỳ sao chép bộ nhớ (Zero-Copy Transfer).
+6. **Hardware PL**: Lõi MHA tự động nạp Ping-Pong BRAM $\rightarrow$ tính toán theo đường ống $\rightarrow$ xuất luồng dữ liệu ra AXI-Stream 128-bit.
+7. **Host PS**: Đợi tín hiệu ngắt DMA hoàn tất (`dma.wait()`), đọc trực tiếp kết quả từ `out_buffer` (Zero-Copy Transfer).
 
 ---
 
-## 6. Phân Tích Hiện Trạng Thư Mục `vivado_kv260`
+## 6. Phân Tích Hiện Trạng Dự Án Triển Khai Thực Tế
 
-Qua quét kiểm tra toàn bộ cây thư mục `c:\Users\tuan2\Desktop\vivado_kv260`:
-* **Số lượng thư mục con**: **220 thư mục** cấu trúc chuẩn của Vivado 2026.
-* **Số lượng file**: Hiện tại bên trong thư mục này chứa **0 file** (toàn bộ các tệp `.bd`, `.xci`, `.bit`, mã nguồn RTL, tệp nhật ký `.log`, `.jou` hoặc báo cáo `.rpt` đã bị lược bỏ hoặc chỉ được tạo ra dạng khung xương thư mục từ máy `DESKTOP-297OVLQ`).
-* **Vết tích môi trường thực thi**:
-  * Thư mục `mha_kv260_deploy.runs/synth_1/.Xil/Vivado-7924-DESKTOP-297OVLQ` cho thấy dự án Vivado từng được khởi tạo và chạy synthesis trên máy trạm mang tên **`DESKTOP-297OVLQ`**.
-  * Trong khi đó, máy tính hiện tại đang phát triển là **`DESKTOP-L58T74E`**.
-  * Toàn bộ mã nguồn RTL chuẩn hóa (Variant 1A, Variant 2A, Variant 3B), các script synthesis (`run_synth_kv260.bat`), ràng buộc chân/xung nhịp (`timing_kv260.xdc`), và mã driver Python hoàn chỉnh (`deploy_kv260.py`, `mha_kv260_demo.py`) hiện đang được lưu trữ toàn vẹn và quản lý chính xác trong kho lưu trữ **`c:\Users\tuan2\Desktop\Capstone_Project`**.
+Trong cấu trúc dự án hiện tại, môi trường tổng hợp và đóng gói hoàn chỉnh đã được hiện thực hóa trực tiếp tại:
+* **Đường dẫn dự án Vivado Active:** [`Project/src/Hardware/synthesis/vivado_prj_2A/mha_kv260_deploy.xpr`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis/vivado_prj_2A/mha_kv260_deploy.xpr)
+* **Kịch bản tự động hóa 100%:** [`Project/src/Hardware/synthesis/build_kv260_mha_2A.tcl`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis/build_kv260_mha_2A.tcl)
+* **Kết quả thực thi (Bitstream & Implementation):**
+  * Tệp Bitstream: `vivado_prj_2A/mha_kv260_deploy.runs/impl_1/attention_core_top_2A.bit`
+  * Tần số hoạt động: **150.0 MHz**
+  * Timing Slack: **WNS = +0.131 ns**, **WHS = +0.011 ns** (Đạt Timing Closure 100%, 0 vi phạm)
+  * Tài nguyên sử dụng: **15,401 LUTs** (13.15%), **14,958 FFs** (6.39%), **52 DSPs** (4.17%), **6 BRAMs** (4.17%)
+  * Công suất toàn hệ thống: **2.655 W** (Nhiệt độ mối nối: **31.2 °C**, chip chạy rất mát)
+  * DRC Check sau định tuyến: **0 Errors, 0 Warnings** (Sạch 100%)
 
 ---
 

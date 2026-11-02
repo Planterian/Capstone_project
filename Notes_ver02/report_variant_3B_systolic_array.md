@@ -365,4 +365,38 @@ Vào ngày **02/11/2026**, kiến trúc 2D Systolic Array Variant 3B đã hoàn 
   * Tổng thời gian thực thi: **363,437 chu kỳ xung nhịp (~1.817 ms @ 200MHz)**.
   * Tổng số bytes kiểm tra: **5,760 / 5,760 bytes (0-LSB Mismatch, PASS 100%)**.
   * So với bản cũ cố định 256 tokens (1,036,721 cycles), thời gian thực thi giảm **64.9%** ($\approx 2.85\text{x}$ speedup)!
-- **Đồng bộ hóa Unit Test:** Các testbench đơn vị đa tầng `tb_golden_scale_unit.sv`, `tb_golden_softmax_lut.sv`, `tb_score_v_gemm.sv` đã đồng bộ hoàn chỉnh sang `rtl_ver02_3B`.
+- **Đồng bộ hóa Unit Test:** Toàn bộ bộ testbench đơn vị đa tầng đã được đồng bộ và kiểm chứng toàn diện:
+  * `tb_systolic_mac_array_3B.sv`: **128 / 128 items 100% Bit-Exact (0 Mismatch) [PASS]** (bao gồm 32 Drain isolation FL-03/04 items + 96 real golden tile items cho cả 3 Stages $N \in \{256, 64, 16\}$, $d_k \in \{16, 20, 24\}$).
+  * `tb_golden_scale_unit.sv`: **69,888 / 69,888 scores 100% Bit-Exact (0 Mismatch) [PASS]**.
+  * `tb_golden_softmax_lut.sv`: **69,888 / 69,888 probs 100% Bit-Exact (0 Mismatch) [PASS]**.
+  * `tb_score_v_gemm.sv`: **5,760 / 5,760 context bytes 100% Bit-Exact (0 Mismatch) [PASS]**.
+  * `tb_attention_core_3B.sv`: **4,096 / 4,096 bytes Egress 100% Bit-Exact (0 Mismatch) [PASS]**.
+  $\implies$ **ALL 5 VARIANT 3B VERIFICATIONS PASSED 100% BIT-EXACT!**
+
+---
+
+### 10.6. Kết Quả Tổng Hợp OOC Synthesis & PnR Vivado 2026.1 (Dynamic N RTL v3.0)
+
+Vào ngày **02/11/2026**, kiến trúc Variant 3B (2D Systolic MAC Array) đã được thực thi tổng hợp và định tuyến thực tế (Out-of-Context Synthesis & Implementation) trên bộ công cụ **Vivado v2026.1** cho chip **AMD Kria KV260 (xck26-sfvc784-2LV-c)** với xung nhịp thiết kế mục tiêu **200 MHz** (5.0 ns period):
+
+| Tài Nguyên Phần Cứng | Đã Sử Dụng (Used) | Khả Dụng Trên KV260 | Tỷ Lệ Chiếm Dụng (%) | Nhận Xét & Phân Tích Kỹ Thuật |
+| :--- | :---: | :---: | :---: | :--- |
+| **Logic LUTs (LUT as Logic)** | **23,727** | 117,120 | **20.26%** | Mảng $4 \times 4$ PE, reorder buffer muxes, và FSM điều khiển |
+| **LUTRAM (Memory LUT)** | **15,416** | 57,600 | **26.76%** | 15,392 Distributed RAM cho Reorder Buffer (32Kb) + 24 SRLs |
+| **Tổng CLB LUTs** | **39,143** | 117,120 | **33.42%** | Tiêu thụ cao hơn 1A/2A do bộ đệm sắp xếp lại thứ tự Tile |
+| **CLB Flip-Flops (FF)** | **42,270** | 234,240 | **18.05%** | Thanh ghi mảng 2D Systolic, pipeline skew và reorder logic |
+| **DSP48E2 Blocks** | **52** | 1,248 | **4.17%** | 16 DSPs (`pe_slice_dsp_packing`) trong mảng $4 \times 4$ + 4 DSPs Scaler/Softmax + 32 DSPs Score-V |
+| **Block RAM (RAMB36 Tile)**| **1 Tile** | 144 | **0.69%** | 1 RAMB36E2 cho bảng tra lũy thừa `exp_rom` của Softmax |
+| **UltraRAM (URAM)** | **0** | 64 | **0.00%** | Không sử dụng |
+
+#### Chỉ số Định Thời & Công Suất Thực Tế (Post-Route Timing & Power Summary):
+- **Worst Negative Slack (WNS) @ 200 MHz:** **`-1.071 ns`**
+  * *Tần số xung nhịp cực đại:* **$F_{max} = \frac{1000}{5.0 + 1.071} \approx \mathbf{164.72\text{ MHz}}$**.
+  * *Tần số vận hành an toàn:* **160.0 MHz** (hoặc chuẩn SoC nhúng 150.0 MHz).
+- **Worst Hold Slack (WHS):** **`+0.015 ns`** (**MET - Thỏa mãn an toàn Hold Time tuyệt đối**).
+- **Worst Pulse Width Slack (WPWS):** **`+1.738 ns`** (**MET**).
+- **Tổng Công Suất Tiêu Thụ Trên Chip (Total On-Chip Power):** **`0.774 W`**
+  * *Dynamic Power:* `0.483 W` (62.4%)
+  * *Device Static Power:* `0.291 W` (37.6%)
+  * *Nhiệt độ mối nối chip (Junction Temperature):* `26.8 °C` (Vận hành cực mát dưới ngưỡng tản nhiệt thụ động).
+- **Design Rule Check (DRC):** **0 Errors, 0 Critical Warnings** (Hoàn toàn sạch luật thiết kế).

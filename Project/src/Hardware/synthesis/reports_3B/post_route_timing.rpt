@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
 --------------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version      : Vivado v.2026.1 (win64) Build 6511674 Tue Jun 16 11:02:23 MDT 2026
-| Date              : Tue Oct 27 22:06:40 2026
+| Date              : Mon Nov  2 22:31:26 2026
 | Host              : DESKTOP-L58T74E running 64-bit major release  (build 9200)
 | Command           : report_timing_summary -max_paths 10 -file ./reports_3B/post_route_timing.rpt
 | Design            : attention_core_top_3B
@@ -139,7 +139,7 @@ Table of Contents
 
     WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
     -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
-     -0.431      -44.591                    441               204888        0.016        0.000                      0               204888        1.738        0.000                       0                 57743  
+     -1.071     -190.459                   1251               204799        0.015        0.000                      0               204799        1.738        0.000                       0                 57705  
 
 
 Timing constraints are not met.
@@ -162,7 +162,7 @@ clk    {0.000 2.500}        5.000           200.000
 
 Clock             WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
 -----             -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
-clk                -0.431      -44.591                    441               204888        0.016        0.000                      0               204888        1.738        0.000                       0                 57743  
+clk                -1.071     -190.459                   1251               204799        0.015        0.000                      0               204799        1.738        0.000                       0                 57705  
 
 
 ------------------------------------------------------------------------------------------------
@@ -193,27 +193,603 @@ Path Group    From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing 
 From Clock:  clk
   To Clock:  clk
 
-Setup :          441  Failing Endpoints,  Worst Slack       -0.431ns,  Total Violation      -44.591ns
-Hold  :            0  Failing Endpoints,  Worst Slack        0.016ns,  Total Violation        0.000ns
+Setup :         1251  Failing Endpoints,  Worst Slack       -1.071ns,  Total Violation     -190.459ns
+Hold  :            0  Failing Endpoints,  Worst Slack        0.015ns,  Total Violation        0.000ns
 PW    :            0  Failing Endpoints,  Worst Slack        1.738ns,  Total Violation        0.000ns
 ---------------------------------------------------------------------------------------------------
 
 
 Max Delay Paths
 --------------------------------------------------------------------------------------
-Slack (VIOLATED) :        -0.431ns  (required time - arrival time)
-  Source:                 u_softmax_engine/cnt_reg_reg[8]/C
+Slack (VIOLATED) :        -1.071ns  (required time - arrival time)
+  Source:                 u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[10]
+                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
+  Data Path Delay:        5.479ns  (logic 2.130ns (38.875%)  route 3.349ns (61.125%))
+  Logic Levels:           16  (CARRY8=4 LUT2=2 LUT3=1 LUT4=1 LUT5=1 LUT6=5 MUXF7=1 MUXF8=1)
+  Clock Path Skew:        0.005ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.048ns = ( 5.048 - 5.000 ) 
+    Source Clock Delay      (SCD):    0.043ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+    User Uncertainty         (UU):    0.100ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.043     0.043    u_axi_lite_regs/clk
+    SLICE_X32Y193        FDCE                                         r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X32Y193        FDCE (Prop_FFF_SLICEM_C_Q)
+                                                      0.112     0.155 r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/Q
+                         net (fo=7, routed)           0.117     0.272    u_axi_lite_regs/slv_seq_len_reg_reg_n_0_[12]
+    SLICE_X32Y195        LUT4 (Prop_F6LUT_SLICEM_I0_O)
+                                                      0.149     0.421 r  u_axi_lite_regs/cnt_reg[8]_i_19/O
+                         net (fo=1, routed)           0.172     0.593    u_axi_lite_regs/cnt_reg[8]_i_19_n_0
+    SLICE_X32Y200        LUT5 (Prop_E6LUT_SLICEM_I4_O)
+                                                      0.083     0.676 r  u_axi_lite_regs/cnt_reg[8]_i_18/O
+                         net (fo=1, routed)           0.187     0.863    u_axi_lite_regs/cnt_reg[8]_i_18_n_0
+    SLICE_X32Y206        LUT6 (Prop_A6LUT_SLICEM_I4_O)
+                                                      0.083     0.946 r  u_axi_lite_regs/cnt_reg[8]_i_17/O
+                         net (fo=11, routed)          0.119     1.065    u_softmax_engine/cnt_reg_reg[8]_i_3_1
+    SLICE_X32Y207        LUT2 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.148 r  u_softmax_engine/cnt_reg[8]_i_12/O
+                         net (fo=1, routed)           0.018     1.166    u_softmax_engine/cnt_reg[8]_i_12_n_0
+    SLICE_X32Y207        CARRY8 (Prop_CARRY8_SLICEM_S[4]_CO[4])
+                                                      0.100     1.266 r  u_softmax_engine/cnt_reg_reg[8]_i_3/CO[4]
+                         net (fo=42, routed)          0.227     1.493    u_softmax_engine/cnt_reg_reg[8]_0[0]
+    SLICE_X31Y207        LUT3 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.576 r  u_softmax_engine/exp_rom_reg_bram_0_i_1430/O
+                         net (fo=64, routed)          0.438     2.015    u_softmax_engine/exp_rom_reg_bram_0_i_1430_n_0
+    SLICE_X26Y206        LUT6 (Prop_E6LUT_SLICEL_I4_O)
+                                                      0.152     2.167 r  u_softmax_engine/exp_rom_reg_bram_0_i_1131/O
+                         net (fo=1, routed)           0.011     2.178    u_softmax_engine/exp_rom_reg_bram_0_i_1131_n_0
+    SLICE_X26Y206        MUXF7 (Prop_F7MUX_EF_SLICEL_I1_O)
+                                                      0.087     2.265 r  u_softmax_engine/exp_rom_reg_bram_0_i_512/O
+                         net (fo=1, routed)           0.000     2.265    u_softmax_engine/exp_rom_reg_bram_0_i_512_n_0
+    SLICE_X26Y206        MUXF8 (Prop_F8MUX_TOP_SLICEL_I1_O)
+                                                      0.031     2.296 r  u_softmax_engine/exp_rom_reg_bram_0_i_226/O
+                         net (fo=1, routed)           0.293     2.589    u_softmax_engine/exp_rom_reg_bram_0_i_226_n_0
+    SLICE_X25Y205        LUT6 (Prop_E6LUT_SLICEM_I3_O)
+                                                      0.223     2.812 r  u_softmax_engine/exp_rom_reg_bram_0_i_79/O
+                         net (fo=2, routed)           0.397     3.209    u_softmax_engine/exp_rom_reg_bram_0_i_79_n_0
+    SLICE_X32Y209        LUT6 (Prop_C6LUT_SLICEM_I1_O)
+                                                      0.135     3.344 r  u_softmax_engine/exp_rom_reg_bram_0_i_38/O
+                         net (fo=1, routed)           0.151     3.495    u_softmax_engine/score_buffer[0]
+    SLICE_X34Y209        CARRY8 (Prop_CARRY8_SLICEM_DI[0]_CO[7])
+                                                      0.196     3.691 r  u_softmax_engine/exp_rom_reg_bram_0_i_13/CO[7]
+                         net (fo=1, routed)           0.062     3.753    u_softmax_engine/exp_rom_reg_bram_0_i_13_n_0
+    SLICE_X34Y210        CARRY8 (Prop_CARRY8_SLICEM_CI_O[5])
+                                                      0.161     3.914 r  u_softmax_engine/exp_rom_reg_bram_0_i_47/O[5]
+                         net (fo=2, routed)           0.458     4.372    u_softmax_engine/rom_addr2[13]
+    SLICE_X39Y207        LUT2 (Prop_G6LUT_SLICEL_I0_O)
+                                                      0.137     4.509 r  u_softmax_engine/exp_rom_reg_bram_0_i_24/O
+                         net (fo=1, routed)           0.012     4.521    u_softmax_engine/exp_rom_reg_bram_0_i_24_n_0
+    SLICE_X39Y207        CARRY8 (Prop_CARRY8_SLICEL_S[6]_CO[7])
+                                                      0.179     4.700 r  u_softmax_engine/exp_rom_reg_bram_0_i_12/CO[7]
+                         net (fo=8, routed)           0.532     5.232    u_softmax_engine/rom_addr1
+    SLICE_X47Y203        LUT6 (Prop_D6LUT_SLICEL_I0_O)
+                                                      0.136     5.368 r  u_softmax_engine/exp_rom_reg_bram_0_i_5/O
+                         net (fo=1, routed)           0.154     5.522    u_softmax_engine/exp_rom_reg_bram_0_i_5_n_0
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[10]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        5.000     5.000 r  <hidden>
+                                                      0.000     5.000 r  clk
+                         net (fo=57789, unset)        0.048     5.048    u_softmax_engine/clk
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+                         clock pessimism              0.000     5.048    <hidden>
+                         clock uncertainty           -0.135     4.913    <hidden>
+    RAMB36_X1Y40         RAMB36E2 (Setup_RAMB36E2_RAMB36_CLKBWRCLK_ADDRBWRADDR[10])
+                                                     -0.462     4.451    u_softmax_engine/exp_rom_reg_bram_0
+  -------------------------------------------------------------------
+                         required time                          4.451    <hidden>
+                         arrival time                          -5.522    <hidden>
+  -------------------------------------------------------------------
+                         slack                                 -1.071    <hidden>
+
+Slack (VIOLATED) :        -1.059ns  (required time - arrival time)
+  Source:                 u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[11]
+                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
+  Data Path Delay:        5.477ns  (logic 2.050ns (37.426%)  route 3.427ns (62.574%))
+  Logic Levels:           16  (CARRY8=4 LUT2=2 LUT3=1 LUT4=1 LUT5=2 LUT6=4 MUXF7=1 MUXF8=1)
+  Clock Path Skew:        0.005ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.048ns = ( 5.048 - 5.000 ) 
+    Source Clock Delay      (SCD):    0.043ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+    User Uncertainty         (UU):    0.100ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.043     0.043    u_axi_lite_regs/clk
+    SLICE_X32Y193        FDCE                                         r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X32Y193        FDCE (Prop_FFF_SLICEM_C_Q)
+                                                      0.112     0.155 r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/Q
+                         net (fo=7, routed)           0.117     0.272    u_axi_lite_regs/slv_seq_len_reg_reg_n_0_[12]
+    SLICE_X32Y195        LUT4 (Prop_F6LUT_SLICEM_I0_O)
+                                                      0.149     0.421 r  u_axi_lite_regs/cnt_reg[8]_i_19/O
+                         net (fo=1, routed)           0.172     0.593    u_axi_lite_regs/cnt_reg[8]_i_19_n_0
+    SLICE_X32Y200        LUT5 (Prop_E6LUT_SLICEM_I4_O)
+                                                      0.083     0.676 r  u_axi_lite_regs/cnt_reg[8]_i_18/O
+                         net (fo=1, routed)           0.187     0.863    u_axi_lite_regs/cnt_reg[8]_i_18_n_0
+    SLICE_X32Y206        LUT6 (Prop_A6LUT_SLICEM_I4_O)
+                                                      0.083     0.946 r  u_axi_lite_regs/cnt_reg[8]_i_17/O
+                         net (fo=11, routed)          0.119     1.065    u_softmax_engine/cnt_reg_reg[8]_i_3_1
+    SLICE_X32Y207        LUT2 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.148 r  u_softmax_engine/cnt_reg[8]_i_12/O
+                         net (fo=1, routed)           0.018     1.166    u_softmax_engine/cnt_reg[8]_i_12_n_0
+    SLICE_X32Y207        CARRY8 (Prop_CARRY8_SLICEM_S[4]_CO[4])
+                                                      0.100     1.266 r  u_softmax_engine/cnt_reg_reg[8]_i_3/CO[4]
+                         net (fo=42, routed)          0.227     1.493    u_softmax_engine/cnt_reg_reg[8]_0[0]
+    SLICE_X31Y207        LUT3 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.576 r  u_softmax_engine/exp_rom_reg_bram_0_i_1430/O
+                         net (fo=64, routed)          0.438     2.015    u_softmax_engine/exp_rom_reg_bram_0_i_1430_n_0
+    SLICE_X26Y206        LUT6 (Prop_E6LUT_SLICEL_I4_O)
+                                                      0.152     2.167 r  u_softmax_engine/exp_rom_reg_bram_0_i_1131/O
+                         net (fo=1, routed)           0.011     2.178    u_softmax_engine/exp_rom_reg_bram_0_i_1131_n_0
+    SLICE_X26Y206        MUXF7 (Prop_F7MUX_EF_SLICEL_I1_O)
+                                                      0.087     2.265 r  u_softmax_engine/exp_rom_reg_bram_0_i_512/O
+                         net (fo=1, routed)           0.000     2.265    u_softmax_engine/exp_rom_reg_bram_0_i_512_n_0
+    SLICE_X26Y206        MUXF8 (Prop_F8MUX_TOP_SLICEL_I1_O)
+                                                      0.031     2.296 r  u_softmax_engine/exp_rom_reg_bram_0_i_226/O
+                         net (fo=1, routed)           0.293     2.589    u_softmax_engine/exp_rom_reg_bram_0_i_226_n_0
+    SLICE_X25Y205        LUT6 (Prop_E6LUT_SLICEM_I3_O)
+                                                      0.223     2.812 r  u_softmax_engine/exp_rom_reg_bram_0_i_79/O
+                         net (fo=2, routed)           0.397     3.209    u_softmax_engine/exp_rom_reg_bram_0_i_79_n_0
+    SLICE_X32Y209        LUT6 (Prop_C6LUT_SLICEM_I1_O)
+                                                      0.135     3.344 r  u_softmax_engine/exp_rom_reg_bram_0_i_38/O
+                         net (fo=1, routed)           0.151     3.495    u_softmax_engine/score_buffer[0]
+    SLICE_X34Y209        CARRY8 (Prop_CARRY8_SLICEM_DI[0]_CO[7])
+                                                      0.196     3.691 r  u_softmax_engine/exp_rom_reg_bram_0_i_13/CO[7]
+                         net (fo=1, routed)           0.062     3.753    u_softmax_engine/exp_rom_reg_bram_0_i_13_n_0
+    SLICE_X34Y210        CARRY8 (Prop_CARRY8_SLICEM_CI_O[5])
+                                                      0.161     3.914 r  u_softmax_engine/exp_rom_reg_bram_0_i_47/O[5]
+                         net (fo=2, routed)           0.458     4.372    u_softmax_engine/rom_addr2[13]
+    SLICE_X39Y207        LUT2 (Prop_G6LUT_SLICEL_I0_O)
+                                                      0.137     4.509 r  u_softmax_engine/exp_rom_reg_bram_0_i_24/O
+                         net (fo=1, routed)           0.012     4.521    u_softmax_engine/exp_rom_reg_bram_0_i_24_n_0
+    SLICE_X39Y207        CARRY8 (Prop_CARRY8_SLICEL_S[6]_CO[7])
+                                                      0.179     4.700 r  u_softmax_engine/exp_rom_reg_bram_0_i_12/CO[7]
+                         net (fo=8, routed)           0.533     5.233    u_softmax_engine/rom_addr1
+    SLICE_X47Y203        LUT5 (Prop_C6LUT_SLICEL_I0_O)
+                                                      0.056     5.289 r  u_softmax_engine/exp_rom_reg_bram_0_i_4/O
+                         net (fo=1, routed)           0.232     5.520    u_softmax_engine/exp_rom_reg_bram_0_i_4_n_0
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[11]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        5.000     5.000 r  <hidden>
+                                                      0.000     5.000 r  clk
+                         net (fo=57789, unset)        0.048     5.048    u_softmax_engine/clk
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+                         clock pessimism              0.000     5.048    <hidden>
+                         clock uncertainty           -0.135     4.913    <hidden>
+    RAMB36_X1Y40         RAMB36E2 (Setup_RAMB36E2_RAMB36_CLKBWRCLK_ADDRBWRADDR[11])
+                                                     -0.451     4.462    u_softmax_engine/exp_rom_reg_bram_0
+  -------------------------------------------------------------------
+                         required time                          4.462    <hidden>
+                         arrival time                          -5.520    <hidden>
+  -------------------------------------------------------------------
+                         slack                                 -1.059    <hidden>
+
+Slack (VIOLATED) :        -1.047ns  (required time - arrival time)
+  Source:                 u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[9]
+                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
+  Data Path Delay:        5.455ns  (logic 2.052ns (37.615%)  route 3.403ns (62.385%))
+  Logic Levels:           16  (CARRY8=4 LUT2=2 LUT3=1 LUT4=1 LUT5=1 LUT6=5 MUXF7=1 MUXF8=1)
+  Clock Path Skew:        0.005ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.048ns = ( 5.048 - 5.000 ) 
+    Source Clock Delay      (SCD):    0.043ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+    User Uncertainty         (UU):    0.100ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.043     0.043    u_axi_lite_regs/clk
+    SLICE_X32Y193        FDCE                                         r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X32Y193        FDCE (Prop_FFF_SLICEM_C_Q)
+                                                      0.112     0.155 r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/Q
+                         net (fo=7, routed)           0.117     0.272    u_axi_lite_regs/slv_seq_len_reg_reg_n_0_[12]
+    SLICE_X32Y195        LUT4 (Prop_F6LUT_SLICEM_I0_O)
+                                                      0.149     0.421 r  u_axi_lite_regs/cnt_reg[8]_i_19/O
+                         net (fo=1, routed)           0.172     0.593    u_axi_lite_regs/cnt_reg[8]_i_19_n_0
+    SLICE_X32Y200        LUT5 (Prop_E6LUT_SLICEM_I4_O)
+                                                      0.083     0.676 r  u_axi_lite_regs/cnt_reg[8]_i_18/O
+                         net (fo=1, routed)           0.187     0.863    u_axi_lite_regs/cnt_reg[8]_i_18_n_0
+    SLICE_X32Y206        LUT6 (Prop_A6LUT_SLICEM_I4_O)
+                                                      0.083     0.946 r  u_axi_lite_regs/cnt_reg[8]_i_17/O
+                         net (fo=11, routed)          0.119     1.065    u_softmax_engine/cnt_reg_reg[8]_i_3_1
+    SLICE_X32Y207        LUT2 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.148 r  u_softmax_engine/cnt_reg[8]_i_12/O
+                         net (fo=1, routed)           0.018     1.166    u_softmax_engine/cnt_reg[8]_i_12_n_0
+    SLICE_X32Y207        CARRY8 (Prop_CARRY8_SLICEM_S[4]_CO[4])
+                                                      0.100     1.266 r  u_softmax_engine/cnt_reg_reg[8]_i_3/CO[4]
+                         net (fo=42, routed)          0.227     1.493    u_softmax_engine/cnt_reg_reg[8]_0[0]
+    SLICE_X31Y207        LUT3 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.576 r  u_softmax_engine/exp_rom_reg_bram_0_i_1430/O
+                         net (fo=64, routed)          0.438     2.015    u_softmax_engine/exp_rom_reg_bram_0_i_1430_n_0
+    SLICE_X26Y206        LUT6 (Prop_E6LUT_SLICEL_I4_O)
+                                                      0.152     2.167 r  u_softmax_engine/exp_rom_reg_bram_0_i_1131/O
+                         net (fo=1, routed)           0.011     2.178    u_softmax_engine/exp_rom_reg_bram_0_i_1131_n_0
+    SLICE_X26Y206        MUXF7 (Prop_F7MUX_EF_SLICEL_I1_O)
+                                                      0.087     2.265 r  u_softmax_engine/exp_rom_reg_bram_0_i_512/O
+                         net (fo=1, routed)           0.000     2.265    u_softmax_engine/exp_rom_reg_bram_0_i_512_n_0
+    SLICE_X26Y206        MUXF8 (Prop_F8MUX_TOP_SLICEL_I1_O)
+                                                      0.031     2.296 r  u_softmax_engine/exp_rom_reg_bram_0_i_226/O
+                         net (fo=1, routed)           0.293     2.589    u_softmax_engine/exp_rom_reg_bram_0_i_226_n_0
+    SLICE_X25Y205        LUT6 (Prop_E6LUT_SLICEM_I3_O)
+                                                      0.223     2.812 r  u_softmax_engine/exp_rom_reg_bram_0_i_79/O
+                         net (fo=2, routed)           0.397     3.209    u_softmax_engine/exp_rom_reg_bram_0_i_79_n_0
+    SLICE_X32Y209        LUT6 (Prop_C6LUT_SLICEM_I1_O)
+                                                      0.135     3.344 r  u_softmax_engine/exp_rom_reg_bram_0_i_38/O
+                         net (fo=1, routed)           0.151     3.495    u_softmax_engine/score_buffer[0]
+    SLICE_X34Y209        CARRY8 (Prop_CARRY8_SLICEM_DI[0]_CO[7])
+                                                      0.196     3.691 r  u_softmax_engine/exp_rom_reg_bram_0_i_13/CO[7]
+                         net (fo=1, routed)           0.062     3.753    u_softmax_engine/exp_rom_reg_bram_0_i_13_n_0
+    SLICE_X34Y210        CARRY8 (Prop_CARRY8_SLICEM_CI_O[5])
+                                                      0.161     3.914 r  u_softmax_engine/exp_rom_reg_bram_0_i_47/O[5]
+                         net (fo=2, routed)           0.458     4.372    u_softmax_engine/rom_addr2[13]
+    SLICE_X39Y207        LUT2 (Prop_G6LUT_SLICEL_I0_O)
+                                                      0.137     4.509 r  u_softmax_engine/exp_rom_reg_bram_0_i_24/O
+                         net (fo=1, routed)           0.012     4.521    u_softmax_engine/exp_rom_reg_bram_0_i_24_n_0
+    SLICE_X39Y207        CARRY8 (Prop_CARRY8_SLICEL_S[6]_CO[7])
+                                                      0.179     4.700 r  u_softmax_engine/exp_rom_reg_bram_0_i_12/CO[7]
+                         net (fo=8, routed)           0.542     5.241    u_softmax_engine/rom_addr1
+    SLICE_X47Y203        LUT6 (Prop_A6LUT_SLICEL_I0_O)
+                                                      0.058     5.299 r  u_softmax_engine/exp_rom_reg_bram_0_i_6/O
+                         net (fo=1, routed)           0.199     5.498    u_softmax_engine/exp_rom_reg_bram_0_i_6_n_0
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[9]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        5.000     5.000 r  <hidden>
+                                                      0.000     5.000 r  clk
+                         net (fo=57789, unset)        0.048     5.048    u_softmax_engine/clk
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+                         clock pessimism              0.000     5.048    <hidden>
+                         clock uncertainty           -0.135     4.913    <hidden>
+    RAMB36_X1Y40         RAMB36E2 (Setup_RAMB36E2_RAMB36_CLKBWRCLK_ADDRBWRADDR[9])
+                                                     -0.461     4.452    u_softmax_engine/exp_rom_reg_bram_0
+  -------------------------------------------------------------------
+                         required time                          4.452    <hidden>
+                         arrival time                          -5.498    <hidden>
+  -------------------------------------------------------------------
+                         slack                                 -1.047    <hidden>
+
+Slack (VIOLATED) :        -1.044ns  (required time - arrival time)
+  Source:                 u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[5]
+                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
+  Data Path Delay:        5.401ns  (logic 2.050ns (37.954%)  route 3.351ns (62.046%))
+  Logic Levels:           16  (CARRY8=4 LUT2=3 LUT3=1 LUT4=1 LUT5=1 LUT6=4 MUXF7=1 MUXF8=1)
+  Clock Path Skew:        0.005ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.048ns = ( 5.048 - 5.000 ) 
+    Source Clock Delay      (SCD):    0.043ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+    User Uncertainty         (UU):    0.100ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.043     0.043    u_axi_lite_regs/clk
+    SLICE_X32Y193        FDCE                                         r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X32Y193        FDCE (Prop_FFF_SLICEM_C_Q)
+                                                      0.112     0.155 r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/Q
+                         net (fo=7, routed)           0.117     0.272    u_axi_lite_regs/slv_seq_len_reg_reg_n_0_[12]
+    SLICE_X32Y195        LUT4 (Prop_F6LUT_SLICEM_I0_O)
+                                                      0.149     0.421 r  u_axi_lite_regs/cnt_reg[8]_i_19/O
+                         net (fo=1, routed)           0.172     0.593    u_axi_lite_regs/cnt_reg[8]_i_19_n_0
+    SLICE_X32Y200        LUT5 (Prop_E6LUT_SLICEM_I4_O)
+                                                      0.083     0.676 r  u_axi_lite_regs/cnt_reg[8]_i_18/O
+                         net (fo=1, routed)           0.187     0.863    u_axi_lite_regs/cnt_reg[8]_i_18_n_0
+    SLICE_X32Y206        LUT6 (Prop_A6LUT_SLICEM_I4_O)
+                                                      0.083     0.946 r  u_axi_lite_regs/cnt_reg[8]_i_17/O
+                         net (fo=11, routed)          0.119     1.065    u_softmax_engine/cnt_reg_reg[8]_i_3_1
+    SLICE_X32Y207        LUT2 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.148 r  u_softmax_engine/cnt_reg[8]_i_12/O
+                         net (fo=1, routed)           0.018     1.166    u_softmax_engine/cnt_reg[8]_i_12_n_0
+    SLICE_X32Y207        CARRY8 (Prop_CARRY8_SLICEM_S[4]_CO[4])
+                                                      0.100     1.266 r  u_softmax_engine/cnt_reg_reg[8]_i_3/CO[4]
+                         net (fo=42, routed)          0.227     1.493    u_softmax_engine/cnt_reg_reg[8]_0[0]
+    SLICE_X31Y207        LUT3 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.576 r  u_softmax_engine/exp_rom_reg_bram_0_i_1430/O
+                         net (fo=64, routed)          0.438     2.015    u_softmax_engine/exp_rom_reg_bram_0_i_1430_n_0
+    SLICE_X26Y206        LUT6 (Prop_E6LUT_SLICEL_I4_O)
+                                                      0.152     2.167 r  u_softmax_engine/exp_rom_reg_bram_0_i_1131/O
+                         net (fo=1, routed)           0.011     2.178    u_softmax_engine/exp_rom_reg_bram_0_i_1131_n_0
+    SLICE_X26Y206        MUXF7 (Prop_F7MUX_EF_SLICEL_I1_O)
+                                                      0.087     2.265 r  u_softmax_engine/exp_rom_reg_bram_0_i_512/O
+                         net (fo=1, routed)           0.000     2.265    u_softmax_engine/exp_rom_reg_bram_0_i_512_n_0
+    SLICE_X26Y206        MUXF8 (Prop_F8MUX_TOP_SLICEL_I1_O)
+                                                      0.031     2.296 r  u_softmax_engine/exp_rom_reg_bram_0_i_226/O
+                         net (fo=1, routed)           0.293     2.589    u_softmax_engine/exp_rom_reg_bram_0_i_226_n_0
+    SLICE_X25Y205        LUT6 (Prop_E6LUT_SLICEM_I3_O)
+                                                      0.223     2.812 r  u_softmax_engine/exp_rom_reg_bram_0_i_79/O
+                         net (fo=2, routed)           0.397     3.209    u_softmax_engine/exp_rom_reg_bram_0_i_79_n_0
+    SLICE_X32Y209        LUT6 (Prop_C6LUT_SLICEM_I1_O)
+                                                      0.135     3.344 r  u_softmax_engine/exp_rom_reg_bram_0_i_38/O
+                         net (fo=1, routed)           0.151     3.495    u_softmax_engine/score_buffer[0]
+    SLICE_X34Y209        CARRY8 (Prop_CARRY8_SLICEM_DI[0]_CO[7])
+                                                      0.196     3.691 r  u_softmax_engine/exp_rom_reg_bram_0_i_13/CO[7]
+                         net (fo=1, routed)           0.062     3.753    u_softmax_engine/exp_rom_reg_bram_0_i_13_n_0
+    SLICE_X34Y210        CARRY8 (Prop_CARRY8_SLICEM_CI_O[5])
+                                                      0.161     3.914 r  u_softmax_engine/exp_rom_reg_bram_0_i_47/O[5]
+                         net (fo=2, routed)           0.458     4.372    u_softmax_engine/rom_addr2[13]
+    SLICE_X39Y207        LUT2 (Prop_G6LUT_SLICEL_I0_O)
+                                                      0.137     4.509 r  u_softmax_engine/exp_rom_reg_bram_0_i_24/O
+                         net (fo=1, routed)           0.012     4.521    u_softmax_engine/exp_rom_reg_bram_0_i_24_n_0
+    SLICE_X39Y207        CARRY8 (Prop_CARRY8_SLICEL_S[6]_CO[7])
+                                                      0.179     4.700 r  u_softmax_engine/exp_rom_reg_bram_0_i_12/CO[7]
+                         net (fo=8, routed)           0.185     4.885    u_softmax_engine/rom_addr1
+    SLICE_X40Y207        LUT2 (Prop_F6LUT_SLICEM_I1_O)
+                                                      0.056     4.941 r  u_softmax_engine/exp_rom_reg_bram_0_i_10/O
+                         net (fo=1, routed)           0.503     5.444    u_softmax_engine/exp_rom_reg_bram_0_i_10_n_0
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[5]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        5.000     5.000 r  <hidden>
+                                                      0.000     5.000 r  clk
+                         net (fo=57789, unset)        0.048     5.048    u_softmax_engine/clk
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+                         clock pessimism              0.000     5.048    <hidden>
+                         clock uncertainty           -0.135     4.913    <hidden>
+    RAMB36_X1Y40         RAMB36E2 (Setup_RAMB36E2_RAMB36_CLKBWRCLK_ADDRBWRADDR[5])
+                                                     -0.512     4.401    u_softmax_engine/exp_rom_reg_bram_0
+  -------------------------------------------------------------------
+                         required time                          4.401    <hidden>
+                         arrival time                          -5.444    <hidden>
+  -------------------------------------------------------------------
+                         slack                                 -1.044    <hidden>
+
+Slack (VIOLATED) :        -1.010ns  (required time - arrival time)
+  Source:                 u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[12]
+                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
+  Data Path Delay:        5.455ns  (logic 2.052ns (37.619%)  route 3.403ns (62.381%))
+  Logic Levels:           16  (CARRY8=4 LUT2=2 LUT3=1 LUT4=1 LUT5=1 LUT6=5 MUXF7=1 MUXF8=1)
+  Clock Path Skew:        0.005ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.048ns = ( 5.048 - 5.000 ) 
+    Source Clock Delay      (SCD):    0.043ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+    User Uncertainty         (UU):    0.100ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.043     0.043    u_axi_lite_regs/clk
+    SLICE_X32Y193        FDCE                                         r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X32Y193        FDCE (Prop_FFF_SLICEM_C_Q)
+                                                      0.112     0.155 r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/Q
+                         net (fo=7, routed)           0.117     0.272    u_axi_lite_regs/slv_seq_len_reg_reg_n_0_[12]
+    SLICE_X32Y195        LUT4 (Prop_F6LUT_SLICEM_I0_O)
+                                                      0.149     0.421 r  u_axi_lite_regs/cnt_reg[8]_i_19/O
+                         net (fo=1, routed)           0.172     0.593    u_axi_lite_regs/cnt_reg[8]_i_19_n_0
+    SLICE_X32Y200        LUT5 (Prop_E6LUT_SLICEM_I4_O)
+                                                      0.083     0.676 r  u_axi_lite_regs/cnt_reg[8]_i_18/O
+                         net (fo=1, routed)           0.187     0.863    u_axi_lite_regs/cnt_reg[8]_i_18_n_0
+    SLICE_X32Y206        LUT6 (Prop_A6LUT_SLICEM_I4_O)
+                                                      0.083     0.946 r  u_axi_lite_regs/cnt_reg[8]_i_17/O
+                         net (fo=11, routed)          0.119     1.065    u_softmax_engine/cnt_reg_reg[8]_i_3_1
+    SLICE_X32Y207        LUT2 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.148 r  u_softmax_engine/cnt_reg[8]_i_12/O
+                         net (fo=1, routed)           0.018     1.166    u_softmax_engine/cnt_reg[8]_i_12_n_0
+    SLICE_X32Y207        CARRY8 (Prop_CARRY8_SLICEM_S[4]_CO[4])
+                                                      0.100     1.266 r  u_softmax_engine/cnt_reg_reg[8]_i_3/CO[4]
+                         net (fo=42, routed)          0.227     1.493    u_softmax_engine/cnt_reg_reg[8]_0[0]
+    SLICE_X31Y207        LUT3 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.576 r  u_softmax_engine/exp_rom_reg_bram_0_i_1430/O
+                         net (fo=64, routed)          0.438     2.015    u_softmax_engine/exp_rom_reg_bram_0_i_1430_n_0
+    SLICE_X26Y206        LUT6 (Prop_E6LUT_SLICEL_I4_O)
+                                                      0.152     2.167 r  u_softmax_engine/exp_rom_reg_bram_0_i_1131/O
+                         net (fo=1, routed)           0.011     2.178    u_softmax_engine/exp_rom_reg_bram_0_i_1131_n_0
+    SLICE_X26Y206        MUXF7 (Prop_F7MUX_EF_SLICEL_I1_O)
+                                                      0.087     2.265 r  u_softmax_engine/exp_rom_reg_bram_0_i_512/O
+                         net (fo=1, routed)           0.000     2.265    u_softmax_engine/exp_rom_reg_bram_0_i_512_n_0
+    SLICE_X26Y206        MUXF8 (Prop_F8MUX_TOP_SLICEL_I1_O)
+                                                      0.031     2.296 r  u_softmax_engine/exp_rom_reg_bram_0_i_226/O
+                         net (fo=1, routed)           0.293     2.589    u_softmax_engine/exp_rom_reg_bram_0_i_226_n_0
+    SLICE_X25Y205        LUT6 (Prop_E6LUT_SLICEM_I3_O)
+                                                      0.223     2.812 r  u_softmax_engine/exp_rom_reg_bram_0_i_79/O
+                         net (fo=2, routed)           0.397     3.209    u_softmax_engine/exp_rom_reg_bram_0_i_79_n_0
+    SLICE_X32Y209        LUT6 (Prop_C6LUT_SLICEM_I1_O)
+                                                      0.135     3.344 r  u_softmax_engine/exp_rom_reg_bram_0_i_38/O
+                         net (fo=1, routed)           0.151     3.495    u_softmax_engine/score_buffer[0]
+    SLICE_X34Y209        CARRY8 (Prop_CARRY8_SLICEM_DI[0]_CO[7])
+                                                      0.196     3.691 r  u_softmax_engine/exp_rom_reg_bram_0_i_13/CO[7]
+                         net (fo=1, routed)           0.062     3.753    u_softmax_engine/exp_rom_reg_bram_0_i_13_n_0
+    SLICE_X34Y210        CARRY8 (Prop_CARRY8_SLICEM_CI_O[5])
+                                                      0.161     3.914 r  u_softmax_engine/exp_rom_reg_bram_0_i_47/O[5]
+                         net (fo=2, routed)           0.458     4.372    u_softmax_engine/rom_addr2[13]
+    SLICE_X39Y207        LUT2 (Prop_G6LUT_SLICEL_I0_O)
+                                                      0.137     4.509 r  u_softmax_engine/exp_rom_reg_bram_0_i_24/O
+                         net (fo=1, routed)           0.012     4.521    u_softmax_engine/exp_rom_reg_bram_0_i_24_n_0
+    SLICE_X39Y207        CARRY8 (Prop_CARRY8_SLICEL_S[6]_CO[7])
+                                                      0.179     4.700 r  u_softmax_engine/exp_rom_reg_bram_0_i_12/CO[7]
+                         net (fo=8, routed)           0.586     5.285    u_softmax_engine/rom_addr1
+    SLICE_X47Y204        LUT6 (Prop_B6LUT_SLICEL_I0_O)
+                                                      0.058     5.343 r  u_softmax_engine/exp_rom_reg_bram_0_i_3/O
+                         net (fo=1, routed)           0.154     5.498    u_softmax_engine/exp_rom_reg_bram_0_i_3_n_0
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[12]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        5.000     5.000 r  <hidden>
+                                                      0.000     5.000 r  clk
+                         net (fo=57789, unset)        0.048     5.048    u_softmax_engine/clk
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+                         clock pessimism              0.000     5.048    <hidden>
+                         clock uncertainty           -0.135     4.913    <hidden>
+    RAMB36_X1Y40         RAMB36E2 (Setup_RAMB36E2_RAMB36_CLKBWRCLK_ADDRBWRADDR[12])
+                                                     -0.425     4.488    u_softmax_engine/exp_rom_reg_bram_0
+  -------------------------------------------------------------------
+                         required time                          4.488    <hidden>
+                         arrival time                          -5.498    <hidden>
+  -------------------------------------------------------------------
+                         slack                                 -1.010    <hidden>
+
+Slack (VIOLATED) :        -1.008ns  (required time - arrival time)
+  Source:                 u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[6]
+                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
+  Data Path Delay:        5.443ns  (logic 2.050ns (37.663%)  route 3.393ns (62.337%))
+  Logic Levels:           16  (CARRY8=4 LUT2=2 LUT3=2 LUT4=1 LUT5=1 LUT6=4 MUXF7=1 MUXF8=1)
+  Clock Path Skew:        0.005ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.048ns = ( 5.048 - 5.000 ) 
+    Source Clock Delay      (SCD):    0.043ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+    User Uncertainty         (UU):    0.100ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.043     0.043    u_axi_lite_regs/clk
+    SLICE_X32Y193        FDCE                                         r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X32Y193        FDCE (Prop_FFF_SLICEM_C_Q)
+                                                      0.112     0.155 r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/Q
+                         net (fo=7, routed)           0.117     0.272    u_axi_lite_regs/slv_seq_len_reg_reg_n_0_[12]
+    SLICE_X32Y195        LUT4 (Prop_F6LUT_SLICEM_I0_O)
+                                                      0.149     0.421 r  u_axi_lite_regs/cnt_reg[8]_i_19/O
+                         net (fo=1, routed)           0.172     0.593    u_axi_lite_regs/cnt_reg[8]_i_19_n_0
+    SLICE_X32Y200        LUT5 (Prop_E6LUT_SLICEM_I4_O)
+                                                      0.083     0.676 r  u_axi_lite_regs/cnt_reg[8]_i_18/O
+                         net (fo=1, routed)           0.187     0.863    u_axi_lite_regs/cnt_reg[8]_i_18_n_0
+    SLICE_X32Y206        LUT6 (Prop_A6LUT_SLICEM_I4_O)
+                                                      0.083     0.946 r  u_axi_lite_regs/cnt_reg[8]_i_17/O
+                         net (fo=11, routed)          0.119     1.065    u_softmax_engine/cnt_reg_reg[8]_i_3_1
+    SLICE_X32Y207        LUT2 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.148 r  u_softmax_engine/cnt_reg[8]_i_12/O
+                         net (fo=1, routed)           0.018     1.166    u_softmax_engine/cnt_reg[8]_i_12_n_0
+    SLICE_X32Y207        CARRY8 (Prop_CARRY8_SLICEM_S[4]_CO[4])
+                                                      0.100     1.266 r  u_softmax_engine/cnt_reg_reg[8]_i_3/CO[4]
+                         net (fo=42, routed)          0.227     1.493    u_softmax_engine/cnt_reg_reg[8]_0[0]
+    SLICE_X31Y207        LUT3 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.576 r  u_softmax_engine/exp_rom_reg_bram_0_i_1430/O
+                         net (fo=64, routed)          0.438     2.015    u_softmax_engine/exp_rom_reg_bram_0_i_1430_n_0
+    SLICE_X26Y206        LUT6 (Prop_E6LUT_SLICEL_I4_O)
+                                                      0.152     2.167 r  u_softmax_engine/exp_rom_reg_bram_0_i_1131/O
+                         net (fo=1, routed)           0.011     2.178    u_softmax_engine/exp_rom_reg_bram_0_i_1131_n_0
+    SLICE_X26Y206        MUXF7 (Prop_F7MUX_EF_SLICEL_I1_O)
+                                                      0.087     2.265 r  u_softmax_engine/exp_rom_reg_bram_0_i_512/O
+                         net (fo=1, routed)           0.000     2.265    u_softmax_engine/exp_rom_reg_bram_0_i_512_n_0
+    SLICE_X26Y206        MUXF8 (Prop_F8MUX_TOP_SLICEL_I1_O)
+                                                      0.031     2.296 r  u_softmax_engine/exp_rom_reg_bram_0_i_226/O
+                         net (fo=1, routed)           0.293     2.589    u_softmax_engine/exp_rom_reg_bram_0_i_226_n_0
+    SLICE_X25Y205        LUT6 (Prop_E6LUT_SLICEM_I3_O)
+                                                      0.223     2.812 r  u_softmax_engine/exp_rom_reg_bram_0_i_79/O
+                         net (fo=2, routed)           0.397     3.209    u_softmax_engine/exp_rom_reg_bram_0_i_79_n_0
+    SLICE_X32Y209        LUT6 (Prop_C6LUT_SLICEM_I1_O)
+                                                      0.135     3.344 r  u_softmax_engine/exp_rom_reg_bram_0_i_38/O
+                         net (fo=1, routed)           0.151     3.495    u_softmax_engine/score_buffer[0]
+    SLICE_X34Y209        CARRY8 (Prop_CARRY8_SLICEM_DI[0]_CO[7])
+                                                      0.196     3.691 r  u_softmax_engine/exp_rom_reg_bram_0_i_13/CO[7]
+                         net (fo=1, routed)           0.062     3.753    u_softmax_engine/exp_rom_reg_bram_0_i_13_n_0
+    SLICE_X34Y210        CARRY8 (Prop_CARRY8_SLICEM_CI_O[5])
+                                                      0.161     3.914 r  u_softmax_engine/exp_rom_reg_bram_0_i_47/O[5]
+                         net (fo=2, routed)           0.458     4.372    u_softmax_engine/rom_addr2[13]
+    SLICE_X39Y207        LUT2 (Prop_G6LUT_SLICEL_I0_O)
+                                                      0.137     4.509 r  u_softmax_engine/exp_rom_reg_bram_0_i_24/O
+                         net (fo=1, routed)           0.012     4.521    u_softmax_engine/exp_rom_reg_bram_0_i_24_n_0
+    SLICE_X39Y207        CARRY8 (Prop_CARRY8_SLICEL_S[6]_CO[7])
+                                                      0.179     4.700 r  u_softmax_engine/exp_rom_reg_bram_0_i_12/CO[7]
+                         net (fo=8, routed)           0.590     5.289    u_softmax_engine/rom_addr1
+    SLICE_X47Y202        LUT3 (Prop_C6LUT_SLICEL_I0_O)
+                                                      0.056     5.345 r  u_softmax_engine/exp_rom_reg_bram_0_i_9/O
+                         net (fo=1, routed)           0.141     5.486    u_softmax_engine/exp_rom_reg_bram_0_i_9_n_0
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[6]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        5.000     5.000 r  <hidden>
+                                                      0.000     5.000 r  clk
+                         net (fo=57789, unset)        0.048     5.048    u_softmax_engine/clk
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+                         clock pessimism              0.000     5.048    <hidden>
+                         clock uncertainty           -0.135     4.913    <hidden>
+    RAMB36_X1Y40         RAMB36E2 (Setup_RAMB36E2_RAMB36_CLKBWRCLK_ADDRBWRADDR[6])
+                                                     -0.435     4.478    u_softmax_engine/exp_rom_reg_bram_0
+  -------------------------------------------------------------------
+                         required time                          4.478    <hidden>
+                         arrival time                          -5.486    <hidden>
+  -------------------------------------------------------------------
+                         slack                                 -1.008    <hidden>
+
+Slack (VIOLATED) :        -0.998ns  (required time - arrival time)
+  Source:                 u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Destination:            u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[7]
                             (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Path Group:             clk
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
-  Data Path Delay:        4.869ns  (logic 1.532ns (31.463%)  route 3.337ns (68.537%))
-  Logic Levels:           11  (CARRY8=3 LUT2=3 LUT4=1 LUT6=2 MUXF7=1 MUXF8=1)
-  Clock Path Skew:        0.007ns (DCD - SCD + CPR)
+  Data Path Delay:        5.434ns  (logic 2.051ns (37.742%)  route 3.383ns (62.258%))
+  Logic Levels:           16  (CARRY8=4 LUT2=2 LUT3=1 LUT4=2 LUT5=1 LUT6=4 MUXF7=1 MUXF8=1)
+  Clock Path Skew:        0.005ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    0.048ns = ( 5.048 - 5.000 ) 
-    Source Clock Delay      (SCD):    0.041ns
+    Source Clock Delay      (SCD):    0.043ns
     Clock Pessimism Removal (CPR):    0.000ns
   Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
     Total System Jitter     (TSJ):    0.071ns
@@ -226,75 +802,90 @@ Slack (VIOLATED) :        -0.431ns  (required time - arrival time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.041     0.041    u_softmax_engine/clk
-    SLICE_X23Y24         FDCE                                         r  u_softmax_engine/cnt_reg_reg[8]/C
+                         net (fo=57789, unset)        0.043     0.043    u_axi_lite_regs/clk
+    SLICE_X32Y193        FDCE                                         r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X23Y24         FDCE (Prop_AFF_SLICEL_C_Q)
-                                                      0.114     0.155 f  u_softmax_engine/cnt_reg_reg[8]/Q
-                         net (fo=65, routed)          0.377     0.532    u_softmax_engine/cnt_reg[8]
-    SLICE_X22Y24         LUT2 (Prop_H6LUT_SLICEL_I1_O)
-                                                      0.137     0.669 r  u_softmax_engine/score_buffer[43][15]_i_2/O
-                         net (fo=523, routed)         1.338     2.006    u_softmax_engine/score_buffer[43][15]_i_2_n_0
-    SLICE_X28Y13         MUXF7 (Prop_F7MUX_CD_SLICEM_S_O)
-                                                      0.105     2.111 r  u_softmax_engine/exp_rom_reg_bram_0_i_500/O
-                         net (fo=1, routed)           0.000     2.111    u_softmax_engine/exp_rom_reg_bram_0_i_500_n_0
-    SLICE_X28Y13         MUXF8 (Prop_F8MUX_BOT_SLICEM_I0_O)
-                                                      0.036     2.147 r  u_softmax_engine/exp_rom_reg_bram_0_i_218/O
-                         net (fo=1, routed)           0.432     2.579    u_softmax_engine/exp_rom_reg_bram_0_i_218_n_0
-    SLICE_X24Y15         LUT6 (Prop_A6LUT_SLICEM_I5_O)
-                                                      0.058     2.637 r  u_softmax_engine/exp_rom_reg_bram_0_i_78/O
-                         net (fo=1, routed)           0.110     2.747    u_softmax_engine/exp_rom_reg_bram_0_i_78_n_0
-    SLICE_X24Y17         LUT6 (Prop_C6LUT_SLICEM_I3_O)
-                                                      0.149     2.896 r  u_softmax_engine/exp_rom_reg_bram_0_i_38/O
-                         net (fo=2, routed)           0.105     3.001    u_softmax_engine/score_buffer[0]
-    SLICE_X23Y17         LUT2 (Prop_A6LUT_SLICEL_I0_O)
-                                                      0.058     3.059 r  u_softmax_engine/exp_rom_reg_bram_0_i_46/O
-                         net (fo=1, routed)           0.014     3.073    u_softmax_engine/exp_rom_reg_bram_0_i_46_n_0
-    SLICE_X23Y17         CARRY8 (Prop_CARRY8_SLICEL_S[0]_CO[7])
-                                                      0.278     3.351 r  u_softmax_engine/exp_rom_reg_bram_0_i_13/CO[7]
-                         net (fo=1, routed)           0.030     3.381    u_softmax_engine/exp_rom_reg_bram_0_i_13_n_0
-    SLICE_X23Y18         CARRY8 (Prop_CARRY8_SLICEL_CI_O[7])
-                                                      0.171     3.552 r  u_softmax_engine/exp_rom_reg_bram_0_i_47/O[7]
-                         net (fo=2, routed)           0.204     3.756    u_softmax_engine/rom_addr2[15]
-    SLICE_X23Y16         LUT2 (Prop_H6LUT_SLICEL_I1_O)
-                                                      0.188     3.944 r  u_softmax_engine/exp_rom_reg_bram_0_i_23/O
-                         net (fo=1, routed)           0.015     3.959    u_softmax_engine/exp_rom_reg_bram_0_i_23_n_0
-    SLICE_X23Y16         CARRY8 (Prop_CARRY8_SLICEL_S[7]_CO[7])
-                                                      0.180     4.139 r  u_softmax_engine/exp_rom_reg_bram_0_i_12/CO[7]
-                         net (fo=8, routed)           0.370     4.510    u_softmax_engine/rom_addr1
-    SLICE_X26Y10         LUT4 (Prop_A6LUT_SLICEL_I0_O)
-                                                      0.058     4.568 r  u_softmax_engine/exp_rom_reg_bram_0_i_8/O
-                         net (fo=1, routed)           0.343     4.910    u_softmax_engine/exp_rom_reg_bram_0_i_8_n_0
-    RAMB36_X0Y1          RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[7]
+    SLICE_X32Y193        FDCE (Prop_FFF_SLICEM_C_Q)
+                                                      0.112     0.155 r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/Q
+                         net (fo=7, routed)           0.117     0.272    u_axi_lite_regs/slv_seq_len_reg_reg_n_0_[12]
+    SLICE_X32Y195        LUT4 (Prop_F6LUT_SLICEM_I0_O)
+                                                      0.149     0.421 r  u_axi_lite_regs/cnt_reg[8]_i_19/O
+                         net (fo=1, routed)           0.172     0.593    u_axi_lite_regs/cnt_reg[8]_i_19_n_0
+    SLICE_X32Y200        LUT5 (Prop_E6LUT_SLICEM_I4_O)
+                                                      0.083     0.676 r  u_axi_lite_regs/cnt_reg[8]_i_18/O
+                         net (fo=1, routed)           0.187     0.863    u_axi_lite_regs/cnt_reg[8]_i_18_n_0
+    SLICE_X32Y206        LUT6 (Prop_A6LUT_SLICEM_I4_O)
+                                                      0.083     0.946 r  u_axi_lite_regs/cnt_reg[8]_i_17/O
+                         net (fo=11, routed)          0.119     1.065    u_softmax_engine/cnt_reg_reg[8]_i_3_1
+    SLICE_X32Y207        LUT2 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.148 r  u_softmax_engine/cnt_reg[8]_i_12/O
+                         net (fo=1, routed)           0.018     1.166    u_softmax_engine/cnt_reg[8]_i_12_n_0
+    SLICE_X32Y207        CARRY8 (Prop_CARRY8_SLICEM_S[4]_CO[4])
+                                                      0.100     1.266 r  u_softmax_engine/cnt_reg_reg[8]_i_3/CO[4]
+                         net (fo=42, routed)          0.227     1.493    u_softmax_engine/cnt_reg_reg[8]_0[0]
+    SLICE_X31Y207        LUT3 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.576 r  u_softmax_engine/exp_rom_reg_bram_0_i_1430/O
+                         net (fo=64, routed)          0.438     2.015    u_softmax_engine/exp_rom_reg_bram_0_i_1430_n_0
+    SLICE_X26Y206        LUT6 (Prop_E6LUT_SLICEL_I4_O)
+                                                      0.152     2.167 r  u_softmax_engine/exp_rom_reg_bram_0_i_1131/O
+                         net (fo=1, routed)           0.011     2.178    u_softmax_engine/exp_rom_reg_bram_0_i_1131_n_0
+    SLICE_X26Y206        MUXF7 (Prop_F7MUX_EF_SLICEL_I1_O)
+                                                      0.087     2.265 r  u_softmax_engine/exp_rom_reg_bram_0_i_512/O
+                         net (fo=1, routed)           0.000     2.265    u_softmax_engine/exp_rom_reg_bram_0_i_512_n_0
+    SLICE_X26Y206        MUXF8 (Prop_F8MUX_TOP_SLICEL_I1_O)
+                                                      0.031     2.296 r  u_softmax_engine/exp_rom_reg_bram_0_i_226/O
+                         net (fo=1, routed)           0.293     2.589    u_softmax_engine/exp_rom_reg_bram_0_i_226_n_0
+    SLICE_X25Y205        LUT6 (Prop_E6LUT_SLICEM_I3_O)
+                                                      0.223     2.812 r  u_softmax_engine/exp_rom_reg_bram_0_i_79/O
+                         net (fo=2, routed)           0.397     3.209    u_softmax_engine/exp_rom_reg_bram_0_i_79_n_0
+    SLICE_X32Y209        LUT6 (Prop_C6LUT_SLICEM_I1_O)
+                                                      0.135     3.344 r  u_softmax_engine/exp_rom_reg_bram_0_i_38/O
+                         net (fo=1, routed)           0.151     3.495    u_softmax_engine/score_buffer[0]
+    SLICE_X34Y209        CARRY8 (Prop_CARRY8_SLICEM_DI[0]_CO[7])
+                                                      0.196     3.691 r  u_softmax_engine/exp_rom_reg_bram_0_i_13/CO[7]
+                         net (fo=1, routed)           0.062     3.753    u_softmax_engine/exp_rom_reg_bram_0_i_13_n_0
+    SLICE_X34Y210        CARRY8 (Prop_CARRY8_SLICEM_CI_O[5])
+                                                      0.161     3.914 r  u_softmax_engine/exp_rom_reg_bram_0_i_47/O[5]
+                         net (fo=2, routed)           0.458     4.372    u_softmax_engine/rom_addr2[13]
+    SLICE_X39Y207        LUT2 (Prop_G6LUT_SLICEL_I0_O)
+                                                      0.137     4.509 r  u_softmax_engine/exp_rom_reg_bram_0_i_24/O
+                         net (fo=1, routed)           0.012     4.521    u_softmax_engine/exp_rom_reg_bram_0_i_24_n_0
+    SLICE_X39Y207        CARRY8 (Prop_CARRY8_SLICEL_S[6]_CO[7])
+                                                      0.179     4.700 r  u_softmax_engine/exp_rom_reg_bram_0_i_12/CO[7]
+                         net (fo=8, routed)           0.185     4.885    u_softmax_engine/rom_addr1
+    SLICE_X40Y207        LUT4 (Prop_E6LUT_SLICEM_I0_O)
+                                                      0.057     4.942 r  u_softmax_engine/exp_rom_reg_bram_0_i_8/O
+                         net (fo=1, routed)           0.535     5.477    u_softmax_engine/exp_rom_reg_bram_0_i_8_n_0
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[7]
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        5.000     5.000 r  <hidden>
                                                       0.000     5.000 r  clk
-                         net (fo=57827, unset)        0.048     5.048    u_softmax_engine/clk
-    RAMB36_X0Y1          RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+                         net (fo=57789, unset)        0.048     5.048    u_softmax_engine/clk
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
                          clock pessimism              0.000     5.048    <hidden>
                          clock uncertainty           -0.135     4.913    <hidden>
-    RAMB36_X0Y1          RAMB36E2 (Setup_RAMB36E2_RAMB36_CLKBWRCLK_ADDRBWRADDR[7])
+    RAMB36_X1Y40         RAMB36E2 (Setup_RAMB36E2_RAMB36_CLKBWRCLK_ADDRBWRADDR[7])
                                                      -0.433     4.480    u_softmax_engine/exp_rom_reg_bram_0
   -------------------------------------------------------------------
                          required time                          4.480    <hidden>
-                         arrival time                          -4.910    <hidden>
+                         arrival time                          -5.477    <hidden>
   -------------------------------------------------------------------
-                         slack                                 -0.431    <hidden>
+                         slack                                 -0.998    <hidden>
 
-Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
-  Source:                 u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+Slack (VIOLATED) :        -0.992ns  (required time - arrival time)
+  Source:                 u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[8]
                             (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[0]
-                            (rising edge-triggered cell DSP_OUTPUT clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Path Group:             clk
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
-  Data Path Delay:        5.242ns  (logic 4.077ns (77.769%)  route 1.165ns (22.231%))
-  Logic Levels:           7  (DSP_A_B_DATA=1 DSP_ALU=2 DSP_M_DATA=1 DSP_MULTIPLIER=1 DSP_OUTPUT=1 DSP_PREADD_DATA=1)
-  Clock Path Skew:        -0.051ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    0.055ns = ( 5.055 - 5.000 ) 
-    Source Clock Delay      (SCD):    0.106ns
+  Data Path Delay:        5.400ns  (logic 2.052ns (38.000%)  route 3.348ns (62.000%))
+  Logic Levels:           16  (CARRY8=4 LUT2=2 LUT3=1 LUT4=1 LUT5=2 LUT6=4 MUXF7=1 MUXF8=1)
+  Clock Path Skew:        0.005ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.048ns = ( 5.048 - 5.000 ) 
+    Source Clock Delay      (SCD):    0.043ns
     Clock Pessimism Removal (CPR):    0.000ns
   Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
     Total System Jitter     (TSJ):    0.071ns
@@ -307,63 +898,90 @@ Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.106     0.106    u_softmax_engine/clk
-    RAMB36_X0Y1          RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+                         net (fo=57789, unset)        0.043     0.043    u_axi_lite_regs/clk
+    SLICE_X32Y193        FDCE                                         r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/C
   -------------------------------------------------------------------    -------------------
-    RAMB36_X0Y1          RAMB36E2 (Prop_RAMB36E2_RAMB36_CLKBWRCLK_DOUTBDOUT[7])
-                                                      1.305     1.411 f  u_softmax_engine/exp_rom_reg_bram_0/DOUTBDOUT[7]
-                         net (fo=3, routed)           1.151     2.562    u_softmax_engine/mult_full_reg0/A[7]
-    DSP48E2_X4Y10        DSP_A_B_DATA (Prop_DSP_A_B_DATA_DSP48E2_A[7]_A2_DATA[7])
-                                                      0.258     2.820 r  u_softmax_engine/mult_full_reg0/DSP_A_B_DATA_INST/A2_DATA[7]
-                         net (fo=1, routed)           0.000     2.820    u_softmax_engine/mult_full_reg0/DSP_A_B_DATA.A2_DATA<7>
-    DSP48E2_X4Y10        DSP_PREADD_DATA (Prop_DSP_PREADD_DATA_DSP48E2_A2_DATA[7]_A2A1[7])
-                                                      0.114     2.934 r  u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA_INST/A2A1[7]
-                         net (fo=1, routed)           0.000     2.934    u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA.A2A1<7>
-    DSP48E2_X4Y10        DSP_MULTIPLIER (Prop_DSP_MULTIPLIER_DSP48E2_A2A1[7]_U[28])
-                                                      0.700     3.634 f  u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER_INST/U[28]
-                         net (fo=1, routed)           0.000     3.634    u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER.U<28>
-    DSP48E2_X4Y10        DSP_M_DATA (Prop_DSP_M_DATA_DSP48E2_U[28]_U_DATA[28])
-                                                      0.067     3.701 r  u_softmax_engine/mult_full_reg0/DSP_M_DATA_INST/U_DATA[28]
-                         net (fo=1, routed)           0.000     3.701    u_softmax_engine/mult_full_reg0/DSP_M_DATA.U_DATA<28>
-    DSP48E2_X4Y10        DSP_ALU (Prop_DSP_ALU_DSP48E2_U_DATA[28]_ALU_OUT[47])
-                                                      0.727     4.428 f  u_softmax_engine/mult_full_reg0/DSP_ALU_INST/ALU_OUT[47]
-                         net (fo=1, routed)           0.000     4.428    u_softmax_engine/mult_full_reg0/DSP_ALU.ALU_OUT<47>
-    DSP48E2_X4Y10        DSP_OUTPUT (Prop_DSP_OUTPUT_DSP48E2_ALU_OUT[47]_PCOUT[47])
-                                                      0.167     4.595 r  u_softmax_engine/mult_full_reg0/DSP_OUTPUT_INST/PCOUT[47]
-                         net (fo=1, routed)           0.014     4.609    u_softmax_engine/mult_full_reg0__0/PCIN[47]
-    DSP48E2_X4Y11        DSP_ALU (Prop_DSP_ALU_DSP48E2_PCIN[47]_ALU_OUT[0])
-                                                      0.739     5.348 r  u_softmax_engine/mult_full_reg0__0/DSP_ALU_INST/ALU_OUT[0]
-                         net (fo=1, routed)           0.000     5.348    u_softmax_engine/mult_full_reg0__0/DSP_ALU.ALU_OUT<0>
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[0]
+    SLICE_X32Y193        FDCE (Prop_FFF_SLICEM_C_Q)
+                                                      0.112     0.155 r  u_axi_lite_regs/slv_seq_len_reg_reg[12]/Q
+                         net (fo=7, routed)           0.117     0.272    u_axi_lite_regs/slv_seq_len_reg_reg_n_0_[12]
+    SLICE_X32Y195        LUT4 (Prop_F6LUT_SLICEM_I0_O)
+                                                      0.149     0.421 r  u_axi_lite_regs/cnt_reg[8]_i_19/O
+                         net (fo=1, routed)           0.172     0.593    u_axi_lite_regs/cnt_reg[8]_i_19_n_0
+    SLICE_X32Y200        LUT5 (Prop_E6LUT_SLICEM_I4_O)
+                                                      0.083     0.676 r  u_axi_lite_regs/cnt_reg[8]_i_18/O
+                         net (fo=1, routed)           0.187     0.863    u_axi_lite_regs/cnt_reg[8]_i_18_n_0
+    SLICE_X32Y206        LUT6 (Prop_A6LUT_SLICEM_I4_O)
+                                                      0.083     0.946 r  u_axi_lite_regs/cnt_reg[8]_i_17/O
+                         net (fo=11, routed)          0.119     1.065    u_softmax_engine/cnt_reg_reg[8]_i_3_1
+    SLICE_X32Y207        LUT2 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.148 r  u_softmax_engine/cnt_reg[8]_i_12/O
+                         net (fo=1, routed)           0.018     1.166    u_softmax_engine/cnt_reg[8]_i_12_n_0
+    SLICE_X32Y207        CARRY8 (Prop_CARRY8_SLICEM_S[4]_CO[4])
+                                                      0.100     1.266 r  u_softmax_engine/cnt_reg_reg[8]_i_3/CO[4]
+                         net (fo=42, routed)          0.227     1.493    u_softmax_engine/cnt_reg_reg[8]_0[0]
+    SLICE_X31Y207        LUT3 (Prop_E6LUT_SLICEM_I1_O)
+                                                      0.083     1.576 r  u_softmax_engine/exp_rom_reg_bram_0_i_1430/O
+                         net (fo=64, routed)          0.438     2.015    u_softmax_engine/exp_rom_reg_bram_0_i_1430_n_0
+    SLICE_X26Y206        LUT6 (Prop_E6LUT_SLICEL_I4_O)
+                                                      0.152     2.167 r  u_softmax_engine/exp_rom_reg_bram_0_i_1131/O
+                         net (fo=1, routed)           0.011     2.178    u_softmax_engine/exp_rom_reg_bram_0_i_1131_n_0
+    SLICE_X26Y206        MUXF7 (Prop_F7MUX_EF_SLICEL_I1_O)
+                                                      0.087     2.265 r  u_softmax_engine/exp_rom_reg_bram_0_i_512/O
+                         net (fo=1, routed)           0.000     2.265    u_softmax_engine/exp_rom_reg_bram_0_i_512_n_0
+    SLICE_X26Y206        MUXF8 (Prop_F8MUX_TOP_SLICEL_I1_O)
+                                                      0.031     2.296 r  u_softmax_engine/exp_rom_reg_bram_0_i_226/O
+                         net (fo=1, routed)           0.293     2.589    u_softmax_engine/exp_rom_reg_bram_0_i_226_n_0
+    SLICE_X25Y205        LUT6 (Prop_E6LUT_SLICEM_I3_O)
+                                                      0.223     2.812 r  u_softmax_engine/exp_rom_reg_bram_0_i_79/O
+                         net (fo=2, routed)           0.397     3.209    u_softmax_engine/exp_rom_reg_bram_0_i_79_n_0
+    SLICE_X32Y209        LUT6 (Prop_C6LUT_SLICEM_I1_O)
+                                                      0.135     3.344 r  u_softmax_engine/exp_rom_reg_bram_0_i_38/O
+                         net (fo=1, routed)           0.151     3.495    u_softmax_engine/score_buffer[0]
+    SLICE_X34Y209        CARRY8 (Prop_CARRY8_SLICEM_DI[0]_CO[7])
+                                                      0.196     3.691 r  u_softmax_engine/exp_rom_reg_bram_0_i_13/CO[7]
+                         net (fo=1, routed)           0.062     3.753    u_softmax_engine/exp_rom_reg_bram_0_i_13_n_0
+    SLICE_X34Y210        CARRY8 (Prop_CARRY8_SLICEM_CI_O[5])
+                                                      0.161     3.914 r  u_softmax_engine/exp_rom_reg_bram_0_i_47/O[5]
+                         net (fo=2, routed)           0.458     4.372    u_softmax_engine/rom_addr2[13]
+    SLICE_X39Y207        LUT2 (Prop_G6LUT_SLICEL_I0_O)
+                                                      0.137     4.509 r  u_softmax_engine/exp_rom_reg_bram_0_i_24/O
+                         net (fo=1, routed)           0.012     4.521    u_softmax_engine/exp_rom_reg_bram_0_i_24_n_0
+    SLICE_X39Y207        CARRY8 (Prop_CARRY8_SLICEL_S[6]_CO[7])
+                                                      0.179     4.700 r  u_softmax_engine/exp_rom_reg_bram_0_i_12/CO[7]
+                         net (fo=8, routed)           0.541     5.240    u_softmax_engine/rom_addr1
+    SLICE_X47Y203        LUT5 (Prop_B6LUT_SLICEL_I0_O)
+                                                      0.058     5.298 r  u_softmax_engine/exp_rom_reg_bram_0_i_7/O
+                         net (fo=1, routed)           0.144     5.443    u_softmax_engine/exp_rom_reg_bram_0_i_7_n_0
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/ADDRBWRADDR[8]
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        5.000     5.000 r  <hidden>
                                                       0.000     5.000 r  clk
-                         net (fo=57827, unset)        0.055     5.055    u_softmax_engine/mult_full_reg0__0/CLK
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/CLK
-                         clock pessimism              0.000     5.055    <hidden>
-                         clock uncertainty           -0.135     4.920    <hidden>
-    DSP48E2_X4Y11        DSP_OUTPUT (Setup_DSP_OUTPUT_DSP48E2_CLK_ALU_OUT[0])
-                                                      0.014     4.934    u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST
+                         net (fo=57789, unset)        0.048     5.048    u_softmax_engine/clk
+    RAMB36_X1Y40         RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+                         clock pessimism              0.000     5.048    <hidden>
+                         clock uncertainty           -0.135     4.913    <hidden>
+    RAMB36_X1Y40         RAMB36E2 (Setup_RAMB36E2_RAMB36_CLKBWRCLK_ADDRBWRADDR[8])
+                                                     -0.462     4.451    u_softmax_engine/exp_rom_reg_bram_0
   -------------------------------------------------------------------
-                         required time                          4.934    <hidden>
-                         arrival time                          -5.348    <hidden>
+                         required time                          4.451    <hidden>
+                         arrival time                          -5.443    <hidden>
   -------------------------------------------------------------------
-                         slack                                 -0.415    <hidden>
+                         slack                                 -0.992    <hidden>
 
-Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
-  Source:                 u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[10]
-                            (rising edge-triggered cell DSP_OUTPUT clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+Slack (VIOLATED) :        -0.453ns  (required time - arrival time)
+  Source:                 u_skid_buffer_rx/reg_main_data_reg[54]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            k_mem_lo_reg_r5_64_127_49_55/RAMF/I
+                            (rising edge-triggered cell RAMD64E clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Path Group:             clk
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
-  Data Path Delay:        5.242ns  (logic 4.077ns (77.769%)  route 1.165ns (22.231%))
-  Logic Levels:           7  (DSP_A_B_DATA=1 DSP_ALU=2 DSP_M_DATA=1 DSP_MULTIPLIER=1 DSP_OUTPUT=1 DSP_PREADD_DATA=1)
-  Clock Path Skew:        -0.051ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    0.055ns = ( 5.055 - 5.000 ) 
-    Source Clock Delay      (SCD):    0.106ns
+  Data Path Delay:        5.197ns  (logic 0.116ns (2.232%)  route 5.081ns (97.768%))
+  Logic Levels:           0  
+  Clock Path Skew:        0.017ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.059ns = ( 5.059 - 5.000 ) 
+    Source Clock Delay      (SCD):    0.042ns
     Clock Pessimism Removal (CPR):    0.000ns
   Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
     Total System Jitter     (TSJ):    0.071ns
@@ -376,63 +994,42 @@ Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.106     0.106    u_softmax_engine/clk
-    RAMB36_X0Y1          RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+                         net (fo=57789, unset)        0.042     0.042    u_skid_buffer_rx/clk
+    SLICE_X55Y21         FDCE                                         r  u_skid_buffer_rx/reg_main_data_reg[54]/C
   -------------------------------------------------------------------    -------------------
-    RAMB36_X0Y1          RAMB36E2 (Prop_RAMB36E2_RAMB36_CLKBWRCLK_DOUTBDOUT[7])
-                                                      1.305     1.411 f  u_softmax_engine/exp_rom_reg_bram_0/DOUTBDOUT[7]
-                         net (fo=3, routed)           1.151     2.562    u_softmax_engine/mult_full_reg0/A[7]
-    DSP48E2_X4Y10        DSP_A_B_DATA (Prop_DSP_A_B_DATA_DSP48E2_A[7]_A2_DATA[7])
-                                                      0.258     2.820 r  u_softmax_engine/mult_full_reg0/DSP_A_B_DATA_INST/A2_DATA[7]
-                         net (fo=1, routed)           0.000     2.820    u_softmax_engine/mult_full_reg0/DSP_A_B_DATA.A2_DATA<7>
-    DSP48E2_X4Y10        DSP_PREADD_DATA (Prop_DSP_PREADD_DATA_DSP48E2_A2_DATA[7]_A2A1[7])
-                                                      0.114     2.934 r  u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA_INST/A2A1[7]
-                         net (fo=1, routed)           0.000     2.934    u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA.A2A1<7>
-    DSP48E2_X4Y10        DSP_MULTIPLIER (Prop_DSP_MULTIPLIER_DSP48E2_A2A1[7]_U[28])
-                                                      0.700     3.634 f  u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER_INST/U[28]
-                         net (fo=1, routed)           0.000     3.634    u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER.U<28>
-    DSP48E2_X4Y10        DSP_M_DATA (Prop_DSP_M_DATA_DSP48E2_U[28]_U_DATA[28])
-                                                      0.067     3.701 r  u_softmax_engine/mult_full_reg0/DSP_M_DATA_INST/U_DATA[28]
-                         net (fo=1, routed)           0.000     3.701    u_softmax_engine/mult_full_reg0/DSP_M_DATA.U_DATA<28>
-    DSP48E2_X4Y10        DSP_ALU (Prop_DSP_ALU_DSP48E2_U_DATA[28]_ALU_OUT[47])
-                                                      0.727     4.428 f  u_softmax_engine/mult_full_reg0/DSP_ALU_INST/ALU_OUT[47]
-                         net (fo=1, routed)           0.000     4.428    u_softmax_engine/mult_full_reg0/DSP_ALU.ALU_OUT<47>
-    DSP48E2_X4Y10        DSP_OUTPUT (Prop_DSP_OUTPUT_DSP48E2_ALU_OUT[47]_PCOUT[47])
-                                                      0.167     4.595 r  u_softmax_engine/mult_full_reg0/DSP_OUTPUT_INST/PCOUT[47]
-                         net (fo=1, routed)           0.014     4.609    u_softmax_engine/mult_full_reg0__0/PCIN[47]
-    DSP48E2_X4Y11        DSP_ALU (Prop_DSP_ALU_DSP48E2_PCIN[47]_ALU_OUT[10])
-                                                      0.739     5.348 r  u_softmax_engine/mult_full_reg0__0/DSP_ALU_INST/ALU_OUT[10]
-                         net (fo=1, routed)           0.000     5.348    u_softmax_engine/mult_full_reg0__0/DSP_ALU.ALU_OUT<10>
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[10]
+    SLICE_X55Y21         FDCE (Prop_EFF2_SLICEL_C_Q)
+                                                      0.116     0.158 r  u_skid_buffer_rx/reg_main_data_reg[54]/Q
+                         net (fo=104, routed)         5.081     5.239    k_mem_lo_reg_r5_64_127_49_55/DIF
+    SLICE_X24Y116        RAMD64E                                      r  k_mem_lo_reg_r5_64_127_49_55/RAMF/I
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        5.000     5.000 r  <hidden>
                                                       0.000     5.000 r  clk
-                         net (fo=57827, unset)        0.055     5.055    u_softmax_engine/mult_full_reg0__0/CLK
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/CLK
-                         clock pessimism              0.000     5.055    <hidden>
-                         clock uncertainty           -0.135     4.920    <hidden>
-    DSP48E2_X4Y11        DSP_OUTPUT (Setup_DSP_OUTPUT_DSP48E2_CLK_ALU_OUT[10])
-                                                      0.014     4.934    u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST
+                         net (fo=57789, unset)        0.059     5.059    k_mem_lo_reg_r5_64_127_49_55/WCLK
+    SLICE_X24Y116        RAMD64E                                      r  k_mem_lo_reg_r5_64_127_49_55/RAMF/CLK
+                         clock pessimism              0.000     5.059    <hidden>
+                         clock uncertainty           -0.135     4.924    <hidden>
+    SLICE_X24Y116        RAMD64E (Setup_F6LUT_SLICEM_CLK_I)
+                                                     -0.138     4.786    k_mem_lo_reg_r5_64_127_49_55/RAMF
   -------------------------------------------------------------------
-                         required time                          4.934    <hidden>
-                         arrival time                          -5.348    <hidden>
+                         required time                          4.786    <hidden>
+                         arrival time                          -5.239    <hidden>
   -------------------------------------------------------------------
-                         slack                                 -0.415    <hidden>
+                         slack                                 -0.453    <hidden>
 
-Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
-  Source:                 u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[11]
-                            (rising edge-triggered cell DSP_OUTPUT clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+Slack (VIOLATED) :        -0.452ns  (required time - arrival time)
+  Source:                 u_skid_buffer_rx/reg_main_data_reg[14]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            k_mem_hi_reg_r7_64_127_14_20/RAMA/I
+                            (rising edge-triggered cell RAMD64E clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Path Group:             clk
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
-  Data Path Delay:        5.242ns  (logic 4.077ns (77.769%)  route 1.165ns (22.231%))
-  Logic Levels:           7  (DSP_A_B_DATA=1 DSP_ALU=2 DSP_M_DATA=1 DSP_MULTIPLIER=1 DSP_OUTPUT=1 DSP_PREADD_DATA=1)
-  Clock Path Skew:        -0.051ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    0.055ns = ( 5.055 - 5.000 ) 
-    Source Clock Delay      (SCD):    0.106ns
+  Data Path Delay:        5.196ns  (logic 0.117ns (2.252%)  route 5.079ns (97.748%))
+  Logic Levels:           0  
+  Clock Path Skew:        0.017ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.059ns = ( 5.059 - 5.000 ) 
+    Source Clock Delay      (SCD):    0.042ns
     Clock Pessimism Removal (CPR):    0.000ns
   Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
     Total System Jitter     (TSJ):    0.071ns
@@ -445,463 +1042,28 @@ Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.106     0.106    u_softmax_engine/clk
-    RAMB36_X0Y1          RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+                         net (fo=57789, unset)        0.042     0.042    u_skid_buffer_rx/clk
+    SLICE_X56Y20         FDCE                                         r  u_skid_buffer_rx/reg_main_data_reg[14]/C
   -------------------------------------------------------------------    -------------------
-    RAMB36_X0Y1          RAMB36E2 (Prop_RAMB36E2_RAMB36_CLKBWRCLK_DOUTBDOUT[7])
-                                                      1.305     1.411 f  u_softmax_engine/exp_rom_reg_bram_0/DOUTBDOUT[7]
-                         net (fo=3, routed)           1.151     2.562    u_softmax_engine/mult_full_reg0/A[7]
-    DSP48E2_X4Y10        DSP_A_B_DATA (Prop_DSP_A_B_DATA_DSP48E2_A[7]_A2_DATA[7])
-                                                      0.258     2.820 r  u_softmax_engine/mult_full_reg0/DSP_A_B_DATA_INST/A2_DATA[7]
-                         net (fo=1, routed)           0.000     2.820    u_softmax_engine/mult_full_reg0/DSP_A_B_DATA.A2_DATA<7>
-    DSP48E2_X4Y10        DSP_PREADD_DATA (Prop_DSP_PREADD_DATA_DSP48E2_A2_DATA[7]_A2A1[7])
-                                                      0.114     2.934 r  u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA_INST/A2A1[7]
-                         net (fo=1, routed)           0.000     2.934    u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA.A2A1<7>
-    DSP48E2_X4Y10        DSP_MULTIPLIER (Prop_DSP_MULTIPLIER_DSP48E2_A2A1[7]_U[28])
-                                                      0.700     3.634 f  u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER_INST/U[28]
-                         net (fo=1, routed)           0.000     3.634    u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER.U<28>
-    DSP48E2_X4Y10        DSP_M_DATA (Prop_DSP_M_DATA_DSP48E2_U[28]_U_DATA[28])
-                                                      0.067     3.701 r  u_softmax_engine/mult_full_reg0/DSP_M_DATA_INST/U_DATA[28]
-                         net (fo=1, routed)           0.000     3.701    u_softmax_engine/mult_full_reg0/DSP_M_DATA.U_DATA<28>
-    DSP48E2_X4Y10        DSP_ALU (Prop_DSP_ALU_DSP48E2_U_DATA[28]_ALU_OUT[47])
-                                                      0.727     4.428 f  u_softmax_engine/mult_full_reg0/DSP_ALU_INST/ALU_OUT[47]
-                         net (fo=1, routed)           0.000     4.428    u_softmax_engine/mult_full_reg0/DSP_ALU.ALU_OUT<47>
-    DSP48E2_X4Y10        DSP_OUTPUT (Prop_DSP_OUTPUT_DSP48E2_ALU_OUT[47]_PCOUT[47])
-                                                      0.167     4.595 r  u_softmax_engine/mult_full_reg0/DSP_OUTPUT_INST/PCOUT[47]
-                         net (fo=1, routed)           0.014     4.609    u_softmax_engine/mult_full_reg0__0/PCIN[47]
-    DSP48E2_X4Y11        DSP_ALU (Prop_DSP_ALU_DSP48E2_PCIN[47]_ALU_OUT[11])
-                                                      0.739     5.348 r  u_softmax_engine/mult_full_reg0__0/DSP_ALU_INST/ALU_OUT[11]
-                         net (fo=1, routed)           0.000     5.348    u_softmax_engine/mult_full_reg0__0/DSP_ALU.ALU_OUT<11>
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[11]
+    SLICE_X56Y20         FDCE (Prop_FFF2_SLICEL_C_Q)
+                                                      0.117     0.159 r  u_skid_buffer_rx/reg_main_data_reg[14]/Q
+                         net (fo=104, routed)         5.079     5.238    k_mem_hi_reg_r7_64_127_14_20/DIA
+    SLICE_X10Y182        RAMD64E                                      r  k_mem_hi_reg_r7_64_127_14_20/RAMA/I
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        5.000     5.000 r  <hidden>
                                                       0.000     5.000 r  clk
-                         net (fo=57827, unset)        0.055     5.055    u_softmax_engine/mult_full_reg0__0/CLK
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/CLK
-                         clock pessimism              0.000     5.055    <hidden>
-                         clock uncertainty           -0.135     4.920    <hidden>
-    DSP48E2_X4Y11        DSP_OUTPUT (Setup_DSP_OUTPUT_DSP48E2_CLK_ALU_OUT[11])
-                                                      0.014     4.934    u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST
+                         net (fo=57789, unset)        0.059     5.059    k_mem_hi_reg_r7_64_127_14_20/WCLK
+    SLICE_X10Y182        RAMD64E                                      r  k_mem_hi_reg_r7_64_127_14_20/RAMA/CLK
+                         clock pessimism              0.000     5.059    <hidden>
+                         clock uncertainty           -0.135     4.924    <hidden>
+    SLICE_X10Y182        RAMD64E (Setup_A6LUT_SLICEM_CLK_I)
+                                                     -0.137     4.787    k_mem_hi_reg_r7_64_127_14_20/RAMA
   -------------------------------------------------------------------
-                         required time                          4.934    <hidden>
-                         arrival time                          -5.348    <hidden>
+                         required time                          4.787    <hidden>
+                         arrival time                          -5.238    <hidden>
   -------------------------------------------------------------------
-                         slack                                 -0.415    <hidden>
-
-Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
-  Source:                 u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[12]
-                            (rising edge-triggered cell DSP_OUTPUT clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Path Group:             clk
-  Path Type:              Setup (Max at Slow Process Corner)
-  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
-  Data Path Delay:        5.242ns  (logic 4.077ns (77.769%)  route 1.165ns (22.231%))
-  Logic Levels:           7  (DSP_A_B_DATA=1 DSP_ALU=2 DSP_M_DATA=1 DSP_MULTIPLIER=1 DSP_OUTPUT=1 DSP_PREADD_DATA=1)
-  Clock Path Skew:        -0.051ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    0.055ns = ( 5.055 - 5.000 ) 
-    Source Clock Delay      (SCD):    0.106ns
-    Clock Pessimism Removal (CPR):    0.000ns
-  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
-    Total System Jitter     (TSJ):    0.071ns
-    Total Input Jitter      (TIJ):    0.000ns
-    Discrete Jitter          (DJ):    0.000ns
-    Phase Error              (PE):    0.000ns
-    User Uncertainty         (UU):    0.100ns
-
-    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
-  -------------------------------------------------------------------    -------------------
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.106     0.106    u_softmax_engine/clk
-    RAMB36_X0Y1          RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-  -------------------------------------------------------------------    -------------------
-    RAMB36_X0Y1          RAMB36E2 (Prop_RAMB36E2_RAMB36_CLKBWRCLK_DOUTBDOUT[7])
-                                                      1.305     1.411 f  u_softmax_engine/exp_rom_reg_bram_0/DOUTBDOUT[7]
-                         net (fo=3, routed)           1.151     2.562    u_softmax_engine/mult_full_reg0/A[7]
-    DSP48E2_X4Y10        DSP_A_B_DATA (Prop_DSP_A_B_DATA_DSP48E2_A[7]_A2_DATA[7])
-                                                      0.258     2.820 r  u_softmax_engine/mult_full_reg0/DSP_A_B_DATA_INST/A2_DATA[7]
-                         net (fo=1, routed)           0.000     2.820    u_softmax_engine/mult_full_reg0/DSP_A_B_DATA.A2_DATA<7>
-    DSP48E2_X4Y10        DSP_PREADD_DATA (Prop_DSP_PREADD_DATA_DSP48E2_A2_DATA[7]_A2A1[7])
-                                                      0.114     2.934 r  u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA_INST/A2A1[7]
-                         net (fo=1, routed)           0.000     2.934    u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA.A2A1<7>
-    DSP48E2_X4Y10        DSP_MULTIPLIER (Prop_DSP_MULTIPLIER_DSP48E2_A2A1[7]_U[28])
-                                                      0.700     3.634 f  u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER_INST/U[28]
-                         net (fo=1, routed)           0.000     3.634    u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER.U<28>
-    DSP48E2_X4Y10        DSP_M_DATA (Prop_DSP_M_DATA_DSP48E2_U[28]_U_DATA[28])
-                                                      0.067     3.701 r  u_softmax_engine/mult_full_reg0/DSP_M_DATA_INST/U_DATA[28]
-                         net (fo=1, routed)           0.000     3.701    u_softmax_engine/mult_full_reg0/DSP_M_DATA.U_DATA<28>
-    DSP48E2_X4Y10        DSP_ALU (Prop_DSP_ALU_DSP48E2_U_DATA[28]_ALU_OUT[47])
-                                                      0.727     4.428 f  u_softmax_engine/mult_full_reg0/DSP_ALU_INST/ALU_OUT[47]
-                         net (fo=1, routed)           0.000     4.428    u_softmax_engine/mult_full_reg0/DSP_ALU.ALU_OUT<47>
-    DSP48E2_X4Y10        DSP_OUTPUT (Prop_DSP_OUTPUT_DSP48E2_ALU_OUT[47]_PCOUT[47])
-                                                      0.167     4.595 r  u_softmax_engine/mult_full_reg0/DSP_OUTPUT_INST/PCOUT[47]
-                         net (fo=1, routed)           0.014     4.609    u_softmax_engine/mult_full_reg0__0/PCIN[47]
-    DSP48E2_X4Y11        DSP_ALU (Prop_DSP_ALU_DSP48E2_PCIN[47]_ALU_OUT[12])
-                                                      0.739     5.348 r  u_softmax_engine/mult_full_reg0__0/DSP_ALU_INST/ALU_OUT[12]
-                         net (fo=1, routed)           0.000     5.348    u_softmax_engine/mult_full_reg0__0/DSP_ALU.ALU_OUT<12>
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[12]
-  -------------------------------------------------------------------    -------------------
-
-                         (clock clk rise edge)        5.000     5.000 r  <hidden>
-                                                      0.000     5.000 r  clk
-                         net (fo=57827, unset)        0.055     5.055    u_softmax_engine/mult_full_reg0__0/CLK
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/CLK
-                         clock pessimism              0.000     5.055    <hidden>
-                         clock uncertainty           -0.135     4.920    <hidden>
-    DSP48E2_X4Y11        DSP_OUTPUT (Setup_DSP_OUTPUT_DSP48E2_CLK_ALU_OUT[12])
-                                                      0.014     4.934    u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST
-  -------------------------------------------------------------------
-                         required time                          4.934    <hidden>
-                         arrival time                          -5.348    <hidden>
-  -------------------------------------------------------------------
-                         slack                                 -0.415    <hidden>
-
-Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
-  Source:                 u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[13]
-                            (rising edge-triggered cell DSP_OUTPUT clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Path Group:             clk
-  Path Type:              Setup (Max at Slow Process Corner)
-  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
-  Data Path Delay:        5.242ns  (logic 4.077ns (77.769%)  route 1.165ns (22.231%))
-  Logic Levels:           7  (DSP_A_B_DATA=1 DSP_ALU=2 DSP_M_DATA=1 DSP_MULTIPLIER=1 DSP_OUTPUT=1 DSP_PREADD_DATA=1)
-  Clock Path Skew:        -0.051ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    0.055ns = ( 5.055 - 5.000 ) 
-    Source Clock Delay      (SCD):    0.106ns
-    Clock Pessimism Removal (CPR):    0.000ns
-  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
-    Total System Jitter     (TSJ):    0.071ns
-    Total Input Jitter      (TIJ):    0.000ns
-    Discrete Jitter          (DJ):    0.000ns
-    Phase Error              (PE):    0.000ns
-    User Uncertainty         (UU):    0.100ns
-
-    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
-  -------------------------------------------------------------------    -------------------
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.106     0.106    u_softmax_engine/clk
-    RAMB36_X0Y1          RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-  -------------------------------------------------------------------    -------------------
-    RAMB36_X0Y1          RAMB36E2 (Prop_RAMB36E2_RAMB36_CLKBWRCLK_DOUTBDOUT[7])
-                                                      1.305     1.411 f  u_softmax_engine/exp_rom_reg_bram_0/DOUTBDOUT[7]
-                         net (fo=3, routed)           1.151     2.562    u_softmax_engine/mult_full_reg0/A[7]
-    DSP48E2_X4Y10        DSP_A_B_DATA (Prop_DSP_A_B_DATA_DSP48E2_A[7]_A2_DATA[7])
-                                                      0.258     2.820 r  u_softmax_engine/mult_full_reg0/DSP_A_B_DATA_INST/A2_DATA[7]
-                         net (fo=1, routed)           0.000     2.820    u_softmax_engine/mult_full_reg0/DSP_A_B_DATA.A2_DATA<7>
-    DSP48E2_X4Y10        DSP_PREADD_DATA (Prop_DSP_PREADD_DATA_DSP48E2_A2_DATA[7]_A2A1[7])
-                                                      0.114     2.934 r  u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA_INST/A2A1[7]
-                         net (fo=1, routed)           0.000     2.934    u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA.A2A1<7>
-    DSP48E2_X4Y10        DSP_MULTIPLIER (Prop_DSP_MULTIPLIER_DSP48E2_A2A1[7]_U[28])
-                                                      0.700     3.634 f  u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER_INST/U[28]
-                         net (fo=1, routed)           0.000     3.634    u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER.U<28>
-    DSP48E2_X4Y10        DSP_M_DATA (Prop_DSP_M_DATA_DSP48E2_U[28]_U_DATA[28])
-                                                      0.067     3.701 r  u_softmax_engine/mult_full_reg0/DSP_M_DATA_INST/U_DATA[28]
-                         net (fo=1, routed)           0.000     3.701    u_softmax_engine/mult_full_reg0/DSP_M_DATA.U_DATA<28>
-    DSP48E2_X4Y10        DSP_ALU (Prop_DSP_ALU_DSP48E2_U_DATA[28]_ALU_OUT[47])
-                                                      0.727     4.428 f  u_softmax_engine/mult_full_reg0/DSP_ALU_INST/ALU_OUT[47]
-                         net (fo=1, routed)           0.000     4.428    u_softmax_engine/mult_full_reg0/DSP_ALU.ALU_OUT<47>
-    DSP48E2_X4Y10        DSP_OUTPUT (Prop_DSP_OUTPUT_DSP48E2_ALU_OUT[47]_PCOUT[47])
-                                                      0.167     4.595 r  u_softmax_engine/mult_full_reg0/DSP_OUTPUT_INST/PCOUT[47]
-                         net (fo=1, routed)           0.014     4.609    u_softmax_engine/mult_full_reg0__0/PCIN[47]
-    DSP48E2_X4Y11        DSP_ALU (Prop_DSP_ALU_DSP48E2_PCIN[47]_ALU_OUT[13])
-                                                      0.739     5.348 r  u_softmax_engine/mult_full_reg0__0/DSP_ALU_INST/ALU_OUT[13]
-                         net (fo=1, routed)           0.000     5.348    u_softmax_engine/mult_full_reg0__0/DSP_ALU.ALU_OUT<13>
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[13]
-  -------------------------------------------------------------------    -------------------
-
-                         (clock clk rise edge)        5.000     5.000 r  <hidden>
-                                                      0.000     5.000 r  clk
-                         net (fo=57827, unset)        0.055     5.055    u_softmax_engine/mult_full_reg0__0/CLK
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/CLK
-                         clock pessimism              0.000     5.055    <hidden>
-                         clock uncertainty           -0.135     4.920    <hidden>
-    DSP48E2_X4Y11        DSP_OUTPUT (Setup_DSP_OUTPUT_DSP48E2_CLK_ALU_OUT[13])
-                                                      0.014     4.934    u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST
-  -------------------------------------------------------------------
-                         required time                          4.934    <hidden>
-                         arrival time                          -5.348    <hidden>
-  -------------------------------------------------------------------
-                         slack                                 -0.415    <hidden>
-
-Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
-  Source:                 u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[14]
-                            (rising edge-triggered cell DSP_OUTPUT clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Path Group:             clk
-  Path Type:              Setup (Max at Slow Process Corner)
-  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
-  Data Path Delay:        5.242ns  (logic 4.077ns (77.769%)  route 1.165ns (22.231%))
-  Logic Levels:           7  (DSP_A_B_DATA=1 DSP_ALU=2 DSP_M_DATA=1 DSP_MULTIPLIER=1 DSP_OUTPUT=1 DSP_PREADD_DATA=1)
-  Clock Path Skew:        -0.051ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    0.055ns = ( 5.055 - 5.000 ) 
-    Source Clock Delay      (SCD):    0.106ns
-    Clock Pessimism Removal (CPR):    0.000ns
-  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
-    Total System Jitter     (TSJ):    0.071ns
-    Total Input Jitter      (TIJ):    0.000ns
-    Discrete Jitter          (DJ):    0.000ns
-    Phase Error              (PE):    0.000ns
-    User Uncertainty         (UU):    0.100ns
-
-    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
-  -------------------------------------------------------------------    -------------------
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.106     0.106    u_softmax_engine/clk
-    RAMB36_X0Y1          RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-  -------------------------------------------------------------------    -------------------
-    RAMB36_X0Y1          RAMB36E2 (Prop_RAMB36E2_RAMB36_CLKBWRCLK_DOUTBDOUT[7])
-                                                      1.305     1.411 f  u_softmax_engine/exp_rom_reg_bram_0/DOUTBDOUT[7]
-                         net (fo=3, routed)           1.151     2.562    u_softmax_engine/mult_full_reg0/A[7]
-    DSP48E2_X4Y10        DSP_A_B_DATA (Prop_DSP_A_B_DATA_DSP48E2_A[7]_A2_DATA[7])
-                                                      0.258     2.820 r  u_softmax_engine/mult_full_reg0/DSP_A_B_DATA_INST/A2_DATA[7]
-                         net (fo=1, routed)           0.000     2.820    u_softmax_engine/mult_full_reg0/DSP_A_B_DATA.A2_DATA<7>
-    DSP48E2_X4Y10        DSP_PREADD_DATA (Prop_DSP_PREADD_DATA_DSP48E2_A2_DATA[7]_A2A1[7])
-                                                      0.114     2.934 r  u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA_INST/A2A1[7]
-                         net (fo=1, routed)           0.000     2.934    u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA.A2A1<7>
-    DSP48E2_X4Y10        DSP_MULTIPLIER (Prop_DSP_MULTIPLIER_DSP48E2_A2A1[7]_U[28])
-                                                      0.700     3.634 f  u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER_INST/U[28]
-                         net (fo=1, routed)           0.000     3.634    u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER.U<28>
-    DSP48E2_X4Y10        DSP_M_DATA (Prop_DSP_M_DATA_DSP48E2_U[28]_U_DATA[28])
-                                                      0.067     3.701 r  u_softmax_engine/mult_full_reg0/DSP_M_DATA_INST/U_DATA[28]
-                         net (fo=1, routed)           0.000     3.701    u_softmax_engine/mult_full_reg0/DSP_M_DATA.U_DATA<28>
-    DSP48E2_X4Y10        DSP_ALU (Prop_DSP_ALU_DSP48E2_U_DATA[28]_ALU_OUT[47])
-                                                      0.727     4.428 f  u_softmax_engine/mult_full_reg0/DSP_ALU_INST/ALU_OUT[47]
-                         net (fo=1, routed)           0.000     4.428    u_softmax_engine/mult_full_reg0/DSP_ALU.ALU_OUT<47>
-    DSP48E2_X4Y10        DSP_OUTPUT (Prop_DSP_OUTPUT_DSP48E2_ALU_OUT[47]_PCOUT[47])
-                                                      0.167     4.595 r  u_softmax_engine/mult_full_reg0/DSP_OUTPUT_INST/PCOUT[47]
-                         net (fo=1, routed)           0.014     4.609    u_softmax_engine/mult_full_reg0__0/PCIN[47]
-    DSP48E2_X4Y11        DSP_ALU (Prop_DSP_ALU_DSP48E2_PCIN[47]_ALU_OUT[14])
-                                                      0.739     5.348 r  u_softmax_engine/mult_full_reg0__0/DSP_ALU_INST/ALU_OUT[14]
-                         net (fo=1, routed)           0.000     5.348    u_softmax_engine/mult_full_reg0__0/DSP_ALU.ALU_OUT<14>
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[14]
-  -------------------------------------------------------------------    -------------------
-
-                         (clock clk rise edge)        5.000     5.000 r  <hidden>
-                                                      0.000     5.000 r  clk
-                         net (fo=57827, unset)        0.055     5.055    u_softmax_engine/mult_full_reg0__0/CLK
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/CLK
-                         clock pessimism              0.000     5.055    <hidden>
-                         clock uncertainty           -0.135     4.920    <hidden>
-    DSP48E2_X4Y11        DSP_OUTPUT (Setup_DSP_OUTPUT_DSP48E2_CLK_ALU_OUT[14])
-                                                      0.014     4.934    u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST
-  -------------------------------------------------------------------
-                         required time                          4.934    <hidden>
-                         arrival time                          -5.348    <hidden>
-  -------------------------------------------------------------------
-                         slack                                 -0.415    <hidden>
-
-Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
-  Source:                 u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[15]
-                            (rising edge-triggered cell DSP_OUTPUT clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Path Group:             clk
-  Path Type:              Setup (Max at Slow Process Corner)
-  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
-  Data Path Delay:        5.242ns  (logic 4.077ns (77.769%)  route 1.165ns (22.231%))
-  Logic Levels:           7  (DSP_A_B_DATA=1 DSP_ALU=2 DSP_M_DATA=1 DSP_MULTIPLIER=1 DSP_OUTPUT=1 DSP_PREADD_DATA=1)
-  Clock Path Skew:        -0.051ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    0.055ns = ( 5.055 - 5.000 ) 
-    Source Clock Delay      (SCD):    0.106ns
-    Clock Pessimism Removal (CPR):    0.000ns
-  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
-    Total System Jitter     (TSJ):    0.071ns
-    Total Input Jitter      (TIJ):    0.000ns
-    Discrete Jitter          (DJ):    0.000ns
-    Phase Error              (PE):    0.000ns
-    User Uncertainty         (UU):    0.100ns
-
-    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
-  -------------------------------------------------------------------    -------------------
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.106     0.106    u_softmax_engine/clk
-    RAMB36_X0Y1          RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-  -------------------------------------------------------------------    -------------------
-    RAMB36_X0Y1          RAMB36E2 (Prop_RAMB36E2_RAMB36_CLKBWRCLK_DOUTBDOUT[7])
-                                                      1.305     1.411 f  u_softmax_engine/exp_rom_reg_bram_0/DOUTBDOUT[7]
-                         net (fo=3, routed)           1.151     2.562    u_softmax_engine/mult_full_reg0/A[7]
-    DSP48E2_X4Y10        DSP_A_B_DATA (Prop_DSP_A_B_DATA_DSP48E2_A[7]_A2_DATA[7])
-                                                      0.258     2.820 r  u_softmax_engine/mult_full_reg0/DSP_A_B_DATA_INST/A2_DATA[7]
-                         net (fo=1, routed)           0.000     2.820    u_softmax_engine/mult_full_reg0/DSP_A_B_DATA.A2_DATA<7>
-    DSP48E2_X4Y10        DSP_PREADD_DATA (Prop_DSP_PREADD_DATA_DSP48E2_A2_DATA[7]_A2A1[7])
-                                                      0.114     2.934 r  u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA_INST/A2A1[7]
-                         net (fo=1, routed)           0.000     2.934    u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA.A2A1<7>
-    DSP48E2_X4Y10        DSP_MULTIPLIER (Prop_DSP_MULTIPLIER_DSP48E2_A2A1[7]_U[28])
-                                                      0.700     3.634 f  u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER_INST/U[28]
-                         net (fo=1, routed)           0.000     3.634    u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER.U<28>
-    DSP48E2_X4Y10        DSP_M_DATA (Prop_DSP_M_DATA_DSP48E2_U[28]_U_DATA[28])
-                                                      0.067     3.701 r  u_softmax_engine/mult_full_reg0/DSP_M_DATA_INST/U_DATA[28]
-                         net (fo=1, routed)           0.000     3.701    u_softmax_engine/mult_full_reg0/DSP_M_DATA.U_DATA<28>
-    DSP48E2_X4Y10        DSP_ALU (Prop_DSP_ALU_DSP48E2_U_DATA[28]_ALU_OUT[47])
-                                                      0.727     4.428 f  u_softmax_engine/mult_full_reg0/DSP_ALU_INST/ALU_OUT[47]
-                         net (fo=1, routed)           0.000     4.428    u_softmax_engine/mult_full_reg0/DSP_ALU.ALU_OUT<47>
-    DSP48E2_X4Y10        DSP_OUTPUT (Prop_DSP_OUTPUT_DSP48E2_ALU_OUT[47]_PCOUT[47])
-                                                      0.167     4.595 r  u_softmax_engine/mult_full_reg0/DSP_OUTPUT_INST/PCOUT[47]
-                         net (fo=1, routed)           0.014     4.609    u_softmax_engine/mult_full_reg0__0/PCIN[47]
-    DSP48E2_X4Y11        DSP_ALU (Prop_DSP_ALU_DSP48E2_PCIN[47]_ALU_OUT[15])
-                                                      0.739     5.348 r  u_softmax_engine/mult_full_reg0__0/DSP_ALU_INST/ALU_OUT[15]
-                         net (fo=1, routed)           0.000     5.348    u_softmax_engine/mult_full_reg0__0/DSP_ALU.ALU_OUT<15>
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[15]
-  -------------------------------------------------------------------    -------------------
-
-                         (clock clk rise edge)        5.000     5.000 r  <hidden>
-                                                      0.000     5.000 r  clk
-                         net (fo=57827, unset)        0.055     5.055    u_softmax_engine/mult_full_reg0__0/CLK
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/CLK
-                         clock pessimism              0.000     5.055    <hidden>
-                         clock uncertainty           -0.135     4.920    <hidden>
-    DSP48E2_X4Y11        DSP_OUTPUT (Setup_DSP_OUTPUT_DSP48E2_CLK_ALU_OUT[15])
-                                                      0.014     4.934    u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST
-  -------------------------------------------------------------------
-                         required time                          4.934    <hidden>
-                         arrival time                          -5.348    <hidden>
-  -------------------------------------------------------------------
-                         slack                                 -0.415    <hidden>
-
-Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
-  Source:                 u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[16]
-                            (rising edge-triggered cell DSP_OUTPUT clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Path Group:             clk
-  Path Type:              Setup (Max at Slow Process Corner)
-  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
-  Data Path Delay:        5.242ns  (logic 4.077ns (77.769%)  route 1.165ns (22.231%))
-  Logic Levels:           7  (DSP_A_B_DATA=1 DSP_ALU=2 DSP_M_DATA=1 DSP_MULTIPLIER=1 DSP_OUTPUT=1 DSP_PREADD_DATA=1)
-  Clock Path Skew:        -0.051ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    0.055ns = ( 5.055 - 5.000 ) 
-    Source Clock Delay      (SCD):    0.106ns
-    Clock Pessimism Removal (CPR):    0.000ns
-  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
-    Total System Jitter     (TSJ):    0.071ns
-    Total Input Jitter      (TIJ):    0.000ns
-    Discrete Jitter          (DJ):    0.000ns
-    Phase Error              (PE):    0.000ns
-    User Uncertainty         (UU):    0.100ns
-
-    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
-  -------------------------------------------------------------------    -------------------
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.106     0.106    u_softmax_engine/clk
-    RAMB36_X0Y1          RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-  -------------------------------------------------------------------    -------------------
-    RAMB36_X0Y1          RAMB36E2 (Prop_RAMB36E2_RAMB36_CLKBWRCLK_DOUTBDOUT[7])
-                                                      1.305     1.411 f  u_softmax_engine/exp_rom_reg_bram_0/DOUTBDOUT[7]
-                         net (fo=3, routed)           1.151     2.562    u_softmax_engine/mult_full_reg0/A[7]
-    DSP48E2_X4Y10        DSP_A_B_DATA (Prop_DSP_A_B_DATA_DSP48E2_A[7]_A2_DATA[7])
-                                                      0.258     2.820 r  u_softmax_engine/mult_full_reg0/DSP_A_B_DATA_INST/A2_DATA[7]
-                         net (fo=1, routed)           0.000     2.820    u_softmax_engine/mult_full_reg0/DSP_A_B_DATA.A2_DATA<7>
-    DSP48E2_X4Y10        DSP_PREADD_DATA (Prop_DSP_PREADD_DATA_DSP48E2_A2_DATA[7]_A2A1[7])
-                                                      0.114     2.934 r  u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA_INST/A2A1[7]
-                         net (fo=1, routed)           0.000     2.934    u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA.A2A1<7>
-    DSP48E2_X4Y10        DSP_MULTIPLIER (Prop_DSP_MULTIPLIER_DSP48E2_A2A1[7]_U[28])
-                                                      0.700     3.634 f  u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER_INST/U[28]
-                         net (fo=1, routed)           0.000     3.634    u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER.U<28>
-    DSP48E2_X4Y10        DSP_M_DATA (Prop_DSP_M_DATA_DSP48E2_U[28]_U_DATA[28])
-                                                      0.067     3.701 r  u_softmax_engine/mult_full_reg0/DSP_M_DATA_INST/U_DATA[28]
-                         net (fo=1, routed)           0.000     3.701    u_softmax_engine/mult_full_reg0/DSP_M_DATA.U_DATA<28>
-    DSP48E2_X4Y10        DSP_ALU (Prop_DSP_ALU_DSP48E2_U_DATA[28]_ALU_OUT[47])
-                                                      0.727     4.428 f  u_softmax_engine/mult_full_reg0/DSP_ALU_INST/ALU_OUT[47]
-                         net (fo=1, routed)           0.000     4.428    u_softmax_engine/mult_full_reg0/DSP_ALU.ALU_OUT<47>
-    DSP48E2_X4Y10        DSP_OUTPUT (Prop_DSP_OUTPUT_DSP48E2_ALU_OUT[47]_PCOUT[47])
-                                                      0.167     4.595 r  u_softmax_engine/mult_full_reg0/DSP_OUTPUT_INST/PCOUT[47]
-                         net (fo=1, routed)           0.014     4.609    u_softmax_engine/mult_full_reg0__0/PCIN[47]
-    DSP48E2_X4Y11        DSP_ALU (Prop_DSP_ALU_DSP48E2_PCIN[47]_ALU_OUT[16])
-                                                      0.739     5.348 r  u_softmax_engine/mult_full_reg0__0/DSP_ALU_INST/ALU_OUT[16]
-                         net (fo=1, routed)           0.000     5.348    u_softmax_engine/mult_full_reg0__0/DSP_ALU.ALU_OUT<16>
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[16]
-  -------------------------------------------------------------------    -------------------
-
-                         (clock clk rise edge)        5.000     5.000 r  <hidden>
-                                                      0.000     5.000 r  clk
-                         net (fo=57827, unset)        0.055     5.055    u_softmax_engine/mult_full_reg0__0/CLK
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/CLK
-                         clock pessimism              0.000     5.055    <hidden>
-                         clock uncertainty           -0.135     4.920    <hidden>
-    DSP48E2_X4Y11        DSP_OUTPUT (Setup_DSP_OUTPUT_DSP48E2_CLK_ALU_OUT[16])
-                                                      0.014     4.934    u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST
-  -------------------------------------------------------------------
-                         required time                          4.934    <hidden>
-                         arrival time                          -5.348    <hidden>
-  -------------------------------------------------------------------
-                         slack                                 -0.415    <hidden>
-
-Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
-  Source:                 u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-                            (rising edge-triggered cell RAMB36E2 clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[17]
-                            (rising edge-triggered cell DSP_OUTPUT clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Path Group:             clk
-  Path Type:              Setup (Max at Slow Process Corner)
-  Requirement:            5.000ns  (clk rise@5.000ns - clk rise@0.000ns)
-  Data Path Delay:        5.242ns  (logic 4.077ns (77.769%)  route 1.165ns (22.231%))
-  Logic Levels:           7  (DSP_A_B_DATA=1 DSP_ALU=2 DSP_M_DATA=1 DSP_MULTIPLIER=1 DSP_OUTPUT=1 DSP_PREADD_DATA=1)
-  Clock Path Skew:        -0.051ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    0.055ns = ( 5.055 - 5.000 ) 
-    Source Clock Delay      (SCD):    0.106ns
-    Clock Pessimism Removal (CPR):    0.000ns
-  Clock Uncertainty:      0.135ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
-    Total System Jitter     (TSJ):    0.071ns
-    Total Input Jitter      (TIJ):    0.000ns
-    Discrete Jitter          (DJ):    0.000ns
-    Phase Error              (PE):    0.000ns
-    User Uncertainty         (UU):    0.100ns
-
-    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
-  -------------------------------------------------------------------    -------------------
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.106     0.106    u_softmax_engine/clk
-    RAMB36_X0Y1          RAMB36E2                                     r  u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-  -------------------------------------------------------------------    -------------------
-    RAMB36_X0Y1          RAMB36E2 (Prop_RAMB36E2_RAMB36_CLKBWRCLK_DOUTBDOUT[7])
-                                                      1.305     1.411 f  u_softmax_engine/exp_rom_reg_bram_0/DOUTBDOUT[7]
-                         net (fo=3, routed)           1.151     2.562    u_softmax_engine/mult_full_reg0/A[7]
-    DSP48E2_X4Y10        DSP_A_B_DATA (Prop_DSP_A_B_DATA_DSP48E2_A[7]_A2_DATA[7])
-                                                      0.258     2.820 r  u_softmax_engine/mult_full_reg0/DSP_A_B_DATA_INST/A2_DATA[7]
-                         net (fo=1, routed)           0.000     2.820    u_softmax_engine/mult_full_reg0/DSP_A_B_DATA.A2_DATA<7>
-    DSP48E2_X4Y10        DSP_PREADD_DATA (Prop_DSP_PREADD_DATA_DSP48E2_A2_DATA[7]_A2A1[7])
-                                                      0.114     2.934 r  u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA_INST/A2A1[7]
-                         net (fo=1, routed)           0.000     2.934    u_softmax_engine/mult_full_reg0/DSP_PREADD_DATA.A2A1<7>
-    DSP48E2_X4Y10        DSP_MULTIPLIER (Prop_DSP_MULTIPLIER_DSP48E2_A2A1[7]_U[28])
-                                                      0.700     3.634 f  u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER_INST/U[28]
-                         net (fo=1, routed)           0.000     3.634    u_softmax_engine/mult_full_reg0/DSP_MULTIPLIER.U<28>
-    DSP48E2_X4Y10        DSP_M_DATA (Prop_DSP_M_DATA_DSP48E2_U[28]_U_DATA[28])
-                                                      0.067     3.701 r  u_softmax_engine/mult_full_reg0/DSP_M_DATA_INST/U_DATA[28]
-                         net (fo=1, routed)           0.000     3.701    u_softmax_engine/mult_full_reg0/DSP_M_DATA.U_DATA<28>
-    DSP48E2_X4Y10        DSP_ALU (Prop_DSP_ALU_DSP48E2_U_DATA[28]_ALU_OUT[47])
-                                                      0.727     4.428 f  u_softmax_engine/mult_full_reg0/DSP_ALU_INST/ALU_OUT[47]
-                         net (fo=1, routed)           0.000     4.428    u_softmax_engine/mult_full_reg0/DSP_ALU.ALU_OUT<47>
-    DSP48E2_X4Y10        DSP_OUTPUT (Prop_DSP_OUTPUT_DSP48E2_ALU_OUT[47]_PCOUT[47])
-                                                      0.167     4.595 r  u_softmax_engine/mult_full_reg0/DSP_OUTPUT_INST/PCOUT[47]
-                         net (fo=1, routed)           0.014     4.609    u_softmax_engine/mult_full_reg0__0/PCIN[47]
-    DSP48E2_X4Y11        DSP_ALU (Prop_DSP_ALU_DSP48E2_PCIN[47]_ALU_OUT[17])
-                                                      0.739     5.348 r  u_softmax_engine/mult_full_reg0__0/DSP_ALU_INST/ALU_OUT[17]
-                         net (fo=1, routed)           0.000     5.348    u_softmax_engine/mult_full_reg0__0/DSP_ALU.ALU_OUT<17>
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/ALU_OUT[17]
-  -------------------------------------------------------------------    -------------------
-
-                         (clock clk rise edge)        5.000     5.000 r  <hidden>
-                                                      0.000     5.000 r  clk
-                         net (fo=57827, unset)        0.055     5.055    u_softmax_engine/mult_full_reg0__0/CLK
-    DSP48E2_X4Y11        DSP_OUTPUT                                   r  u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST/CLK
-                         clock pessimism              0.000     5.055    <hidden>
-                         clock uncertainty           -0.135     4.920    <hidden>
-    DSP48E2_X4Y11        DSP_OUTPUT (Setup_DSP_OUTPUT_DSP48E2_CLK_ALU_OUT[17])
-                                                      0.014     4.934    u_softmax_engine/mult_full_reg0__0/DSP_OUTPUT_INST
-  -------------------------------------------------------------------
-                         required time                          4.934    <hidden>
-                         arrival time                          -5.348    <hidden>
-  -------------------------------------------------------------------
-                         slack                                 -0.415    <hidden>
+                         slack                                 -0.452    <hidden>
 
 
 
@@ -909,16 +1071,16 @@ Slack (VIOLATED) :        -0.415ns  (required time - arrival time)
 
 Min Delay Paths
 --------------------------------------------------------------------------------------
-Slack (MET) :             0.016ns  (arrival time - required time)
-  Source:                 u_softmax_engine/div_step_reg_reg[1]/C
+Slack (MET) :             0.015ns  (arrival time - required time)
+  Source:                 u_ping_pong_buffer/waddr_cnt_reg[2]/C
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/div_step_reg_reg[2]/D
+  Destination:            u_ping_pong_buffer/waddr_cnt_reg[3]/D
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Path Group:             clk
   Path Type:              Hold (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
-  Data Path Delay:        0.168ns  (logic 0.124ns (74.023%)  route 0.044ns (25.977%))
-  Logic Levels:           1  (LUT4=1)
+  Data Path Delay:        0.167ns  (logic 0.124ns (74.337%)  route 0.043ns (25.663%))
+  Logic Levels:           1  (LUT5=1)
   Clock Path Skew:        0.007ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    0.021ns
     Source Clock Delay      (SCD):    0.014ns
@@ -934,140 +1096,92 @@ Slack (MET) :             0.016ns  (arrival time - required time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.014     0.014    u_softmax_engine/clk
-    SLICE_X2Y24          FDCE                                         r  u_softmax_engine/div_step_reg_reg[1]/C
+                         net (fo=57789, unset)        0.014     0.014    u_ping_pong_buffer/clk
+    SLICE_X58Y183        FDCE                                         r  u_ping_pong_buffer/waddr_cnt_reg[2]/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X2Y24          FDCE (Prop_DFF_SLICEM_C_Q)
-                                                      0.083     0.097 r  u_softmax_engine/div_step_reg_reg[1]/Q
-                         net (fo=6, routed)           0.034     0.131    u_softmax_engine/div_step_reg_reg_n_0_[1]
-    SLICE_X2Y24          LUT4 (Prop_D5LUT_SLICEM_I1_O)
-                                                      0.041     0.172 r  u_softmax_engine/div_step_reg[2]_i_1/O
-                         net (fo=1, routed)           0.010     0.182    u_softmax_engine/div_step_reg[2]
-    SLICE_X2Y24          FDCE                                         r  u_softmax_engine/div_step_reg_reg[2]/D
+    SLICE_X58Y183        FDCE (Prop_DFF_SLICEM_C_Q)
+                                                      0.083     0.097 r  u_ping_pong_buffer/waddr_cnt_reg[2]/Q
+                         net (fo=5, routed)           0.033     0.130    u_ping_pong_buffer/waddr_cnt[2]
+    SLICE_X58Y183        LUT5 (Prop_D5LUT_SLICEM_I3_O)
+                                                      0.041     0.171 r  u_ping_pong_buffer/waddr_cnt[3]_i_1/O
+                         net (fo=1, routed)           0.010     0.181    u_ping_pong_buffer/waddr_cnt[3]_i_1_n_0
+    SLICE_X58Y183        FDCE                                         r  u_ping_pong_buffer/waddr_cnt_reg[3]/D
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.021     0.021    u_softmax_engine/clk
-    SLICE_X2Y24          FDCE                                         r  u_softmax_engine/div_step_reg_reg[2]/C
+                         net (fo=57789, unset)        0.021     0.021    u_ping_pong_buffer/clk
+    SLICE_X58Y183        FDCE                                         r  u_ping_pong_buffer/waddr_cnt_reg[3]/C
                          clock pessimism              0.000     0.021    <hidden>
                          clock uncertainty            0.100     0.121    <hidden>
-    SLICE_X2Y24          FDCE (Hold_DFF2_SLICEM_C_D)
-                                                      0.045     0.166    u_softmax_engine/div_step_reg_reg[2]
+    SLICE_X58Y183        FDCE (Hold_DFF2_SLICEM_C_D)
+                                                      0.045     0.166    u_ping_pong_buffer/waddr_cnt_reg[3]
   -------------------------------------------------------------------
                          required time                         -0.166    <hidden>
+                         arrival time                           0.181    <hidden>
+  -------------------------------------------------------------------
+                         slack                                  0.015    <hidden>
+
+Slack (MET) :             0.019ns  (arrival time - required time)
+  Source:                 u_ping_pong_buffer/waddr_cnt_reg[7]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            u_ping_pong_buffer/waddr_cnt_reg[9]/D
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Path Group:             clk
+  Path Type:              Hold (Min at Fast Process Corner)
+  Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
+  Data Path Delay:        0.168ns  (logic 0.122ns (72.567%)  route 0.046ns (27.433%))
+  Logic Levels:           1  (LUT6=1)
+  Clock Path Skew:        0.005ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    0.019ns
+    Source Clock Delay      (SCD):    0.014ns
+    Clock Pessimism Removal (CPR):    -0.000ns
+  Clock Uncertainty:      0.100ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
+    Total System Jitter     (TSJ):    0.000ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+    User Uncertainty         (UU):    0.100ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.014     0.014    u_ping_pong_buffer/clk
+    SLICE_X60Y182        FDCE                                         r  u_ping_pong_buffer/waddr_cnt_reg[7]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X60Y182        FDCE (Prop_DFF_SLICEL_C_Q)
+                                                      0.084     0.098 r  u_ping_pong_buffer/waddr_cnt_reg[7]/Q
+                         net (fo=5, routed)           0.029     0.127    u_ping_pong_buffer/waddr_cnt[7]
+    SLICE_X60Y182        LUT6 (Prop_B6LUT_SLICEL_I2_O)
+                                                      0.038     0.165 r  u_ping_pong_buffer/waddr_cnt[9]_i_1/O
+                         net (fo=1, routed)           0.017     0.182    u_ping_pong_buffer/waddr_cnt[9]_i_1_n_0
+    SLICE_X60Y182        FDCE                                         r  u_ping_pong_buffer/waddr_cnt_reg[9]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.019     0.019    u_ping_pong_buffer/clk
+    SLICE_X60Y182        FDCE                                         r  u_ping_pong_buffer/waddr_cnt_reg[9]/C
+                         clock pessimism              0.000     0.019    <hidden>
+                         clock uncertainty            0.100     0.119    <hidden>
+    SLICE_X60Y182        FDCE (Hold_BFF_SLICEL_C_D)
+                                                      0.044     0.163    u_ping_pong_buffer/waddr_cnt_reg[9]
+  -------------------------------------------------------------------
+                         required time                         -0.163    <hidden>
                          arrival time                           0.182    <hidden>
   -------------------------------------------------------------------
-                         slack                                  0.016    <hidden>
+                         slack                                  0.019    <hidden>
 
-Slack (MET) :             0.018ns  (arrival time - required time)
-  Source:                 u_softmax_engine/sum_exp_reg_reg[3]/C
+Slack (MET) :             0.022ns  (arrival time - required time)
+  Source:                 v_tok_rd_idx_reg[4]_rep__0/C
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/div_denom_reg_reg[3]/D
-                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Path Group:             clk
-  Path Type:              Hold (Min at Fast Process Corner)
-  Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
-  Data Path Delay:        0.170ns  (logic 0.085ns (50.045%)  route 0.085ns (49.955%))
-  Logic Levels:           0  
-  Clock Path Skew:        0.007ns (DCD - SCD - CPR)
-    Destination Clock Delay (DCD):    0.021ns
-    Source Clock Delay      (SCD):    0.014ns
-    Clock Pessimism Removal (CPR):    -0.000ns
-  Clock Uncertainty:      0.100ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
-    Total System Jitter     (TSJ):    0.000ns
-    Total Input Jitter      (TIJ):    0.000ns
-    Discrete Jitter          (DJ):    0.000ns
-    Phase Error              (PE):    0.000ns
-    User Uncertainty         (UU):    0.100ns
-
-    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
-  -------------------------------------------------------------------    -------------------
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.014     0.014    u_softmax_engine/clk
-    SLICE_X4Y25          FDCE                                         r  u_softmax_engine/sum_exp_reg_reg[3]/C
-  -------------------------------------------------------------------    -------------------
-    SLICE_X4Y25          FDCE (Prop_BFF2_SLICEM_C_Q)
-                                                      0.085     0.099 r  u_softmax_engine/sum_exp_reg_reg[3]/Q
-                         net (fo=4, routed)           0.085     0.184    u_softmax_engine/sum_exp_reg_reg_n_0_[3]
-    SLICE_X2Y26          FDCE                                         r  u_softmax_engine/div_denom_reg_reg[3]/D
-  -------------------------------------------------------------------    -------------------
-
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.021     0.021    u_softmax_engine/clk
-    SLICE_X2Y26          FDCE                                         r  u_softmax_engine/div_denom_reg_reg[3]/C
-                         clock pessimism              0.000     0.021    <hidden>
-                         clock uncertainty            0.100     0.121    <hidden>
-    SLICE_X2Y26          FDCE (Hold_GFF2_SLICEM_C_D)
-                                                      0.045     0.166    u_softmax_engine/div_denom_reg_reg[3]
-  -------------------------------------------------------------------
-                         required time                         -0.166    <hidden>
-                         arrival time                           0.184    <hidden>
-  -------------------------------------------------------------------
-                         slack                                  0.018    <hidden>
-
-Slack (MET) :             0.020ns  (arrival time - required time)
-  Source:                 u_softmax_engine/div_rem_reg_reg[26]/C
-                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/div_rem_reg_reg[27]/D
+  Destination:            v_tok_rd_idx_reg[4]_rep__0/D
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Path Group:             clk
   Path Type:              Hold (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
-  Data Path Delay:        0.171ns  (logic 0.119ns (69.739%)  route 0.052ns (30.261%))
-  Logic Levels:           1  (LUT4=1)
-  Clock Path Skew:        0.007ns (DCD - SCD - CPR)
-    Destination Clock Delay (DCD):    0.021ns
-    Source Clock Delay      (SCD):    0.014ns
-    Clock Pessimism Removal (CPR):    -0.000ns
-  Clock Uncertainty:      0.100ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
-    Total System Jitter     (TSJ):    0.000ns
-    Total Input Jitter      (TIJ):    0.000ns
-    Discrete Jitter          (DJ):    0.000ns
-    Phase Error              (PE):    0.000ns
-    User Uncertainty         (UU):    0.100ns
-
-    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
-  -------------------------------------------------------------------    -------------------
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.014     0.014    u_softmax_engine/clk
-    SLICE_X2Y29          FDCE                                         r  u_softmax_engine/div_rem_reg_reg[26]/C
-  -------------------------------------------------------------------    -------------------
-    SLICE_X2Y29          FDCE (Prop_BFF_SLICEM_C_Q)
-                                                      0.082     0.096 r  u_softmax_engine/div_rem_reg_reg[26]/Q
-                         net (fo=3, routed)           0.032     0.128    u_softmax_engine/p_1_in[27]
-    SLICE_X2Y29          LUT4 (Prop_A6LUT_SLICEM_I0_O)
-                                                      0.037     0.165 r  u_softmax_engine/div_rem_reg[27]_i_1/O
-                         net (fo=1, routed)           0.020     0.185    u_softmax_engine/div_rem_reg[27]
-    SLICE_X2Y29          FDCE                                         r  u_softmax_engine/div_rem_reg_reg[27]/D
-  -------------------------------------------------------------------    -------------------
-
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.021     0.021    u_softmax_engine/clk
-    SLICE_X2Y29          FDCE                                         r  u_softmax_engine/div_rem_reg_reg[27]/C
-                         clock pessimism              0.000     0.021    <hidden>
-                         clock uncertainty            0.100     0.121    <hidden>
-    SLICE_X2Y29          FDCE (Hold_AFF_SLICEM_C_D)
-                                                      0.044     0.165    u_softmax_engine/div_rem_reg_reg[27]
-  -------------------------------------------------------------------
-                         required time                         -0.165    <hidden>
-                         arrival time                           0.185    <hidden>
-  -------------------------------------------------------------------
-                         slack                                  0.020    <hidden>
-
-Slack (MET) :             0.020ns  (arrival time - required time)
-  Source:                 tile_row_blk_reg[0]_rep__12/C
-                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            tile_row_blk_reg[1]_rep__14/D
-                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Path Group:             clk
-  Path Type:              Hold (Min at Fast Process Corner)
-  Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
-  Data Path Delay:        0.171ns  (logic 0.106ns (61.846%)  route 0.065ns (38.154%))
+  Data Path Delay:        0.172ns  (logic 0.122ns (71.088%)  route 0.050ns (28.912%))
   Logic Levels:           1  (LUT4=1)
   Clock Path Skew:        0.006ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    0.020ns
@@ -1084,89 +1198,41 @@ Slack (MET) :             0.020ns  (arrival time - required time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.014     0.014    clk
-    SLICE_X16Y93         FDCE                                         r  tile_row_blk_reg[0]_rep__12/C
+                         net (fo=57789, unset)        0.014     0.014    clk
+    SLICE_X22Y185        FDCE                                         r  v_tok_rd_idx_reg[4]_rep__0/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X16Y93         FDCE (Prop_EFF_SLICEL_C_Q)
-                                                      0.084     0.098 r  tile_row_blk_reg[0]_rep__12/Q
-                         net (fo=108, routed)         0.058     0.156    tile_row_blk_reg[0]_rep__12_n_0
-    SLICE_X16Y93         LUT4 (Prop_H5LUT_SLICEL_I1_O)
-                                                      0.022     0.178 r  tile_row_blk[1]_rep__14_i_1/O
-                         net (fo=1, routed)           0.007     0.185    tile_row_blk[1]_rep__14_i_1_n_0
-    SLICE_X16Y93         FDCE                                         r  tile_row_blk_reg[1]_rep__14/D
+    SLICE_X22Y185        FDCE (Prop_HFF_SLICEL_C_Q)
+                                                      0.084     0.098 r  v_tok_rd_idx_reg[4]_rep__0/Q
+                         net (fo=4, routed)           0.031     0.129    u_axi_lite_regs/v_tok_rd_idx_reg[4]_rep
+    SLICE_X22Y185        LUT4 (Prop_H6LUT_SLICEL_I2_O)
+                                                      0.038     0.167 r  u_axi_lite_regs/v_tok_rd_idx[4]_rep__0_i_1/O
+                         net (fo=1, routed)           0.019     0.186    u_axi_lite_regs_n_651
+    SLICE_X22Y185        FDCE                                         r  v_tok_rd_idx_reg[4]_rep__0/D
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.020     0.020    clk
-    SLICE_X16Y93         FDCE                                         r  tile_row_blk_reg[1]_rep__14/C
+                         net (fo=57789, unset)        0.020     0.020    clk
+    SLICE_X22Y185        FDCE                                         r  v_tok_rd_idx_reg[4]_rep__0/C
                          clock pessimism              0.000     0.020    <hidden>
                          clock uncertainty            0.100     0.120    <hidden>
-    SLICE_X16Y93         FDCE (Hold_HFF2_SLICEL_C_D)
-                                                      0.045     0.165    tile_row_blk_reg[1]_rep__14
+    SLICE_X22Y185        FDCE (Hold_HFF_SLICEL_C_D)
+                                                      0.044     0.164    v_tok_rd_idx_reg[4]_rep__0
   -------------------------------------------------------------------
-                         required time                         -0.165    <hidden>
-                         arrival time                           0.185    <hidden>
+                         required time                         -0.164    <hidden>
+                         arrival time                           0.186    <hidden>
   -------------------------------------------------------------------
-                         slack                                  0.020    <hidden>
+                         slack                                  0.022    <hidden>
 
-Slack (MET) :             0.021ns  (arrival time - required time)
-  Source:                 u_systolic_mac_array/dot_product_stream_reg[8]_rep__4/C
+Slack (MET) :             0.022ns  (arrival time - required time)
+  Source:                 u_scale_unit/scaled_score_reg[15]_rep/C
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_reorder_buffer/score_ram_reg[3][3][8]/D
+  Destination:            u_softmax_engine/score_buffer_reg[160][15]/D
                             (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Path Group:             clk
   Path Type:              Hold (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
-  Data Path Delay:        0.172ns  (logic 0.084ns (48.902%)  route 0.088ns (51.098%))
-  Logic Levels:           0  
-  Clock Path Skew:        0.006ns (DCD - SCD - CPR)
-    Destination Clock Delay (DCD):    0.020ns
-    Source Clock Delay      (SCD):    0.014ns
-    Clock Pessimism Removal (CPR):    -0.000ns
-  Clock Uncertainty:      0.100ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
-    Total System Jitter     (TSJ):    0.000ns
-    Total Input Jitter      (TIJ):    0.000ns
-    Discrete Jitter          (DJ):    0.000ns
-    Phase Error              (PE):    0.000ns
-    User Uncertainty         (UU):    0.100ns
-
-    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
-  -------------------------------------------------------------------    -------------------
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.014     0.014    u_systolic_mac_array/clk
-    SLICE_X33Y109        FDCE                                         r  u_systolic_mac_array/dot_product_stream_reg[8]_rep__4/C
-  -------------------------------------------------------------------    -------------------
-    SLICE_X33Y109        FDCE (Prop_BFF_SLICEL_C_Q)
-                                                      0.084     0.098 r  u_systolic_mac_array/dot_product_stream_reg[8]_rep__4/Q
-                         net (fo=79, routed)          0.088     0.186    u_reorder_buffer/score_ram_reg[1][217][31]_0[8]
-    SLICE_X33Y103        FDRE                                         r  u_reorder_buffer/score_ram_reg[3][3][8]/D
-  -------------------------------------------------------------------    -------------------
-
-                         (clock clk rise edge)        0.000     0.000 r  <hidden>
-                                                      0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.020     0.020    u_reorder_buffer/clk
-    SLICE_X33Y103        FDRE                                         r  u_reorder_buffer/score_ram_reg[3][3][8]/C
-                         clock pessimism              0.000     0.020    <hidden>
-                         clock uncertainty            0.100     0.120    <hidden>
-    SLICE_X33Y103        FDRE (Hold_HFF2_SLICEL_C_D)
-                                                      0.045     0.165    u_reorder_buffer/score_ram_reg[3][3][8]
-  -------------------------------------------------------------------
-                         required time                         -0.165    <hidden>
-                         arrival time                           0.186    <hidden>
-  -------------------------------------------------------------------
-                         slack                                  0.021    <hidden>
-
-Slack (MET) :             0.022ns  (arrival time - required time)
-  Source:                 u_systolic_mac_array/gen_pe_row[2].gen_pe_col[2].wt0_pipe_reg[2][2][7]/C
-                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_systolic_mac_array/gen_pe_row[3].gen_pe_col[2].wt0_pipe_reg[3][2][7]/D
-                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Path Group:             clk
-  Path Type:              Hold (Min at Fast Process Corner)
-  Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
-  Data Path Delay:        0.174ns  (logic 0.083ns (47.632%)  route 0.091ns (52.368%))
+  Data Path Delay:        0.174ns  (logic 0.083ns (47.783%)  route 0.091ns (52.217%))
   Logic Levels:           0  
   Clock Path Skew:        0.007ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    0.021ns
@@ -1183,38 +1249,86 @@ Slack (MET) :             0.022ns  (arrival time - required time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.014     0.014    u_systolic_mac_array/clk
-    SLICE_X53Y194        FDCE                                         r  u_systolic_mac_array/gen_pe_row[2].gen_pe_col[2].wt0_pipe_reg[2][2][7]/C
+                         net (fo=57789, unset)        0.014     0.014    u_scale_unit/clk
+    SLICE_X34Y189        FDCE                                         r  u_scale_unit/scaled_score_reg[15]_rep/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X53Y194        FDCE (Prop_HFF2_SLICEM_C_Q)
-                                                      0.083     0.097 r  u_systolic_mac_array/gen_pe_row[2].gen_pe_col[2].wt0_pipe_reg[2][2][7]/Q
-                         net (fo=3, routed)           0.091     0.188    u_systolic_mac_array/gen_pe_row[2].gen_pe_col[2].wt0_pipe_reg[2][2]_39[7]
-    SLICE_X53Y192        FDCE                                         r  u_systolic_mac_array/gen_pe_row[3].gen_pe_col[2].wt0_pipe_reg[3][2][7]/D
+    SLICE_X34Y189        FDCE (Prop_DFF_SLICEM_C_Q)
+                                                      0.083     0.097 r  u_scale_unit/scaled_score_reg[15]_rep/Q
+                         net (fo=64, routed)          0.091     0.188    u_softmax_engine/score_buffer_reg[126][15]_0[15]
+    SLICE_X32Y191        FDRE                                         r  u_softmax_engine/score_buffer_reg[160][15]/D
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.021     0.021    u_systolic_mac_array/clk
-    SLICE_X53Y192        FDCE                                         r  u_systolic_mac_array/gen_pe_row[3].gen_pe_col[2].wt0_pipe_reg[3][2][7]/C
+                         net (fo=57789, unset)        0.021     0.021    u_softmax_engine/clk
+    SLICE_X32Y191        FDRE                                         r  u_softmax_engine/score_buffer_reg[160][15]/C
                          clock pessimism              0.000     0.021    <hidden>
                          clock uncertainty            0.100     0.121    <hidden>
-    SLICE_X53Y192        FDCE (Hold_GFF2_SLICEM_C_D)
-                                                      0.045     0.166    u_systolic_mac_array/gen_pe_row[3].gen_pe_col[2].wt0_pipe_reg[3][2][7]
+    SLICE_X32Y191        FDRE (Hold_DFF2_SLICEM_C_D)
+                                                      0.045     0.166    u_softmax_engine/score_buffer_reg[160][15]
   -------------------------------------------------------------------
                          required time                         -0.166    <hidden>
                          arrival time                           0.188    <hidden>
   -------------------------------------------------------------------
                          slack                                  0.022    <hidden>
 
-Slack (MET) :             0.024ns  (arrival time - required time)
-  Source:                 u_ping_pong_buffer/waddr_cnt_reg[7]/C
+Slack (MET) :             0.023ns  (arrival time - required time)
+  Source:                 u_systolic_mac_array/dot_product_stream_reg[1]/C
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_ping_pong_buffer/waddr_cnt_reg[7]/D
+  Destination:            u_reorder_buffer/score_ram_reg[2][35][1]/D
+                            (rising edge-triggered cell FDRE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Path Group:             clk
+  Path Type:              Hold (Min at Fast Process Corner)
+  Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
+  Data Path Delay:        0.175ns  (logic 0.083ns (47.530%)  route 0.092ns (52.470%))
+  Logic Levels:           0  
+  Clock Path Skew:        0.007ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    0.021ns
+    Source Clock Delay      (SCD):    0.014ns
+    Clock Pessimism Removal (CPR):    -0.000ns
+  Clock Uncertainty:      0.100ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
+    Total System Jitter     (TSJ):    0.000ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+    User Uncertainty         (UU):    0.100ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.014     0.014    u_systolic_mac_array/clk
+    SLICE_X28Y23         FDCE                                         r  u_systolic_mac_array/dot_product_stream_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X28Y23         FDCE (Prop_CFF_SLICEM_C_Q)
+                                                      0.083     0.097 r  u_systolic_mac_array/dot_product_stream_reg[1]/Q
+                         net (fo=48, routed)          0.092     0.189    u_reorder_buffer/score_ram_reg[1][12][31]_0[1]
+    SLICE_X28Y22         FDRE                                         r  u_reorder_buffer/score_ram_reg[2][35][1]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.021     0.021    u_reorder_buffer/clk
+    SLICE_X28Y22         FDRE                                         r  u_reorder_buffer/score_ram_reg[2][35][1]/C
+                         clock pessimism              0.000     0.021    <hidden>
+                         clock uncertainty            0.100     0.121    <hidden>
+    SLICE_X28Y22         FDRE (Hold_HFF2_SLICEM_C_D)
+                                                      0.045     0.166    u_reorder_buffer/score_ram_reg[2][35][1]
+  -------------------------------------------------------------------
+                         required time                         -0.166    <hidden>
+                         arrival time                           0.189    <hidden>
+  -------------------------------------------------------------------
+                         slack                                  0.023    <hidden>
+
+Slack (MET) :             0.024ns  (arrival time - required time)
+  Source:                 u_ping_pong_buffer/bank1_full_reg/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            u_ping_pong_buffer/pp_bank_reg_reg/D
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Path Group:             clk
   Path Type:              Hold (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
-  Data Path Delay:        0.175ns  (logic 0.121ns (69.150%)  route 0.054ns (30.850%))
+  Data Path Delay:        0.175ns  (logic 0.119ns (68.008%)  route 0.056ns (31.992%))
   Logic Levels:           1  (LUT6=1)
   Clock Path Skew:        0.007ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    0.021ns
@@ -1231,41 +1345,41 @@ Slack (MET) :             0.024ns  (arrival time - required time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.014     0.014    u_ping_pong_buffer/clk
-    SLICE_X31Y44         FDCE                                         r  u_ping_pong_buffer/waddr_cnt_reg[7]/C
+                         net (fo=57789, unset)        0.014     0.014    u_ping_pong_buffer/clk
+    SLICE_X58Y182        FDCE                                         r  u_ping_pong_buffer/bank1_full_reg/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X31Y44         FDCE (Prop_HFF_SLICEM_C_Q)
-                                                      0.083     0.097 r  u_ping_pong_buffer/waddr_cnt_reg[7]/Q
-                         net (fo=3, routed)           0.031     0.128    u_ping_pong_buffer/waddr_cnt[7]
-    SLICE_X31Y44         LUT6 (Prop_H6LUT_SLICEM_I5_O)
-                                                      0.038     0.166 r  u_ping_pong_buffer/waddr_cnt[7]_i_1/O
-                         net (fo=1, routed)           0.023     0.189    u_ping_pong_buffer/waddr_cnt[7]_i_1_n_0
-    SLICE_X31Y44         FDCE                                         r  u_ping_pong_buffer/waddr_cnt_reg[7]/D
+    SLICE_X58Y182        FDCE (Prop_BFF_SLICEM_C_Q)
+                                                      0.082     0.096 f  u_ping_pong_buffer/bank1_full_reg/Q
+                         net (fo=5, routed)           0.036     0.132    u_ping_pong_buffer/bank1_full_reg_n_0
+    SLICE_X58Y182        LUT6 (Prop_A6LUT_SLICEM_I0_O)
+                                                      0.037     0.169 r  u_ping_pong_buffer/pp_bank_reg_i_1/O
+                         net (fo=1, routed)           0.020     0.189    u_ping_pong_buffer/pp_bank_reg_i_1_n_0
+    SLICE_X58Y182        FDCE                                         r  u_ping_pong_buffer/pp_bank_reg_reg/D
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.021     0.021    u_ping_pong_buffer/clk
-    SLICE_X31Y44         FDCE                                         r  u_ping_pong_buffer/waddr_cnt_reg[7]/C
+                         net (fo=57789, unset)        0.021     0.021    u_ping_pong_buffer/clk
+    SLICE_X58Y182        FDCE                                         r  u_ping_pong_buffer/pp_bank_reg_reg/C
                          clock pessimism              0.000     0.021    <hidden>
                          clock uncertainty            0.100     0.121    <hidden>
-    SLICE_X31Y44         FDCE (Hold_HFF_SLICEM_C_D)
-                                                      0.044     0.165    u_ping_pong_buffer/waddr_cnt_reg[7]
+    SLICE_X58Y182        FDCE (Hold_AFF_SLICEM_C_D)
+                                                      0.044     0.165    u_ping_pong_buffer/pp_bank_reg_reg
   -------------------------------------------------------------------
                          required time                         -0.165    <hidden>
                          arrival time                           0.189    <hidden>
   -------------------------------------------------------------------
                          slack                                  0.024    <hidden>
 
-Slack (MET) :             0.026ns  (arrival time - required time)
-  Source:                 u_softmax_engine/div_step_reg_reg[1]/C
+Slack (MET) :             0.025ns  (arrival time - required time)
+  Source:                 u_ping_pong_buffer/bank1_full_reg/C
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/div_step_reg_reg[4]/D
+  Destination:            u_ping_pong_buffer/bank1_full_reg/D
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Path Group:             clk
   Path Type:              Hold (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
-  Data Path Delay:        0.177ns  (logic 0.120ns (67.983%)  route 0.057ns (32.017%))
+  Data Path Delay:        0.176ns  (logic 0.119ns (67.621%)  route 0.057ns (32.379%))
   Logic Levels:           1  (LUT6=1)
   Clock Path Skew:        0.007ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    0.021ns
@@ -1282,31 +1396,31 @@ Slack (MET) :             0.026ns  (arrival time - required time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.014     0.014    u_softmax_engine/clk
-    SLICE_X2Y24          FDCE                                         r  u_softmax_engine/div_step_reg_reg[1]/C
+                         net (fo=57789, unset)        0.014     0.014    u_ping_pong_buffer/clk
+    SLICE_X58Y182        FDCE                                         r  u_ping_pong_buffer/bank1_full_reg/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X2Y24          FDCE (Prop_DFF_SLICEM_C_Q)
-                                                      0.083     0.097 r  u_softmax_engine/div_step_reg_reg[1]/Q
-                         net (fo=6, routed)           0.033     0.130    u_softmax_engine/div_step_reg_reg_n_0_[1]
-    SLICE_X2Y24          LUT6 (Prop_B6LUT_SLICEM_I3_O)
-                                                      0.037     0.167 r  u_softmax_engine/div_step_reg[4]_i_1/O
-                         net (fo=1, routed)           0.024     0.191    u_softmax_engine/div_step_reg[4]_i_1_n_0
-    SLICE_X2Y24          FDCE                                         r  u_softmax_engine/div_step_reg_reg[4]/D
+    SLICE_X58Y182        FDCE (Prop_BFF_SLICEM_C_Q)
+                                                      0.082     0.096 r  u_ping_pong_buffer/bank1_full_reg/Q
+                         net (fo=5, routed)           0.033     0.129    u_ping_pong_buffer/bank1_full_reg_n_0
+    SLICE_X58Y182        LUT6 (Prop_B6LUT_SLICEM_I4_O)
+                                                      0.037     0.166 r  u_ping_pong_buffer/bank1_full_i_1/O
+                         net (fo=1, routed)           0.024     0.190    u_ping_pong_buffer/bank1_full_i_1_n_0
+    SLICE_X58Y182        FDCE                                         r  u_ping_pong_buffer/bank1_full_reg/D
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.021     0.021    u_softmax_engine/clk
-    SLICE_X2Y24          FDCE                                         r  u_softmax_engine/div_step_reg_reg[4]/C
+                         net (fo=57789, unset)        0.021     0.021    u_ping_pong_buffer/clk
+    SLICE_X58Y182        FDCE                                         r  u_ping_pong_buffer/bank1_full_reg/C
                          clock pessimism              0.000     0.021    <hidden>
                          clock uncertainty            0.100     0.121    <hidden>
-    SLICE_X2Y24          FDCE (Hold_BFF_SLICEM_C_D)
-                                                      0.044     0.165    u_softmax_engine/div_step_reg_reg[4]
+    SLICE_X58Y182        FDCE (Hold_BFF_SLICEM_C_D)
+                                                      0.044     0.165    u_ping_pong_buffer/bank1_full_reg
   -------------------------------------------------------------------
                          required time                         -0.165    <hidden>
-                         arrival time                           0.191    <hidden>
+                         arrival time                           0.190    <hidden>
   -------------------------------------------------------------------
-                         slack                                  0.026    <hidden>
+                         slack                                  0.025    <hidden>
 
 Slack (MET) :             0.027ns  (arrival time - required time)
   Source:                 u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].pe_acc_col0_reg[1][1][31]/C
@@ -1333,28 +1447,28 @@ Slack (MET) :             0.027ns  (arrival time - required time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.014     0.014    u_systolic_mac_array/clk
-    SLICE_X43Y185        FDCE                                         r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].pe_acc_col0_reg[1][1][31]/C
+                         net (fo=57789, unset)        0.014     0.014    u_systolic_mac_array/clk
+    SLICE_X35Y14         FDCE                                         r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].pe_acc_col0_reg[1][1][31]/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X43Y185        FDCE (Prop_HFF_SLICEM_C_Q)
+    SLICE_X35Y14         FDCE (Prop_HFF_SLICEM_C_Q)
                                                       0.083     0.097 r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].pe_acc_col0_reg[1][1][31]/Q
                          net (fo=2, routed)           0.032     0.129    u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].u_pe_slice/gen_pe_row[1].gen_pe_col[1].pe_acc_col0_reg[1][1]_83[31]
-    SLICE_X43Y185        LUT3 (Prop_H6LUT_SLICEM_I2_O)
+    SLICE_X35Y14         LUT3 (Prop_H6LUT_SLICEM_I2_O)
                                                       0.021     0.150 r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].u_pe_slice/gen_pe_row[1].gen_pe_col[1].pe_acc_col0[1][1][24]_i_9/O
                          net (fo=1, routed)           0.013     0.163    u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].u_pe_slice/gen_pe_row[1].gen_pe_col[1].pe_acc_col0[1][1][24]_i_9_n_0
-    SLICE_X43Y185        CARRY8 (Prop_CARRY8_SLICEM_S[7]_O[7])
+    SLICE_X35Y14         CARRY8 (Prop_CARRY8_SLICEM_S[7]_O[7])
                                                       0.021     0.184 r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].u_pe_slice/gen_pe_row[1].gen_pe_col[1].pe_acc_col0_reg[1][1][24]_i_1/O[7]
                          net (fo=1, routed)           0.008     0.192    u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].u_pe_slice_n_56
-    SLICE_X43Y185        FDCE                                         r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].pe_acc_col0_reg[1][1][31]/D
+    SLICE_X35Y14         FDCE                                         r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].pe_acc_col0_reg[1][1][31]/D
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.021     0.021    u_systolic_mac_array/clk
-    SLICE_X43Y185        FDCE                                         r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].pe_acc_col0_reg[1][1][31]/C
+                         net (fo=57789, unset)        0.021     0.021    u_systolic_mac_array/clk
+    SLICE_X35Y14         FDCE                                         r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].pe_acc_col0_reg[1][1][31]/C
                          clock pessimism              0.000     0.021    <hidden>
                          clock uncertainty            0.100     0.121    <hidden>
-    SLICE_X43Y185        FDCE (Hold_HFF_SLICEM_C_D)
+    SLICE_X35Y14         FDCE (Hold_HFF_SLICEM_C_D)
                                                       0.044     0.165    u_systolic_mac_array/gen_pe_row[1].gen_pe_col[1].pe_acc_col0_reg[1][1][31]
   -------------------------------------------------------------------
                          required time                         -0.165    <hidden>
@@ -1363,15 +1477,15 @@ Slack (MET) :             0.027ns  (arrival time - required time)
                          slack                                  0.027    <hidden>
 
 Slack (MET) :             0.027ns  (arrival time - required time)
-  Source:                 u_softmax_engine/sum_exp_reg_reg[4]/C
+  Source:                 u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].pe_acc_col0_reg[1][2][31]/C
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
-  Destination:            u_softmax_engine/div_denom_reg_reg[4]/D
+  Destination:            u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].pe_acc_col0_reg[1][2][31]/D
                             (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
   Path Group:             clk
   Path Type:              Hold (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
-  Data Path Delay:        0.178ns  (logic 0.084ns (47.158%)  route 0.094ns (52.842%))
-  Logic Levels:           0  
+  Data Path Delay:        0.178ns  (logic 0.125ns (70.369%)  route 0.053ns (29.631%))
+  Logic Levels:           2  (CARRY8=1 LUT3=1)
   Clock Path Skew:        0.007ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    0.021ns
     Source Clock Delay      (SCD):    0.014ns
@@ -1387,23 +1501,83 @@ Slack (MET) :             0.027ns  (arrival time - required time)
   -------------------------------------------------------------------    -------------------
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.014     0.014    u_softmax_engine/clk
-    SLICE_X4Y25          FDCE                                         r  u_softmax_engine/sum_exp_reg_reg[4]/C
+                         net (fo=57789, unset)        0.014     0.014    u_systolic_mac_array/clk
+    SLICE_X38Y19         FDCE                                         r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].pe_acc_col0_reg[1][2][31]/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X4Y25          FDCE (Prop_AFF2_SLICEM_C_Q)
-                                                      0.084     0.098 r  u_softmax_engine/sum_exp_reg_reg[4]/Q
-                         net (fo=5, routed)           0.094     0.192    u_softmax_engine/sum_exp_reg_reg_n_0_[4]
-    SLICE_X2Y26          FDCE                                         r  u_softmax_engine/div_denom_reg_reg[4]/D
+    SLICE_X38Y19         FDCE (Prop_HFF_SLICEM_C_Q)
+                                                      0.083     0.097 r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].pe_acc_col0_reg[1][2][31]/Q
+                         net (fo=2, routed)           0.032     0.129    u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].u_pe_slice/gen_pe_row[1].gen_pe_col[2].pe_acc_col0_reg[1][2]_79[31]
+    SLICE_X38Y19         LUT3 (Prop_H6LUT_SLICEM_I2_O)
+                                                      0.021     0.150 r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].u_pe_slice/gen_pe_row[1].gen_pe_col[2].pe_acc_col0[1][2][24]_i_9/O
+                         net (fo=1, routed)           0.013     0.163    u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].u_pe_slice/gen_pe_row[1].gen_pe_col[2].pe_acc_col0[1][2][24]_i_9_n_0
+    SLICE_X38Y19         CARRY8 (Prop_CARRY8_SLICEM_S[7]_O[7])
+                                                      0.021     0.184 r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].u_pe_slice/gen_pe_row[1].gen_pe_col[2].pe_acc_col0_reg[1][2][24]_i_1/O[7]
+                         net (fo=1, routed)           0.008     0.192    u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].u_pe_slice_n_56
+    SLICE_X38Y19         FDCE                                         r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].pe_acc_col0_reg[1][2][31]/D
   -------------------------------------------------------------------    -------------------
 
                          (clock clk rise edge)        0.000     0.000 r  <hidden>
                                                       0.000     0.000 r  clk
-                         net (fo=57827, unset)        0.021     0.021    u_softmax_engine/clk
-    SLICE_X2Y26          FDCE                                         r  u_softmax_engine/div_denom_reg_reg[4]/C
+                         net (fo=57789, unset)        0.021     0.021    u_systolic_mac_array/clk
+    SLICE_X38Y19         FDCE                                         r  u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].pe_acc_col0_reg[1][2][31]/C
                          clock pessimism              0.000     0.021    <hidden>
                          clock uncertainty            0.100     0.121    <hidden>
-    SLICE_X2Y26          FDCE (Hold_HFF_SLICEM_C_D)
-                                                      0.044     0.165    u_softmax_engine/div_denom_reg_reg[4]
+    SLICE_X38Y19         FDCE (Hold_HFF_SLICEM_C_D)
+                                                      0.044     0.165    u_systolic_mac_array/gen_pe_row[1].gen_pe_col[2].pe_acc_col0_reg[1][2][31]
+  -------------------------------------------------------------------
+                         required time                         -0.165    <hidden>
+                         arrival time                           0.192    <hidden>
+  -------------------------------------------------------------------
+                         slack                                  0.027    <hidden>
+
+Slack (MET) :             0.027ns  (arrival time - required time)
+  Source:                 u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].pe_acc_col1_reg[2][3][31]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Destination:            u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].pe_acc_col1_reg[2][3][31]/D
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.500ns period=5.000ns})
+  Path Group:             clk
+  Path Type:              Hold (Min at Fast Process Corner)
+  Requirement:            0.000ns  (clk rise@0.000ns - clk rise@0.000ns)
+  Data Path Delay:        0.178ns  (logic 0.125ns (70.369%)  route 0.053ns (29.631%))
+  Logic Levels:           2  (CARRY8=1 LUT3=1)
+  Clock Path Skew:        0.007ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    0.021ns
+    Source Clock Delay      (SCD):    0.014ns
+    Clock Pessimism Removal (CPR):    -0.000ns
+  Clock Uncertainty:      0.100ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE + UU
+    Total System Jitter     (TSJ):    0.000ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+    User Uncertainty         (UU):    0.100ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.014     0.014    u_systolic_mac_array/clk
+    SLICE_X32Y4          FDCE                                         r  u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].pe_acc_col1_reg[2][3][31]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X32Y4          FDCE (Prop_HFF_SLICEM_C_Q)
+                                                      0.083     0.097 r  u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].pe_acc_col1_reg[2][3][31]/Q
+                         net (fo=2, routed)           0.032     0.129    u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].u_pe_slice/gen_pe_row[2].gen_pe_col[3].pe_acc_col1_reg[2][3]_58[31]
+    SLICE_X32Y4          LUT3 (Prop_H6LUT_SLICEM_I2_O)
+                                                      0.021     0.150 r  u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].u_pe_slice/gen_pe_row[2].gen_pe_col[3].pe_acc_col1[2][3][24]_i_9/O
+                         net (fo=1, routed)           0.013     0.163    u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].u_pe_slice/gen_pe_row[2].gen_pe_col[3].pe_acc_col1[2][3][24]_i_9_n_0
+    SLICE_X32Y4          CARRY8 (Prop_CARRY8_SLICEM_S[7]_O[7])
+                                                      0.021     0.184 r  u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].u_pe_slice/gen_pe_row[2].gen_pe_col[3].pe_acc_col1_reg[2][3][24]_i_1/O[7]
+                         net (fo=1, routed)           0.008     0.192    u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].u_pe_slice_n_24
+    SLICE_X32Y4          FDCE                                         r  u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].pe_acc_col1_reg[2][3][31]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        0.000     0.000 r  <hidden>
+                                                      0.000     0.000 r  clk
+                         net (fo=57789, unset)        0.021     0.021    u_systolic_mac_array/clk
+    SLICE_X32Y4          FDCE                                         r  u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].pe_acc_col1_reg[2][3][31]/C
+                         clock pessimism              0.000     0.021    <hidden>
+                         clock uncertainty            0.100     0.121    <hidden>
+    SLICE_X32Y4          FDCE (Hold_HFF_SLICEM_C_D)
+                                                      0.044     0.165    u_systolic_mac_array/gen_pe_row[2].gen_pe_col[3].pe_acc_col1_reg[2][3][31]
   -------------------------------------------------------------------
                          required time                         -0.165    <hidden>
                          arrival time                           0.192    <hidden>
@@ -1422,36 +1596,36 @@ Period(ns):         5.000
 Sources:            { clk }
 
 Check Type        Corner  Lib Pin             Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location       Pin
-Min Period        n/a     RAMB36E2/CLKARDCLK  n/a            1.960         5.000       3.040      RAMB36_X0Y1    u_softmax_engine/exp_rom_reg_bram_0/CLKARDCLK
-Min Period        n/a     RAMB36E2/CLKBWRCLK  n/a            1.709         5.000       3.291      RAMB36_X0Y1    u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
-Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMA/CLK
-Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMB/CLK
-Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMC/CLK
-Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMD/CLK
-Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAME/CLK
-Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMF/CLK
-Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMG/CLK
-Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMH/CLK
-Low Pulse Width   Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMA/CLK
-Low Pulse Width   Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMA/CLK
-Low Pulse Width   Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMB/CLK
-Low Pulse Width   Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMB/CLK
-Low Pulse Width   Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMC/CLK
-Low Pulse Width   Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMC/CLK
-Low Pulse Width   Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMD/CLK
-Low Pulse Width   Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMD/CLK
-Low Pulse Width   Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAME/CLK
-Low Pulse Width   Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAME/CLK
-High Pulse Width  Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMA/CLK
-High Pulse Width  Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMA/CLK
-High Pulse Width  Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMB/CLK
-High Pulse Width  Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMB/CLK
-High Pulse Width  Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMC/CLK
-High Pulse Width  Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMC/CLK
-High Pulse Width  Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMD/CLK
-High Pulse Width  Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAMD/CLK
-High Pulse Width  Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAME/CLK
-High Pulse Width  Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X20Y131  k_mem_hi_reg_r1_0_63_0_6/RAME/CLK
+Min Period        n/a     RAMB36E2/CLKARDCLK  n/a            1.960         5.000       3.040      RAMB36_X1Y40   u_softmax_engine/exp_rom_reg_bram_0/CLKARDCLK
+Min Period        n/a     RAMB36E2/CLKBWRCLK  n/a            1.709         5.000       3.291      RAMB36_X1Y40   u_softmax_engine/exp_rom_reg_bram_0/CLKBWRCLK
+Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMA/CLK
+Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMB/CLK
+Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMC/CLK
+Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMD/CLK
+Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAME/CLK
+Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMF/CLK
+Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMG/CLK
+Min Period        n/a     RAMD64E/CLK         n/a            1.524         5.000       3.476      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMH/CLK
+Low Pulse Width   Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMA/CLK
+Low Pulse Width   Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMA/CLK
+Low Pulse Width   Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMB/CLK
+Low Pulse Width   Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMB/CLK
+Low Pulse Width   Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMC/CLK
+Low Pulse Width   Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMC/CLK
+Low Pulse Width   Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMD/CLK
+Low Pulse Width   Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMD/CLK
+Low Pulse Width   Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAME/CLK
+Low Pulse Width   Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAME/CLK
+High Pulse Width  Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMA/CLK
+High Pulse Width  Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMA/CLK
+High Pulse Width  Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMB/CLK
+High Pulse Width  Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMB/CLK
+High Pulse Width  Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMC/CLK
+High Pulse Width  Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMC/CLK
+High Pulse Width  Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMD/CLK
+High Pulse Width  Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAMD/CLK
+High Pulse Width  Slow    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAME/CLK
+High Pulse Width  Fast    RAMD64E/CLK         n/a            0.762         2.500       1.738      SLICE_X18Y163  k_mem_hi_reg_r1_0_63_0_6/RAME/CLK
 
 
 

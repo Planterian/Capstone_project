@@ -7,8 +7,8 @@
 # Vivado Tool: AMD Vivado 2026.1 / 2024.x / 2022.2+ (GUI Mode)
 # ==============================================================================
 
-# Use 4 threads to prevent laptop thermal throttling or freezing
-set_param general.maxThreads 4
+# Use 2 threads to prevent laptop thermal throttling or freezing
+set_param general.maxThreads 2
 
 set PROJ_NAME   "mha_kv260_deploy"
 set PROJ_DIR    "./vivado_prj_2A"

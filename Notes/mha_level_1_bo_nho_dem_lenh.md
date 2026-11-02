@@ -1,179 +1,105 @@
-# Bộ Nhớ Đệm Lệnh - MHA Level 1: Sub-system / Memory & Streaming Routing
+# Kiến Trúc MHA Level 1 v2.0: Hệ Thống Bộ Nhớ Đệm Ingress, Ping-Pong BRAM & Skid Buffer
 
-Dưới đây là **LEVEL 1 — SUB-SYSTEM / MEMORY & STREAMING ROUTING** theo quy chuẩn phân rã cấu trúc Top-Down Hierarchy.
-Phần này tập trung vào vi mạch quản lý luồng dữ liệu liên tục: **Mạch chống nghẽn Skid Buffer (AXI-Stream Adapter)**, **Hệ thống bộ đệm BRAM Ping-Pong đa ngân hàng (Multi-Bank Ping-Pong BRAM)** và **Máy trạng thái FSM tráo con trỏ đệm 1 chu kỳ clock**.
+> **Dự án:** Tăng tốc Attention Core MobileViT-XXS trên AMD Kria KV260  
+> **Phiên bản:** v2.0 (Cập nhật chuẩn hóa theo RTL `rtl_ver02`)  
+> **Tài liệu gốc tham chiếu:** [`Notes/mha_level_1_bo_nho_dem_lenh.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes/m## 1. TỔNG QUAN HỆ THỐNG BỘ NHỚ ĐỆM INGRESS
 
----
-
-## 1. Sub-system Block Diagram (memory_streaming_subsys.sv)
-
-Sơ đồ phác thảo chi tiết sự kết hợp giữa **Skid Buffer (chống mất gói AXI-Stream)**, **Bộ phân giải địa chỉ (Address Generator)**, và **Kiến trúc BRAM Ping-Pong Ngân hàng kép (Dual-Bank BRAM)**:
+Hệ thống bộ nhớ đệm Ingress chịu trách nhiệm thu nhận dòng dữ liệu AXI4-Stream 128-bit native tốc độ cao từ kênh DMA MM2S, loại bỏ hiện tượng bong bóng đường ống (Zero Bubble Ingress), và giải mã tự động nạp vào 3 phân vùng bộ nhớ nội chip của Head hiện hành ($Q, K, V$).
 
 ```text
 ========================================================================================================================
-                            LEVEL 1: MEMORY & STREAMING SUB-SYSTEM (memory_streaming_subsys.sv)
+                              LEVEL 1: INGRESS BUFFERING & ON-CHIP MEMORY ARCHITECTURE (128-BIT NATIVE)
 ========================================================================================================================
 
-   AXI4-Stream Ingress Raw Data [63:0]                     Handshake Control Signals (s_axis_tvalid, s_axis_tready)
-            │                                                                      │
-            v                                                                      v
+    AXI DMA MM2S (DDR4 Memory)
+   +---------------------------+
+   | 128-bit Stream TX Master  |
+   +-------------+-------------+
+                 |
+                 | S_AXIS_TDATA [127:0], TVALID, TREADY, TLAST (16 INT8 tokens/beat)
+                 v
    +-------------------------------------------------------------------------------------------------------------------+
-   | AXI4-STREAM SKID BUFFER ADAPTER (axis_adapter.sv)                                                                 |
-   | - Holds incoming data beat when downstream BRAM writing is stalled                                                |
-   | - Guarantees zero bubble cycles and compliant TVALID/TREADY protocol                                              |
-   +---------------------------------------------------+---------------------------------------------------------------+
-                                                       │
-                                                       v Skid_Data [63:0] & Skid_Valid
-   +---------------------------------------------------+---------------------------------------------------------------+
-   | ADDRESS GENERATOR & BANK SWITCHING FSM (ping_pong_fsm.sv)                                                         |
-   | - Auto-increments write addresses waddr_q, waddr_k, waddr_v                                                       |
-   | - Toggles pp_bank_sel (Bank 0 / Bank 1) upon tile completion in 1 clock cycle                                     |
-   +---------------------------------------------------+---------------------------------------------------------------+
-                                                       │
-                           ┌───────────────────────────┴───────────────────────────┐
-                           │                                                       │
-                           v (Bank 0 Active for Writing)                           v (Bank 1 Active for Reading)
-   +---------------------------------------------------+   +---------------------------------------------------+
-   | PING-PONG BRAM BANK 0                             |   | PING-PONG BRAM BANK 1                             |
-   |  [ Q_RAM_0 ] [ K_RAM_0 ] [ V_RAM_0 ]              |   |  [ Q_RAM_1 ] [ K_RAM_1 ] [ V_RAM_1 ]              |
-   |  (Storage Size: N x d_k bytes INT8)               |   |  (Storage Size: N x d_k bytes INT8)               |
-   +---------------------------------------------------+   +---------------------------------------------------+
-                                                       │
-                                                       v
-                                            rdata_q_vec, rdata_k_vec (32-bit Vector to Systolic Array)
+   | SKID BUFFER (axis_adapter.sv - DATA_WIDTH = 128)                                                                  |
+   | - Lưu trữ tức thời 1 beat 128-bit dự phòng khi downstream bận (tready = 0)                                        |
+   | - Triệt tiêu 100% rủi ro mất dữ liệu trên bus bắt tay AXI-Stream                                                  |
+   +--------------------------------------------+----------------------------------------------------------------------+
+                                                |
+                                                | skid_tdata [127:0], skid_tvalid, skid_tready
+                                                v
+   +-------------------------------------------------------------------------------------------------------------------+
+   | FSM GIẢI MÃ NẠP TỰ ĐỘNG INGRESS (ing_load_state in attention_core_top_*.sv)                                       |
+   |                                                                                                                   |
+   |   [ING_Q]  --> Nạp đủ beats_per_mat beats vào q_mem [256][MAX_HEAD_DIM]                                          |
+   |      |                                                                                                            |
+   |      v                                                                                                            |
+   |   [ING_K]  --> Tự động chuyển nạp beats_per_mat beats vào k_mem [256][MAX_HEAD_DIM]                               |
+   |      |                                                                                                            |
+   |      v                                                                                                            |
+   |   [ING_V]  --> Tự động chuyển nạp beats_per_mat beats vào v_mem [256][MAX_HEAD_DIM]                               |
+   |      |                                                                                                            |
+   |      v                                                                                                            |
+   |   [ING_READY] -> Phát cờ head_data_ready = 1'b1 kích hoạt Attention Pipeline bắt đầu tính toán                    |
+   +----------------------------------------------------+--------------------------------------------------------------+
+                                                        |
+                                                        v
+   +-------------------------------------------------------------------------------------------------------------------+
+   | ON-CHIP ACTIVE HEAD STORAGE (Block RAM tổng hợp được trên UltraScale+)                                             |
+   | (* ram_style = "block" *)                                                                                         |
+   |                                                                                                                   |
+   |   +------------------------------------+  +------------------------------------+  +----------------------------+  |
+   |   | q_mem [256][32] (INT8 Signed)      |  | k_mem [256][32] (INT8 Signed)      |  | v_mem [256][32] (INT8 S.)  |  |
+   |   | Port A: Ghi từ Ingress Stream      |  | Port A: Ghi từ Ingress Stream      |  | Port A: Ghi Ingress Stream |  |
+   |   | Port B: Đọc song song d_k chiều    |  | Port B: Đọc song song d_k chiều    |  | Port B: Cung cấp cho S*V   |  |
+   |   +------------------------------------+  +------------------------------------+  +----------------------------+  |
+   +-------------------------------------------------------------------------------------------------------------------+
 ```
 
 ---
 
-### 2. Bảng Mô Tả Tín Hiệu & Routing Sub-system (LEVEL 1 Signal Table)
+## 2. NGUYÊN LÝ GIẢI MÃ ĐỊA CHỈ TOKEN ĐA CHIỀU (MULTI-STAGE ADDRESSING TRÊN BUS 128-BIT)
 
-| Tên Tín hiệu (Signal) | Hướng | Độ rộng bit | Mô tả Chức năng & Định tuyến Routing |
-| ------ | ------ | ------ | ------ |
-| clk / rst_n | Input | 1 / 1 bit | Clock hệ thống 200 MHz và Reset bất đồng bộ tích cực mức thấp. |
-| s_axis_tdata_raw | Input | 64 bits | Tín hiệu dữ liệu thô từ AXI DMA MM2S. |
-| s_axis_tvalid_raw | Input | 1 bit | Cờ báo dữ liệu thô hợp lệ từ DMA. |
-| s_axis_tready_raw | Output | 1 bit | Tín hiệu báo sẵn sàng nhận từ Skid Buffer (gửi ngược về DMA). |
-| s_axis_tlast_raw | Input | 1 bit | Cờ báo beat cuối cùng của tile dữ liệu đầu vào. |
-| skid_tdata | Internal | 64 bits | Dữ liệu đã qua Skid Buffer, sẵn sàng nạp vào BRAM. |
-| skid_tvalid | Internal | 1 bit | Cờ Valid ổn định không bị giật nhịp khi downstream bận. |
-| pp_bank_sel | Internal | 1 bit | Con trỏ chọn ngân hàng BRAM Ping-Pong (0: Bank 0 Write / Bank 1 Read; 1: Bank 1 Write / Bank 0 Read). |
-| waddr_q / waddr_k | Internal | 8 bits | Địa chỉ ghi vào BRAM Q, K (0 đến 255). |
-| we_q / we_k / we_v | Internal | 1 bit | Tín hiệu Enable ghi tương ứng cho từng BRAM. |
-| raddr_q / raddr_k | Internal | 8 bits | Địa chỉ đọc BRAM từ mảng Systolic MAC Array. |
-| rdata_q_vec | Output | 32 bits | Vector $4 \times \text{INT8}$ đọc từ BRAM Q đưa thẳng vào mảng Systolic. |
-| rdata_k_vec | Output | 32 bits | Vector $4 \times \text{INT8}$ đọc từ BRAM K đưa thẳng vào mảng Systolic. |
-| tile_write_done | Internal | 1 bit | Xung báo hoàn tất ghi đủ 1 Tile ($N \times d_k$) vào Bank đang Active. |
-| tile_read_done | Internal | 1 bit | Xung báo Stage 1 GEMM đã đọc xong 1 Tile từ Bank Active. |
+Mỗi beat AXI4-Stream 128-bit chứa **16 giá trị INT8** (16 bytes/beat). Mạch giải mã trong RTL kiểm tra trực tiếp kích thước $d_k$ (`reg_head_dim`) để xác định số beats cần nạp:
 
----
-
-### 3. Sơ đồ ASMD Chart Điều Khiển Ping-Pong Buffer (ping_pong_fsm.sv)
-
-Sơ đồ điều khiển chuyển đổi con trỏ đệm Ping-Pong đảm bảo **Zero-Latency Overhead** (không mất chu kỳ trống khi hoán đổi ngân hàng bộ nhớ):
-
-```text
-                               +-------------------+
-                               |     ST_PP_RESET   |
-                               | pp_bank_sel <= 0  |
-                               | bank0_free  <= 1  |
-                               | bank1_free  <= 1  |
-                               +---------+---------+
-                                         |
-                                         v
-                               +-------------------+
-                               |     ST_PP_IDLE    | <----------------------+
-                               +---------+---------+                        |
-                                         |                                  |
-                                (s_axis_tvalid == 1)                        |
-                                 /               \                          |
-                               YES                NO                        |
-                               /                    \                       |
-                              v                      +----------------------+
-                    (bank_write_free?)
-                      /          \                    
-                    YES           NO
-                    /               \                   
-                   v                 v
-         +-------------------+     +-------------------+
-         |   ST_WRITE_ACTIVE |     |   ST_WAIT_COMPUTE |
-         | Write to active   |     | Hold TREADY = 0   |
-         | bank (0 or 1)     |     | (Backpressure)    |
-         +---------+---------+     +---------+---------+
-                   |                         |
-                   v                         v
-          (tile_write_done?)          (tile_read_done?)
-           /            \               /          \        
-         YES             NO           YES          NO
-         /                \           /             \        
-        v                  v         v               v
-  +---------------+   (Keep Write) ST_WRITE_ACTIVE (Keep Wait)
-  | ST_SWAP_BANKS |
-  | pp_bank_sel <=|
-  | ~pp_bank_sel  |
-  | Trigger GEMM  |
-  +-------+-------+
-          |
-          v
-      ST_PP_IDLE
-```
-
-### 4. Mã RTL SystemVerilog Chống Nghẽn Chuẩn (axis_adapter.sv)
-
-```verilog
-module axis_adapter #(
-    parameter int DATA_WIDTH = 64
-)(
-    input  logic                  clk,
-    input  logic                  rst_n,
-    // Ingress AXI-Stream
-    input  logic [DATA_WIDTH-1:0] s_axis_tdata,
-    input  logic                  s_axis_tvalid,
-    output logic                  s_axis_tready,
-    input  logic                  s_axis_tlast,
-    // Egress Internal Stream (Sạch)
-    output logic [DATA_WIDTH-1:0] m_axis_tdata,
-    output logic                  m_axis_tvalid,
-    input  logic                  m_axis_tready,
-    output logic                  m_axis_tlast
-);
-
-    logic [DATA_WIDTH-1:0] reg_main_data, reg_skid_data;
-    logic                  reg_main_valid, reg_skid_valid;
-    logic                  reg_main_last,  reg_skid_last;
-
-    assign s_axis_tready = !reg_skid_valid;
-
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            reg_main_valid <= 1'b0;
-            reg_skid_valid <= 1'b0;
-        end else begin
-            if (s_axis_tready && s_axis_tvalid) begin
-                if (m_axis_tready || !m_axis_tvalid) begin
-                    reg_main_data  <= s_axis_tdata;
-                    reg_main_valid <= 1'b1;
-                    reg_main_last  <= s_axis_tlast;
-                end else begin
-                    reg_skid_data  <= s_axis_tdata;
-                    reg_skid_valid <= 1'b1;
-                    reg_skid_last  <= s_axis_tlast;
-                end
-            end else if (m_axis_tready) begin
-                if (reg_skid_valid) begin
-                    reg_main_data  <= reg_skid_data;
-                    reg_main_valid <= 1'b1;
-                    reg_main_last  <= reg_skid_last;
-                    reg_skid_valid <= 1'b0;
-                end else begin
-                    reg_main_valid <= 1'b0;
-                end
-            end
-        end
+```systemverilog
+always_comb begin
+    if (reg_head_dim <= 16'd16) begin
+        beats_per_mat = 16'(reg_seq_len);         // 256 beats (1 beat/token)
+        ing_tok_idx   = 8'(ing_beat_cnt);
+        ing_slice_idx = 2'b00;
+    end else begin
+        beats_per_mat = 16'(reg_seq_len << 1);     // 512 beats (2 beats/token)
+        ing_tok_idx   = 8'(ing_beat_cnt >> 1);
+        ing_slice_idx = 2'(ing_beat_cnt & 16'd1);
     end
-
-    assign m_axis_tdata  = reg_main_data;
-    assign m_axis_tvalid = reg_main_valid;
-    assign m_axis_tlast  = reg_main_last;
-
-endmodule
+end
 ```
+
+### 2.1 Stage 2 ($d_k = 16$):
+- Mỗi token chiếm đúng 16 bytes $\implies$ **đúng 1 beat 128-bit duy nhất**:
+  - Beat 0: Chứa trọn vẹn 16 chiều đặc trưng (`dim 0..15`).
+- Giải mã địa chỉ:
+  - Token index: `ing_tok_idx = ing_beat_cnt;`
+  - Slice index: `ing_slice_idx = 2'b00;`
+- Tổng số beats mỗi ma trận: $256 \times 1 = \mathbf{256\text{ beats}}$.
+- Tổng số beats cho cả 3 ma trận $Q, K, V$: $3 \times 256 = \mathbf{768\text{ beats}}$ (tiết kiệm 50% số nhịp truyền so với bus 64-bit cũ).
+
+### 2.2 Stage 3 ($d_k = 20$) & Stage 4 ($d_k = 24$):
+- Số chiều vượt quá 16 bytes, áp dụng chuẩn **Token-Aligned Padding** (mỗi token chiếm 2 beats 128-bit = 32 bytes):
+  - **Beat 0** (`ing_slice_idx == 0`): 16 bytes đầu (`dim 0..15`).
+  - **Beat 1** (`ing_slice_idx == 1`):
+    - Stage 3 ($d_k = 20$): 4 bytes (`dim 16..19`) + 12 bytes đệm zero.
+    - Stage 4 ($d_k = 24$): 8 bytes (`dim 16..23`) + 8 bytes đệm zero.
+    - Mở rộng $d_k = 32$: 16 bytes trọn vẹn (`dim 16..31`).
+- Giải mã địa chỉ:
+  - Token index: `ing_tok_idx = ing_beat_cnt >> 1;`
+  - Slice index: `ing_slice_idx = ing_beat_cnt & 1;`
+- Tổng số beats mỗi ma trận: $256 \times 2 = \mathbf{512\text{ beats}}$.
+- Tổng số beats cho cả 3 ma trận $Q, K, V$: $3 \times 512 = \mathbf{1,536\text{ beats}}$.
+
+---
+
+## 3. CƠ CHẾ BẢO VỆ CHỐNG NGHẼN SKID BUFFER (`axis_adapter.sv`)
+
+Mô-đun Skid Buffer giải quyết triệt để vấn đề phản hồi trễ tín hiệu `TREADY` (Backpressure Handshake):
+- Khi `m_axis_tready = 1`: Dữ liệu đi thẳng qua tầng đệm với độ trễ 0 cycle.
+- Khi `m_axis_tready = 0` bất ngờ: Thanh ghi nội bộ lưu giữ ngay beat hiện tại và hạ `s_axis_tready = 0` về phía DMA ở chu kỳ kế tiếp, đảm bảo không mất mát bất kỳ byte dữ liệu nào.

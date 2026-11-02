@@ -34,9 +34,9 @@
 ```
 
 ### 1.2 Bảng Phân Bổ Số Beat DMA Cho Cả 3 Stages
-* **Stage 2 ($d_k = 16$):** 1 token = 1 beat $\implies$ $Q, K, V = 256 \times 3 = \mathbf{768\text{ beats}}$ (giảm 50% thời gian DMA).
-* **Stage 3 ($d_k = 20$):** 1 token = 2 beats $\implies$ $Q, K, V = 512 \times 3 = \mathbf{1,536\text{ beats}}$.
-* **Stage 4 ($d_k = 24$):** 1 token = 2 beats $\implies$ $Q, K, V = 512 \times 3 = \mathbf{1,536\text{ beats}}$.
+* **Stage 2 ($N=256, d_k = 16$):** 1 token = 1 beat $\implies$ $Q, K, V = 256 \times 3 = \mathbf{768\text{ beats}}$ (giảm 50% thời gian DMA so với bus 64-bit).
+* **Stage 3 ($N=64, d_k = 20$):** 1 token = 2 beats (16B + 4B data/12B pad) $\implies$ $Q, K, V = (64 \times 2) \times 3 = \mathbf{384\text{ beats}}$.
+* **Stage 4 ($N=16, d_k = 24$):** 1 token = 2 beats (16B + 8B data/8B pad) $\implies$ $Q, K, V = (16 \times 2) \times 3 = \mathbf{96\text{ beats}}$.
 
 ---
 
@@ -137,10 +137,10 @@ graph TD
 
 ### 4.2 Kịch Bản Testbench Đa Tầng Liên Hoàn
 Xây dựng testbench liên hoàn cho cả 3 biến thể:
-1. **Phase 1:** Cấu hình $d_k=16$, nạp 768 beats Ingress $\to$ kiểm tra 256 beats Context Out.
-2. **Phase 2:** Cấu hình $d_k=20$, nạp 1,536 beats Ingress $\to$ kiểm tra 512 beats Context Out.
-3. **Phase 3:** Cấu hình $d_k=24$, nạp 1,536 beats Ingress $\to$ kiểm tra 512 beats Context Out.
-4. **Tiêu chuẩn đạt:** 100% mẫu khớp 0-LSB với PyTorch, tín hiệu `tlast` khẳng định chính xác ở beat cuối của từng Stage.
+1. **Phase 1:** Cấu hình $N=256, d_k=16$, nạp 768 beats Ingress $\to$ kiểm tra 256 beats Context Out (4,096 Bytes).
+2. **Phase 2:** Cấu hình $N=64, d_k=20$, nạp 384 beats Ingress $\to$ kiểm tra 128 beats Context Out (1,280 Bytes).
+3. **Phase 3:** Cấu hình $N=16, d_k=24$, nạp 96 beats Ingress $\to$ kiểm tra 32 beats Context Out (384 Bytes).
+4. **Tiêu chuẩn đạt:** 100% mẫu ($4,096 + 1,280 + 384 = \mathbf{5,760\text{ bytes}}$) khớp 0-LSB với PyTorch, tín hiệu `m_axis_tlast` khẳng định chính xác ở beat cuối của từng Stage.
 
 ---
 

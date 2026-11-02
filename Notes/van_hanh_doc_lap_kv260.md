@@ -1,18 +1,23 @@
-# Vận hành Độc lập KV260
+# Vận Hành Độc Lập KV260 v2.0 (Standalone Edge AI Execution)
 
-**Vẫn CẦN Laptop/PC trong quá trình lập trình và phát triển**, nhưng **KHÔNG CẦN Laptop khi hệ thống chạy demo/thực tế (Standalone)**.
-
----
-
-##### 1. Tại sao VẪN CẦN Laptop/PC khi phát triển?
-* **Tổng hợp vi mạch (Vivado Synthesis & Implementation)**: Để biên dịch các file mã nguồn **SystemVerilog RTL** thành file phần cứng **Bitstream (`.bit`)**, bạn bắt buộc phải dùng phần mềm **AMD Vivado** chạy trên Laptop/PC x86 (cấu hình khuyến nghị CPU 4-8 nhân, RAM 16GB+). Chip ARM PS trên KV260 không đủ tài nguyên để tự chạy Vivado.
-* **Soạn thảo mã nguồn & Kiểm thử (IDE & Simulation)**: Bạn viết code RTL, script Python trên VS Code, chạy mô phỏng Cocotb / Verilator trên Laptop trước khi đẩy xuống phần cứng.
-* **Giao tiếp & Điều khiển KV260**: Laptop đóng vai trò là Terminal để điều khiển KV260 từ xa qua **SSH**, **Jupyter Notebook**, hoặc **VS Code Remote Development** (thông qua cáp mạng LAN hoặc USB-C).
+> **Dự án:** Triển khai End-to-End HW-SW Codesign MobileViT-XXS trên AMD Kria KV260  
+> **Phiên bản:** v2.0 (Cập nhật chuẩn hóa theo mô hình MobileViT $256 \times 256$ và Bitstream `rtl_ver02`)  
+> **Tài liệu gốc tham chiếu:** [`Notes/van_hanh_doc_lap_kv260.md`](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes/van_hanh_doc_lap_kv260.md)
 
 ---
 
-##### 2. Khi nào thì KHÔNG CẦN Laptop nữa?
-Khi bạn đã hoàn tất lập trình và nạp file `.bit` + script Python vào thẻ nhớ của KV260, bo mạch **Kria KV260 có thể vận hành hoàn toàn độc lập (Standalone Embedded System)**:
-1. **Cắm Webcam USB** trực tiếp vào cổng USB trên KV260.
-2. **Cắm màn hình** trực tiếp vào cổng HDMI / DisplayPort của KV260.
-3. **Cấp nguồn cho KV260**: Lõi ARM PS tự khởi động Ubuntu/PYNQ, nạp Bitstream lên FPGA PL, đọc hình ảnh từ Webcam và xuất kết quả nhận diện real-time lên màn hình **mà không cần nối với bất kỳ chiếc Laptop nào**.
+## 1. PHÂN BIỆT 2 GIAI ĐOẠN: PHÁT TRIỂN VS. VẬN HÀNH ĐỘC LẬP
+
+### 1.1 Giai đoạn Phát triển (Development Phase):
+Cần Laptop/PC phát triển để:
+- Tổng hợp vi mạch (Vivado Synthesis & Implementation 200 MHz trên part `xck26-sfvc784-2LV-c`).
+- Kiểm thử số học Bit-Exact và mô phỏng RTL (Icarus Verilog / Vivado Simulator).
+- Tinh chỉnh mô hình lượng tử hóa (I-ViT Surgery, PTQ, QAT).
+
+### 1.2 Giai đoạn Vận hành Độc lập (Standalone Demonstration Phase):
+Bo mạch **AMD Kria KV260 có thể vận hành hoàn toàn độc lập mà không cần kết nối với Laptop**:
+1. Cắm USB Webcam vào cổng USB 3.0 trên KV260.
+2. Cắm màn hình hiển thị trực tiếp vào cổng HDMI/DisplayPort.
+3. Cấp nguồn 12V-3A: Hệ thống Ubuntu/PYNQ tự khởi động qua systemd service:
+   - Tự động nạp file `attention_core_kv260.bit` lên FPGA PL.
+   - Chạy pipeline nhận diện MobileViT-XXS thời gian thực (chụp ảnh $256 \times 256$, chạy CNN Stem trên ARM PS, offload Attention Core sang FPGA PL, và xuất nhãn phân loại lên màn hình).

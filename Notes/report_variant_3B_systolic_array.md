@@ -1,0 +1,402 @@
+# Báo Cáo Thiết Kế Kiến Trúc Phương Án 3B: 2D Output-Stationary Systolic MAC Array with DSP Packing
+## Thư mục mã nguồn mục tiêu: `rtl_ver02_3B` — Tile-Based GEMM with Score Matrix Reordering Buffer
+**Dự án**: Bộ Tăng Tốc Phần Cứng MobileViT-XXS I-ViT INT8 trên Nền Tảng AMD Kria KV260  
+**Ngày cập nhật**: 22/10/2026  
+**Trạng thái**: Thiết kế chi tiết & Phân tích tối ưu hóa
+
+---
+
+## 1. Tổng Quan Kiến Trúc & Triết Lý Output-Stationary
+
+Phương án **3B (2D Systolic MAC Array)** là kiến trúc gia tốc phần cứng chuẩn công nghiệp, đại diện cho trường phái tính toán song song không gian (Spatial Computing). Thay vì sử dụng cây cộng gộp dồn dữ liệu về một điểm như các phương án streaming, 3B phân tán tính toán trên một **mảng 2 chiều các phần tử xử lý (2D Processing Element Grid - PE Array)**.
+
+### 1.1. Các Đặc Điểm Cốt Lõi
+- **Kích thước mảng phần cứng**: $4 \times 4$ PE vật lý.
+- **Tích hợp DSP Packing**: Mỗi PE vật lý chứa 1 khối `pe_slice_dsp_packing`, sử dụng 1 khối DSP48E2 cứng để thực hiện đồng thời **2 phép nhân INT8 $\times$ INT8**.
+- **Quy mô tính toán song song**: Toàn mảng chứa 16 DSP, thực hiện đồng thời **32 phép nhân - tích lũy (32 MACs/cycle)**.
+- **Kích thước khối ngõ ra (Output Tile Size)**: Do mỗi cột PE tính toán đồng thời 2 cột trọng số ($K_{col0}$ và $K_{col1}$), mảng $4 \times 4$ PE tạo ra một mảnh ma trận kết quả kích thước **$4\text{ hàng} \times 8\text{ cột}$** ($4 \times 8 = 32$ phần tử tích lũy).
+- **Mô hình luân chuyển dữ liệu (Dataflow)**: **Output-Stationary (OS)** — Giá trị tích lũy (Accumulator) đứng yên tại chỗ bên trong mỗi PE. Dữ liệu kích hoạt $Q$ và trọng số $K$ di chuyển xuyên qua mảng theo dạng sóng lan truyền (Wavefront).
+
+> [!NOTE]
+> **Sơ Đồ Thông Lượng Toàn Mạch & Nút Thắt Drain**: Phân tích chi tiết về sơ đồ thông lượng end-to-end, giản đồ nhịp sóng Wavefront, so sánh tương quan giữa $d_k=16$ và $d_k > 16$, cùng phân tích điểm nghẽn Drain theo định luật Amdahl có tại: [so_do_thong_luong_3_variants.md](file:///c:/Users/tuan2/Desktop/Capstone_Project/Notes_ver02/so_do_thong_luong_3_variants.md).
+
+---
+
+## 2. Sơ Đồ Khối Chi Tiết Mảng 2D Systolic Array $4 \times 4$ PE
+
+Dưới đây là sơ đồ chi tiết luồng di chuyển dữ liệu theo dạng sóng (Wavefront propagation) qua mảng PE:
+
+```mermaid
+graph TD
+    subgraph SKEW_CIRCUIT ["MẠCH LỆCH PHA DỮ LIỆU ĐẦU VÀO"]
+        Q_IN0["Q Row 0"] -->|Skew 0T| PE00
+        Q_IN1["Q Row 1"] --> REG_Q1_0["Reg Trễ 1 chu kỳ"] -->|Skew 1T| PE10
+        Q_IN2["Q Row 2"] --> REG_Q2_0["Reg Trễ"] --> REG_Q2_1["Reg Trễ"] -->|Skew 2T| PE20
+        Q_IN3["Q Row 3"] --> REG_Q3_0["Reg Trễ"] --> REG_Q3_1["Reg Trễ"] --> REG_Q3_2["Reg Trễ"] -->|Skew 3T| PE30
+
+        K_IN0["K Cols 0 và 1"] -->|Skew 0T| PE00
+        K_IN1["K Cols 2 và 3"] --> REG_K1_0["Reg Trễ"] -->|Skew 1T| PE01
+        K_IN2["K Cols 4 và 5"] --> REG_K2_0["Reg Trễ"] --> REG_K2_1["Reg Trễ"] -->|Skew 2T| PE02
+        K_IN3["K Cols 6 và 7"] --> REG_K3_0["Reg Trễ"] --> REG_K3_1["Reg Trễ"] --> REG_K3_2["Reg Trễ"] -->|Skew 3T| PE03
+    end
+
+    subgraph PE_GRID ["MẢNG 2D SYSTOLIC MAC GRID (4x4 PEs - 32 Accumulators)"]
+        PE00["PE 0,0<br/>acc0, acc1"] -->|Q act| PE01["PE 0,1<br/>acc0, acc1"]
+        PE01 -->|Q act| PE02["PE 0,2<br/>acc0, acc1"]
+        PE02 -->|Q act| PE03["PE 0,3<br/>acc0, acc1"]
+
+        PE10["PE 1,0<br/>acc0, acc1"] -->|Q act| PE11["PE 1,1<br/>acc0, acc1"]
+        PE11 -->|Q act| PE12["PE 1,2<br/>acc0, acc1"]
+        PE12 -->|Q act| PE13["PE 1,3<br/>acc0, acc1"]
+
+        PE20["PE 2,0<br/>acc0, acc1"] -->|Q act| PE21["PE 2,1<br/>acc0, acc1"]
+        PE21 -->|Q act| PE22["PE 2,2<br/>acc0, acc1"]
+        PE22 -->|Q act| PE23["PE 2,3<br/>acc0, acc1"]
+
+        PE30["PE 3,0<br/>acc0, acc1"] -->|Q act| PE31["PE 3,1<br/>acc0, acc1"]
+        PE31 -->|Q act| PE32["PE 3,2<br/>acc0, acc1"]
+        PE32 -->|Q act| PE33["PE 3,3<br/>acc0, acc1"]
+
+        PE00 -->|K wt| PE10
+        PE10 -->|K wt| PE20
+        PE20 -->|K wt| PE30
+
+        PE01 -->|K wt| PE11
+        PE11 -->|K wt| PE21
+        PE21 -->|K wt| PE31
+
+        PE02 -->|K wt| PE12
+        PE12 -->|K wt| PE22
+        PE22 -->|K wt| PE32
+
+        PE03 -->|K wt| PE13
+        PE13 -->|K wt| PE23
+        PE23 -->|K wt| PE33
+    end
+
+    subgraph DRAIN_LOGIC ["MẠCH DỠ DỮ LIỆU TUẦN TỰ"]
+        PE00 -.-> DRAIN_MUX["Drain Multiplexer 32 sang 1<br/>Quét tuần tự 32 thanh ghi"]
+        PE33 -.-> DRAIN_MUX
+        DRAIN_MUX -->|dot_product_stream INT32| REORDER_BUF["BRAM Score Reordering Buffer<br/>4 hàng x 256 cột x 32-bit"]
+    end
+```
+
+---
+
+## 3. Bản Chất Toán Học & Sự Lệch Pha Của Dòng Sóng (Wavefront Compute Timing)
+
+### 3.1. Cơ Chế Lệch Pha Tự Động (Auto Wavefront Skewing Logic)
+Để đảm bảo các phần tử của vector $Q$ và ma trận $K$ gặp nhau chính xác tại các giao điểm không gian trong mảng 2D:
+- Hàng thứ $r$ của ma trận $Q$ phải trễ $r$ chu kỳ xung nhịp trước khi vào PE $(r, 0)$.
+- Cột thứ $c$ của ma trận $K$ phải trễ $c$ chu kỳ xung nhịp trước khi vào PE $(0, c)$.
+- **Triển khai RTL thực tế**: Trong [systolic_mac_array.sv](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_3B/systolic_mac_array.sv), cơ chế này được tích hợp sẵn thông qua parameter `AUTO_SKEW = 1'b1` và khối logic `gen_auto_skew`:
+  - Mảng thanh ghi trễ bậc thang `q_skew_regs[r][d]` tự động chèn $r$ tầng Flip-Flop trễ cho hàng $r$.
+  - Mảng thanh ghi trễ bậc thang `k_skew_regs[c][d]` tự động chèn $c$ tầng Flip-Flop trễ cho cột $c$.
+  - Nhờ vậy, bộ điều khiển FSM ngoài Top Core có thể cấp đồng thời các hàng $Q$ và cột $K$ mà không cần tự quản lý các thanh ghi lệch pha rải rác bên ngoài!
+- Phần tử PE $(r, c)$ nhận dữ liệu hợp lệ đầu tiên tại chu kỳ:
+  $$t_{\text{start}}(r, c) = r + c$$
+- PE góc dưới cùng $(3, 3)$ là phần tử bắt đầu và kết thúc muộn nhất, trễ $3 + 3 = 6$ chu kỳ so với PE $(0, 0)$.
+
+### 3.2. Chu Kỳ Tính Toán Của Một Khối (Tile Compute Cycles)
+Với chiều sâu đặc trưng $d_k = 16$:
+- Thời gian nạp dữ liệu: $d_k = 16\text{ chu kỳ}$.
+- Độ trễ đường ống lan truyền sóng: $(N_{row} - 1) + (N_{col} - 1) = 3 + 3 = 6\text{ chu kỳ}$.
+- Độ trễ nội bộ của DSP48E2: $2\text{ chu kỳ}$.
+- **Tổng thời gian tính toán của 1 Tile**:
+  $$T_{\text{compute\_tile}} = d_k + 2 \times (\text{ARRAY\_SIZE} - 1) + 2 = 16 + 6 + 2 = \mathbf{24\text{ chu kỳ xung nhịp}}$$
+
+---
+
+## 4. Pha Dỡ Dữ Liệu (Drain Phase) & Nút Thắt Hiệu Suất
+
+Đây là **phân tích cực kỳ quan trọng làm sáng tỏ lý do tại sao Systolic Array bị giảm thông lượng** trong trường hợp kích thước chiều đặc trưng nhỏ ($d_k = 16$):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant CTL as Tiling Controller FSM
+    participant ARR as 4x4 PE Systolic Array
+    participant DRAIN as Drain MUX Logic
+    participant BRAM as Score Matrix Reorder Buffer
+
+    Note over CTL, ARR: PHA 1 - TINH TOAN WAVEFRONT 24 chu ky
+    CTL->>ARR: Cap Q va K qua cac thanh ghi lech pha
+    Note over ARR: 32 Accumulators tich luy ket qua cuc bo
+    Note over CTL, DRAIN: PHA 2 - DO DU LIEU TUAN TU 32 chu ky
+    CTL->>ARR: Kich hoat xung drain_start
+    loop Quet 32 bo tich luy
+        ARR->>DRAIN: Trich xuat acc cua PE r c
+        DRAIN->>BRAM: Ghi 1 gia tri score INT32 moi chu ky
+    end
+    Note over ARR: Mang dung tinh toan trong suot 32 chu ky nay
+    DRAIN-->>CTL: Phat xung drain_done
+```
+
+### 4.1. Phân Tích Tỷ Lệ Hiệu Dụng Phần Cứng (Hardware Utilization Ratio)
+- Chu kỳ tính toán thực tế: $T_{\text{compute}} = 24\text{ chu kỳ}$.
+- Chu kỳ dỡ dữ liệu (Drain): $T_{\text{drain}} = 32\text{ chu kỳ}$.
+- Tổng chu kỳ cho 1 Tile: $T_{\text{tile}} = 24 + 32 = \mathbf{56\text{ chu kỳ}}$.
+- **Hiệu suất tính toán thực tế (Compute Efficiency)**:
+  $$\eta = \frac{T_{\text{compute}}}{T_{\text{tile}}} = \frac{24}{56} \approx \mathbf{42.8\%}$$
+- **Kết luận**: Hơn **57.2% thời gian hoạt động của phần cứng mảng Systolic bị lãng phí** chỉ để chờ mạch MUX tuần tự lấy dữ liệu ra ngoài bus đơn!
+
+---
+
+## 5. Mạch Đổi Thứ Tự Dữ Liệu: Score Matrix Reordering Buffer
+
+### 5.1. Xung Đột Định Dạng Dữ Liệu (Format Impedance Mismatch)
+Một thiếu sót lớn trong các thiết kế sơ sài ban đầu là bỏ qua sự xung đột giữa thứ tự xuất của Systolic Array và thứ tự nhập của Softmax:
+- **Systolic Array xuất theo Tile**: Mỗi lần dỡ mảng, mạch xuất ra một khối $4\text{ hàng} \times 8\text{ cột}$ (32 phần tử gồm 8 phần tử của Hàng 0, 8 phần tử của Hàng 1, 8 phần tử của Hàng 2, 8 phần tử của Hàng 3).
+- **Softmax Engine đòi hỏi luồng hàng liên tục**: Softmax cần duyệt trọn vẹn **256 phần tử liên tiếp của duy nhất 1 hàng** để tìm giá trị cực đại ($Max$) và tính tổng hàm mũ ($\sum \exp$).
+
+### 5.2. Cấu Trúc Bộ Nhớ Reordering Buffer
+Để giải quyết xung đột này, Phương án 3B bắt buộc phải tích hợp một khối **BRAM Reordering Buffer** nằm giữa Systolic Array và Softmax:
+
+```mermaid
+graph LR
+    subgraph DRAIN_STREAM ["DÒNG DỮ LIỆU DỠ TILE 4x8"]
+        STREAM_IN["32 phần tử Tile:<br/>Hàng 0 đến Hàng 3"]
+    end
+
+    subgraph ADDR_WRITE ["BỘ TÍNH ĐỊA CHỈ GHI"]
+        W_GEN["Địa chỉ ghi Tile sang Matrix Buffer"]
+    end
+
+    subgraph REORDER_RAM ["BRAM REORDERING BUFFER (4 x 256 x 32-bit = 4KB)"]
+        RAM_H0["Vùng Nhớ Hàng 0 (256 Words INT32)"]
+        RAM_H1["Vùng Nhớ Hàng 1 (256 Words INT32)"]
+        RAM_H2["Vùng Nhớ Hàng 2 (256 Words INT32)"]
+        RAM_H3["Vùng Nhớ Hàng 3 (256 Words INT32)"]
+    end
+
+    subgraph ADDR_READ ["BỘ TÍNH ĐỊA CHỈ ĐỌC"]
+        R_GEN["Địa chỉ đọc tuần tự từng hàng"]
+    end
+
+    subgraph SOFTMAX_OUT ["ĐẦU RA SOFTMAX"]
+        SM_STREAM["Dòng tuần tự 256 phần tử mỗi hàng<br/>chuyển sang Scale Unit và Softmax"]
+    end
+
+    STREAM_IN --> W_GEN --> REORDER_RAM
+    REORDER_RAM --> ADDR_READ --> SM_STREAM
+```
+
+- **Quy trình hoạt động**:
+  1. Mảng Systolic tính toán tuần tự $32\text{ tiles}$ ngang (quét hết chiều rộng $256$ cột của ma trận $K$).
+  2. Dữ liệu của 4 hàng được ghi rải vào đúng vị trí tọa độ của chúng trong Reordering Buffer.
+  3. Sau khi hoàn thành $32\text{ tiles} \times 56\text{ chu kỳ} = 1,792\text{ chu kỳ}$, bộ đệm đã chứa đủ 4 hàng hoàn chỉnh ($4 \times 256 = 1,024\text{ scores}$).
+  4. Bộ điều khiển bắt đầu kích hoạt đọc tuần tự từng hàng ra ngoài cho khối Softmax xử lý.
+
+---
+
+## 6. Máy Trạng Thái Hữu Hạn Điều Khiển (Tiling Controller FSM)
+
+```mermaid
+stateDiagram-v2
+    [*] --> TILE_IDLE
+    TILE_IDLE --> TILE_INIT : Bat dau GEMM
+    
+    state TILE_OUTER_LOOP {
+        TILE_INIT --> TILE_ROW_START : Bat dau Tile hang
+        
+        state TILE_INNER_LOOP {
+            TILE_ROW_START --> TILE_COL_START : Bat dau Tile cot
+            TILE_COL_START --> WAVEFRONT_RUN : Nap du lieu Skew
+            WAVEFRONT_RUN --> WAVEFRONT_RUN : Tinh toan 24 chu ky
+            WAVEFRONT_RUN --> DRAIN_START : Kich hoat Drain MUX
+            
+            state DRAIN_OPERATION {
+                DRAIN_START --> DRAIN_STEP : Quet 32 bo tich luy
+                DRAIN_STEP --> DRAIN_STEP : Ghi vao Reorder Buffer
+            }
+            
+            DRAIN_OPERATION --> CHECK_COL_END : Drain hoan tat
+            CHECK_COL_END --> TILE_COL_START : Chua het cac cot
+        }
+        
+        CHECK_COL_END --> TRIGGER_SOFTMAX_4ROWS : Gom du 4 hang
+        
+        state DRAIN_TO_SOFTMAX {
+            TRIGGER_SOFTMAX_4ROWS --> READ_ROW_SEQ : Doc tuan tu cac hang
+            READ_ROW_SEQ --> READ_ROW_SEQ : Softmax va Score V thuc thi
+        }
+        
+        DRAIN_TO_SOFTMAX --> TILE_ROW_START : Tiep tuc cac hang khac
+        DRAIN_TO_SOFTMAX --> TILE_DONE : Hoan tat 256 hang
+    }
+    
+    TILE_DONE --> [*] : Hoan thanh 1 Head
+```
+
+---
+
+## 7. Đánh Giá Định Lượng & So Sánh Chi Tiết với Phương Án 2A
+
+### 7.1. Bảng So Sánh Hiệu Năng và Chi Phí Phần Cứng Cho MobileViT-XXS ($d_k=16$)
+| Thông Số Đo Lường | Phương Án 2A (DSP Streaming) | Phương Án 3B (Systolic Array) | Chênh Lệch / Nhận Xét |
+| :--- | :---: | :---: | :--- |
+| **Số lượng khối DSP48E2** | **8 DSP** | **16 DSP** | **3B tốn gấp 2 lần DSP** |
+| **Số lượng LUT6 tiêu thụ** | ~2,700 | ~4,200 | 3B tốn hơn **+55% LUT** (do FSM và Reorder Buffer) |
+| **Số lượng Flip-Flop** | ~2,900 | ~4,600 | 3B tốn hơn **+58% FF** (32 bộ tích lũy 32-bit) |
+| **Số khối BRAM18K bổ sung** | 0 | **2 khối** (4 KB) | Bắt buộc cho Score Matrix Reordering Buffer |
+| **Chu kỳ tính GEMM 1 / Head** | **67,072 chu kỳ** | **114,688 chu kỳ** | **3B chậm hơn 71%** (do nghẽn Drain 32 chu kỳ) |
+| **Thời gian GEMM 1 @ 200MHz** | **0.335 ms** | **0.573 ms** | 2A nhanh hơn rõ rệt |
+| **Tổng chu kỳ Full Head (Thực Đo 128-bit TB)** | **209,919 chu kỳ** | **337,216 chu kỳ** | **3B tốn hơn 60.6% chu kỳ** |
+| **Thời gian 4 Heads (Full Attention @ 200MHz)** | **4.20 ms** | **6.74 ms** | 2A nhanh hơn 60.6% |
+| **Khung hình/giây (Attention FPS)**| **~238.2 FPS** | **~148.3 FPS** | 2A dẫn trước ~90 FPS |
+
+### 7.2. Giải Pháp Nâng Cao: Mảng PE Có Bộ Đệm Kép (Shadow Accumulator)
+Để triệt tiêu hoàn toàn thời gian chết trong pha Drain, ta có thể bổ sung **Shadow Accumulator (Double-Buffered Registers)** vào bên trong mỗi PE:
+- Khi mảng đang tính toán Tile $N+1$, thanh ghi bóng (Shadow Regs) sẽ dỡ kết quả của Tile $N$ ra ngoài bus.
+- **Ưu điểm**: Triệt tiêu toàn bộ 32 chu kỳ drain, hiệu suất phần cứng đạt $100\%$. Chu kỳ mỗi tile giảm từ $56 \to 24\text{ chu kỳ}$.
+- **Nhược điểm**: Tiêu tốn thêm $32 \times 32\text{ bit} = 1,024\text{ Flip-Flops}$ bên trong fabric và làm phức tạp hóa đáng kể mạch logic chuyển mạch thanh ghi.
+
+---
+
+## 8. Khi Nào Phương Án 3B Trở Nên Vượt Trội?
+
+Dù có hiệu năng thấp hơn 2A đối với bài toán cụ thể MobileViT-XXS ($d_k=16$), Phương án 3B sẽ **hoàn toàn áp đảo** trong các kịch bản sau:
+1. **Mô hình có chiều đặc trưng lớn (ViT-Base với $d_k = 64$)**:
+   - Khi $d_k = 64$, chu kỳ tính toán tăng lên: $T_{\text{compute}} = 64 + 6 + 2 = 72\text{ chu kỳ}$.
+   - Tỷ lệ chu kỳ tính toán trên tổng chu kỳ: $\eta = \frac{72}{72 + 32} = \mathbf{69.2\%}$ (Hiệu suất tăng vọt).
+   - Trong khi đó, nếu dùng Streaming Engine cho $d_k=64$, cây cộng dồn sẽ phình to ra 6 tầng, gây tắc nghẽn routing trầm trọng.
+2. **Kích thước mảng PE lớn hơn ($8 \times 8$ hoặc $16 \times 16$)**:
+   - Mảng PE càng lớn, số phép tính song song càng áp đảo, khấu hao thời gian nạp và dỡ dữ liệu càng tốt.
+3. **Tái sử dụng cho các tầng Linear Projection và MLP / Feed-Forward Network**:
+   - Systolic Array có thể tái sử dụng trực tiếp để nhân các ma trận trọng số khổng lồ ($768 \times 3072$) của tầng MLP mà kiến trúc Streaming không thể làm được.
+
+---
+
+## 9. Kết Luận & Giá Trị Đề Tài Của Phương Án 3B
+
+> **Ý nghĩa học thuật & Luận văn**: Phương án 3B là **minh chứng thuyết phục nhất về năng lực thiết kế phần cứng vi mạch tiên tiến (Advanced VLSI Design)**. 
+> - Nó giải quyết trọn vẹn bài toán đồng bộ hóa 2 chiều, kỹ thuật tính toán dạng sóng (Wavefront Systolic Computation), kỹ thuật DSP Packing trong không gian 2D, và cơ chế chuyển đổi không gian địa chỉ bộ nhớ (Address Reordering Buffer).
+> - Đây là nền tảng cốt lõi để mở rộng đề tài sang các kiến trúc Transformer quy mô lớn (ViT, Swin, LLaMA) và là điểm nhấn quan trọng trong hồ sơ bảo vệ đồ án tốt nghiệp.
+
+---
+
+## 10. Nhật Ký Cập Nhật Kiến Trúc (Architecture Revision History & Latest Upgrade Log)
+
+### 10.1. Lịch Sử Các Phiên Bản Thiết Kế
+
+| Phiên Bản | Ngày Hoàn Thành | Chuẩn Bus AXI-Stream | Cấu Trúc GEMM 1 | Phạm Vi Hỗ Trợ Stage | Trạng Thái Xác Minh |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| **v1.0 (Baseline)** | 20/10/2026 | 64-bit (8 bytes/beat) | Mảng $4 \times 4$ Systolic Grid, quét cố định $d_k=16$ | Cố định Stage 2 ($d_k=16$) | 100% Bit-Exact (4,096 B) |
+| **v2.0 (Newest Upgrade)** | **22/10/2026** | **128-bit Native (16 bytes/beat)** | **Mảng $4 \times 4$ Systolic Grid + Quét chiều $d_k$ động** | **Đa tầng linh hoạt 3 Stages ($d_k=16, 20, 24$)** | **100% Bit-Exact (337,216 cycles)** |
+
+---
+
+### 10.2. Chi Tiết Nâng Cấp Phiên Bản Mới Nhất (Version 2.0 - 128-Bit & Dynamic $d_k$ Sweep)
+
+Nhằm chuẩn hóa giao tiếp AXI4-Stream 128-bit trên SoC Kria KV260 và khai thác tối đa ưu thế kiến trúc Output-Stationary cho cả 3 Stages của MobileViT-XXS, Biến thể 3B đã được nâng cấp toàn diện:
+
+#### 1. Nâng cấp Bus AXI4-Stream Lên 128-Bit Native
+- **Giao diện Skid Buffer Ingress & Egress**: Cập nhật toàn diện `C_AXIS_DATA_WIDTH = 128` (16 bytes/beat, `s_axis_tkeep` 16-bit).
+- **Rút ngắn 50% thời gian DMA Ingress**:
+  - Tại Stage 2 ($d_k = 16$), mỗi token nạp trọn vẹn trong 1 beat 16 bytes.
+  - Tổng số beat DMA nạp ma trận $Q, K, V$ giảm một nửa từ **1,536 beats xuống còn đúng 768 beats**.
+- **Đồng bộ ngõ ra Score-V GEMM 128-bit**: Egress Master xuất 256 beats (16 bytes/beat), cờ `m_axis_tlast` khẳng định chính xác tại beat 255.
+
+#### 2. Khả Năng Thích Nghi Tự Nhiên Với Chiều $d_k$ Động Trên Trục Thời Gian
+- Bản chất của kiến trúc **Output-Stationary (OS)** trong [systolic_mac_array.sv](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_3B/systolic_mac_array.sv):
+  - Giá trị tích lũy (Accumulator) đứng yên tại mỗi PE vật lý.
+  - Chiều sâu đặc trưng $d_k$ được tích lũy tuần tự theo **trục thời gian (Temporal Accumulation)** qua từng chu kỳ xung nhịp.
+- Tại [attention_core_top_3B.sv](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_3B/attention_core_top_3B.sv):
+  ```systemverilog
+  // FSM quét chiều sâu đặc trưng linh hoạt
+  if (dim_cnt == reg_head_dim - 1) begin
+      dim_cnt   <= '0;
+      flush_cnt <= '0;
+      state     <= TILE_FLUSH;
+  end else begin
+      dim_cnt <= dim_cnt + 1'b1;
+  end
+  ```
+  - Khi chạy **Stage 2** ($d_k=16$): `dim_cnt` quét từ $0 \to 15$ ($T_{\text{feed}} = 16\text{ cycles}$).
+  - Khi chạy **Stage 3** ($d_k=20$): `dim_cnt` quét từ $0 \to 19$ ($T_{\text{feed}} = 20\text{ cycles}$).
+  - Khi chạy **Stage 4** ($d_k=24$): `dim_cnt` quét từ $0 \to 23$ ($T_{\text{feed}} = 24\text{ cycles}$).
+- **Ưu điểm vượt trội**: Không cần mở rộng mảng PE, không cần thêm bộ cộng dồn hay bộ ghép mux phức tạp; mảng tự động hỗ trợ bất kỳ $d_k \le 32$ chỉ bằng cách thay đổi giá trị CSR `reg_head_dim`!
+
+#### 3. Quy Luật Tăng Vọt Hiệu Suất PE Khi Chiều $d_k$ Tăng (Scalability Analysis)
+- Trong kiến trúc 3B, thời gian xả mảng (Drain) cố định là **32 chu kỳ** cho mỗi Tile $4 \times 8$:
+  - Tại $d_k = 16$: Thời gian tính $T_{\text{compute}} = 16 + 6 = 22\text{ cycles} \implies \eta = \frac{16}{16 + 12 + 32} \approx \mathbf{26.7\%}$.
+  - Tại $d_k = 20$: Thời gian tính $T_{\text{compute}} = 20 + 6 = 26\text{ cycles} \implies \eta = \frac{20}{20 + 12 + 32} \approx \mathbf{31.2\%}$.
+  - Tại $d_k = 24$: Thời gian tính $T_{\text{compute}} = 24 + 6 = 30\text{ cycles} \implies \eta = \frac{24}{24 + 12 + 32} \approx \mathbf{35.3\%}$.
+  - Tại $d_k = 64$ (ViT-Base): Thời gian tính $T_{\text{compute}} = 64 + 6 = 70\text{ cycles} \implies \eta = \frac{64}{64 + 12 + 32} \approx \mathbf{59.3\%}$.
+- Tỷ trọng thời gian chết Drain giảm dần khi $d_k$ tăng, chứng minh mảng tâm thu 3B ngày càng phát huy hiệu suất vượt trội ở các Stage lớn.
+
+---
+
+### 10.3. Bảng Đối Soát Thông Số Kỹ Thuật v1.0 vs v2.0
+
+| Đặc Tính Kỹ Thuật | Phiên Bản v1.0 (Cũ) | Phiên Bản v2.0 (Mới Nhất) | Lợi Ích Cải Tiến |
+| :--- | :---: | :---: | :--- |
+| **Độ rộng Bus AXI4-Stream** | 64-bit (8 bytes/beat) | **128-bit (16 bytes/beat)** | Khớp chuẩn native AXI HP Port Kria KV260 |
+| **Số beat nạp DMA Q, K, V** | 1,536 beats | **768 beats** | **Nhanh hơn gấp 2 lần (tiết kiệm 50% thời gian DMA)** |
+| **Số khối DSP48E2 sử dụng** | **16 DSP (1.28%)** | **16 DSP (1.28%)** | 32 MACs/cycle trên mảng $4 \times 4$ PE |
+| **Khả năng đổi Stage động** | Cố định chỉ chạy $d_k=16$ | **Linh hoạt $d_k \in \{16, 20, 24\}$** | **Hỗ trợ trọn vẹn cả 3 Stages MobileViT-XXS** |
+| **Cơ chế quét chiều đặc trưng** | Cố định 16 chu kỳ | **Quét động theo `reg_head_dim`** | Quét dọc trục thời gian, không tốn thêm tài nguyên |
+| **Định dạng Egress Context Out** | 512 beats (8 bytes/beat) | **256 beats (16 bytes/beat)** | 1 beat/token cho $d_k=16$, TLAST tại beat 255 |
+
+---
+
+### 10.4. Kết Quả Xác Minh Phần Cứng Bit-Exact (Verification Report v2.0)
+
+Toàn bộ 5/5 bài kiểm tra trong [run_verifications_3B.bat](file:///c:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/rtl_ver02_3B/run_verifications_3B.bat) đã vượt qua với kết quả tuyệt đối:
+1. `tb_systolic_mac_array_3B.sv` (4x4 PE Grid + Drain): **32 / 32 Tile items khớp 100% [PASS]**.
+2. `tb_golden_scale_unit.sv`: **65,536 / 65,536 scores khớp 0-LSB [PASS]**.
+3. `tb_golden_softmax_lut.sv`: **1,024 / 1,024 probs khớp 0-LSB [PASS]**.
+4. `tb_score_v_gemm.sv` (128-bit): **256 beats / 4,096 bytes khớp 100% [PASS]**.
+5. `tb_attention_core_3B.sv` (Top 128-bit): **4,096 / 4,096 bytes Egress khớp 100% [PASS]**, thực thi trong **337,216 chu kỳ xung nhịp**, cờ `m_axis_tlast` khẳng định chính xác tại beat 255.
+
+
+
+---
+
+### 10.5. Kế Hoạch & Kết Quả Nâng Cấp v3.0 (Dynamic Token Length $N \in \{256, 64, 16\}$)
+
+Vào ngày **02/11/2026**, kiến trúc 2D Systolic Array Variant 3B đã hoàn tất nâng cấp và thẩm định toàn diện lên phiên bản **v3.0**:
+- **Cải tiến RTL:** Cập nhật `attention_core_top_3B.sv`, `softmax_lut.sv`, `score_v_gemm.sv` tiếp nhận `reg_seq_len` (CSR `0x10`) và điều khiển dynamic loop bounds cho $N \in \{256, 64, 16\}$.
+- **Kết quả đo chu kỳ xung nhịp thực tế (Isolated Stage DV):**
+  * Stage 2 ($N=256, d_k=16$): **337,472 chu kỳ** (~1.69 ms @ 200MHz), 4,096 bytes Egress khớp 100% Bit-Exact (0-LSB).
+  * Stage 3 ($N=64, d_k=20$): **23,888 chu kỳ** (~119.44 $\mu$s @ 200MHz), 1,280 bytes Egress khớp 100% Bit-Exact. **Tăng tốc 14.13x** so với Stage 2!
+  * Stage 4 ($N=16, d_k=24$): **2,092 chu kỳ** (~10.46 $\mu$s @ 200MHz), 384 bytes Egress khớp 100% Bit-Exact. **Tăng tốc 161.32x** so với Stage 2!
+- **Chuỗi liên hoàn 3 tầng không reset phần cứng (`tb_multi_stage_seq_3B.sv`):**
+  * Tổng thời gian thực thi: **363,437 chu kỳ xung nhịp (~1.817 ms @ 200MHz)**.
+  * Tổng số bytes kiểm tra: **5,760 / 5,760 bytes (0-LSB Mismatch, PASS 100%)**.
+  * So với bản cũ cố định 256 tokens (1,036,721 cycles), thời gian thực thi giảm **64.9%** ($\approx 2.85\text{x}$ speedup)!
+- **Đồng bộ hóa Unit Test:** Toàn bộ bộ testbench đơn vị đa tầng đã được đồng bộ và kiểm chứng toàn diện:
+  * `tb_systolic_mac_array_3B.sv`: **128 / 128 items 100% Bit-Exact (0 Mismatch) [PASS]** (bao gồm 32 Drain isolation FL-03/04 items + 96 real golden tile items cho cả 3 Stages $N \in \{256, 64, 16\}$, $d_k \in \{16, 20, 24\}$).
+  * `tb_golden_scale_unit.sv`: **69,888 / 69,888 scores 100% Bit-Exact (0 Mismatch) [PASS]**.
+  * `tb_golden_softmax_lut.sv`: **69,888 / 69,888 probs 100% Bit-Exact (0 Mismatch) [PASS]**.
+  * `tb_score_v_gemm.sv`: **5,760 / 5,760 context bytes 100% Bit-Exact (0 Mismatch) [PASS]**.
+  * `tb_attention_core_3B.sv`: **4,096 / 4,096 bytes Egress 100% Bit-Exact (0 Mismatch) [PASS]**.
+  $\implies$ **ALL 5 VARIANT 3B VERIFICATIONS PASSED 100% BIT-EXACT!**
+
+---
+
+### 10.6. Kết Quả Tổng Hợp OOC Synthesis & PnR Vivado 2026.1 (Dynamic N RTL v3.0)
+
+Vào ngày **02/11/2026**, kiến trúc Variant 3B (2D Systolic MAC Array) đã được thực thi tổng hợp và định tuyến thực tế (Out-of-Context Synthesis & Implementation) trên bộ công cụ **Vivado v2026.1** cho chip **AMD Kria KV260 (xck26-sfvc784-2LV-c)** với xung nhịp thiết kế mục tiêu **200 MHz** (5.0 ns period):
+
+| Tài Nguyên Phần Cứng | Đã Sử Dụng (Used) | Khả Dụng Trên KV260 | Tỷ Lệ Chiếm Dụng (%) | Nhận Xét & Phân Tích Kỹ Thuật |
+| :--- | :---: | :---: | :---: | :--- |
+| **Logic LUTs (LUT as Logic)** | **23,727** | 117,120 | **20.26%** | Mảng $4 \times 4$ PE, reorder buffer muxes, và FSM điều khiển |
+| **LUTRAM (Memory LUT)** | **15,416** | 57,600 | **26.76%** | 15,392 Distributed RAM cho Reorder Buffer (32Kb) + 24 SRLs |
+| **Tổng CLB LUTs** | **39,143** | 117,120 | **33.42%** | Tiêu thụ cao hơn 1A/2A do bộ đệm sắp xếp lại thứ tự Tile |
+| **CLB Flip-Flops (FF)** | **42,270** | 234,240 | **18.05%** | Thanh ghi mảng 2D Systolic, pipeline skew và reorder logic |
+| **DSP48E2 Blocks** | **52** | 1,248 | **4.17%** | 16 DSPs (`pe_slice_dsp_packing`) trong mảng $4 \times 4$ + 4 DSPs Scaler/Softmax + 32 DSPs Score-V |
+| **Block RAM (RAMB36 Tile)**| **1 Tile** | 144 | **0.69%** | 1 RAMB36E2 cho bảng tra lũy thừa `exp_rom` của Softmax |
+| **UltraRAM (URAM)** | **0** | 64 | **0.00%** | Không sử dụng |
+
+#### Chỉ số Định Thời & Công Suất Thực Tế (Post-Route Timing & Power Summary):
+- **Worst Negative Slack (WNS) @ 200 MHz:** **`-1.071 ns`**
+  * *Tần số xung nhịp cực đại:* **$F_{max} = \frac{1000}{5.0 + 1.071} \approx \mathbf{164.72\text{ MHz}}$**.
+  * *Tần số vận hành an toàn:* **160.0 MHz** (hoặc chuẩn SoC nhúng 150.0 MHz).
+- **Worst Hold Slack (WHS):** **`+0.015 ns`** (**MET - Thỏa mãn an toàn Hold Time tuyệt đối**).
+- **Worst Pulse Width Slack (WPWS):** **`+1.738 ns`** (**MET**).
+- **Tổng Công Suất Tiêu Thụ Trên Chip (Total On-Chip Power):** **`0.774 W`**
+  * *Dynamic Power:* `0.483 W` (62.4%)
+  * *Device Static Power:* `0.291 W` (37.6%)
+  * *Nhiệt độ mối nối chip (Junction Temperature):* `26.8 °C` (Vận hành cực mát dưới ngưỡng tản nhiệt thụ động).
+- **Design Rule Check (DRC):** **0 Errors, 0 Critical Warnings** (Hoàn toàn sạch luật thiết kế).

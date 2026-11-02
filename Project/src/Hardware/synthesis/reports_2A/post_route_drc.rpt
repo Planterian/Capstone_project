@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
 ---------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2026.1 (win64) Build 6511674 Tue Jun 16 11:02:23 MDT 2026
-| Date         : Tue Oct 27 20:32:57 2026
+| Date         : Mon Nov  2 21:27:13 2026
 | Host         : DESKTOP-L58T74E running 64-bit major release  (build 9200)
 | Command      : report_drc -file ./reports_2A/post_route_drc.rpt
 | Design       : attention_core_top_2A
@@ -1201,7 +1201,7 @@ RTSTAT-10#1 Warning
 No routable loads  
 165 net(s) have no routable loads. The problem bus(es) and/or net(s) are u_axi_lite_regs/m_axis_tkeep[1:0], u_axi_lite_regs/m_axis_tlast,
 u_axi_lite_regs/s_axi_rdata[31:0], u_score_v_gemm/m_axis_tdata[127:0],
-u_score_v_gemm/m_axis_tkeep[0], u_skid_buffer_rx/s_axis_tready.
+u_score_v_gemm/m_axis_tvalid, u_skid_buffer_rx/s_axis_tready.
 Related violations: <none>
 
 

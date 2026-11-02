@@ -5,7 +5,7 @@
 # Clock:       200 MHz (5.0 ns period)
 # Mode:        Out-of-Context (OOC) IP Synthesis
 # ==============================================================================
-set_param general.maxThreads 4
+set_param general.maxThreads 2
 
 set TOP_NAME      attention_core_top_2A
 set PART          xck26-sfvc784-2LV-c
