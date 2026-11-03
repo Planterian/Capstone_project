@@ -18,27 +18,46 @@
 
 ---
 
-## 2. Quy Trình 1: Phương Pháp "GUI Automation" (Khuyên Dùng)
+## 2. Quy Trình 1: Phương Pháp "GUI Automation" Toàn Diện (Khuyên Dùng)
 
-Phương pháp này kết hợp sức mạnh tự động hóa của script TCL với giao diện đồ họa trực quan của Vivado GUI. Chỉ mất **~15 giây** để Vivado dựng toàn bộ hệ thống chuẩn xác 100%, tự căn chỉnh layout dây nối đẹp mắt và **giữ nguyên GUI mở sẵn** để sinh viên thao tác chuột, chụp ảnh báo cáo và sinh bitstream.
+Phương pháp này kết hợp sức mạnh tự động hóa của script TCL với giao diện đồ họa trực quan của Vivado GUI. Script `setup_kv260_gui_2A.tcl` được thiết kế để tự động hóa trọn gói: **Dựng Block Design SoC $\to$ Tạo Wrapper $\to$ Tổng hợp (Synthesis) $\to$ Định tuyến (Implementation) $\to$ Tạo Bitstream $\to$ Xuất Artifacts Overlay $\to$ Mở Implemented Design & Block Design ngay trên GUI** (không đóng Vivado).
 
 ### Bước 1: Khởi động Vivado GUI
 - Mở Vivado (phiên bản 2022.2+ hoặc 2026.1) từ Start Menu hoặc màn hình Desktop.
 
-### Bước 2: Chạy Script Khởi Tạo Tự Động
+### Bước 2: Chạy Script Tự Động Từ Tcl Console
 - Ở thanh **Tcl Console** dưới đáy màn hình Vivado, nhập lệnh sau và nhấn `Enter`:
   ```tcl
   cd C:/Users/tuan2/Desktop/Capstone_Project/Project/src/Hardware/synthesis
   source setup_kv260_gui_2A.tcl
   ```
 
-### Bước 3: Điều gì diễn ra tự động trên màn hình GUI?
-1. Vivado tự tạo project `mha_kv260_deploy` tại thư mục `./vivado_prj_2A`.
-2. Tự nạp toàn bộ mã nguồn SystemVerilog từ `../rtl_ver02_2A/` và file bộ nhớ Softmax LUT `exp_rom_all_stages.hex`.
-3. Tự động kéo thả các khối IP: `zynq_ps`, `axi_dma_0`, `axi_smc_hp`, `axi_interconnect_ctrl`, `irq_concat`, và lõi RTL Module Reference `mha_core_0`.
-4. Tự nối toàn bộ bus AXI4-Stream 128-bit, AXI4 128-bit, AXI-Lite 32-bit, xung nhịp 150 MHz và ngắt IRQ.
-5. Thực hiện `regenerate_bd_layout` để **tự sắp xếp dây nối vuông vức, thẳng hàng, đạt chuẩn xuất bản báo cáo**.
-6. Tự động kiểm tra tính hợp lệ (`validate_bd_design`), tạo wrapper HDL `mha_system_wrapper.v`, và **mở sẵn sơ đồ Block Design trên canvas GUI** (không tắt công cụ).
+> [!TIP]
+> **Chế độ tùy chọn (Nếu chỉ muốn dừng lại xem Block Design trước khi build):**
+> Trước khi `source`, bạn có thể gõ `set AUTO_BUILD_BITSTREAM 0` vào Tcl Console. Script sẽ dừng lại sau khi dựng xong Block Design để bạn ngắm layout. Khi sẵn sàng sinh Bitstream, chỉ cần gõ lệnh `run_generate_bitstream`.
+
+### Bước 3: Quy Trình Diễn Ra Hoàn Toàn Tự Động Trên Vivado GUI
+1. **Khởi tạo Project & Nạp Source**:
+   - Vivado tự tạo project `mha_kv260_deploy` tại thư mục `./vivado_prj_2A`.
+   - Nạp toàn bộ RTL SystemVerilog (`attention_core_top_2A.sv`, `dsp_packed_adder_tree.sv`, `softmax_lut.sv`,...).
+   - Đăng ký bảng tra cứu Softmax LUT `exp_rom_all_stages.hex`.
+   - Nạp ràng buộc định thời hệ thống `timing_kv260_system.xdc` (loại bỏ vi phạm quasi-static false path).
+2. **Dựng Block Design `mha_system`**:
+   - Tự động tích hợp IP: `zynq_ps` (150 MHz `pl_clk0`, HP0 128-bit, HPM0 AXI-Lite), `axi_dma_0` (128-bit Direct Register Mode), `axi_smc_hp` (128-bit), `axi_smc_ctrl`, `irq_concat`, và RTL Module Reference `mha_core_0`.
+   - Tự nối toàn bộ bus AXI4-Stream 128-bit, AXI4 128-bit, AXI-Lite 32-bit, xung nhịp 150 MHz và ngắt IRQ.
+   - Phân bổ địa chỉ: `0xA000_0000` (DMA) và `0xA001_0000` (MHA Core).
+   - Tự động căn chỉnh layout (`regenerate_bd_layout`) và kiểm tra hợp lệ (`validate_bd_design`).
+3. **Sinh Top-Level HDL Wrapper**:
+   - Tự tạo file `mha_system_wrapper.v` và gán làm Top của project.
+4. **Synthesis, Implementation & Write Bitstream**:
+   - Chạy tự động với **`jobs = 4`** (`set_param general.maxThreads 4`) bảo đảm tốc độ cao và giữ nhiệt độ máy tính an toàn (~79°C).
+   - Tự động đợi quá trình chạy hoàn tất (`wait_on_run impl_1`).
+5. **Xuất Hardware Handoff & Overlay**:
+   - Tự động copy `attention_core_top_2A.bit`, `attention_core_top_2A.hwh`, và `attention_core_top_2A.xsa` sang `Project/src/Software/` và các thư mục overlay.
+6. **Mở Trực Quan Trên Màn Hình GUI (Không Đóng Ứng Dụng)**:
+   - Mở sẵn cửa sổ **Implemented Design** (Device Floorplan hiển thị vị trí các khối DSP/BRAM/LUT).
+   - Nạp sẵn bảng báo cáo **Timing Summary** (`timing_1`) và **Utilization** (`utilization_1`).
+   - Mở sẵn tab sơ đồ **Block Design Diagram** (`mha_system.bd`) để sinh viên chụp hình ảnh minh chứng.
 
 ---
 

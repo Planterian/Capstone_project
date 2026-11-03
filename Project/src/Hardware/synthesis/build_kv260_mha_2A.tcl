@@ -98,7 +98,7 @@ set_property -dict [list \
     CONFIG.PSU__USE__M_AXI_GP2 {0} \
     CONFIG.PSU__USE__S_AXI_GP2 {1} \
     CONFIG.PSU__HIGH_PERF_PORT__ENABLE {1} \
-    CONFIG.PSU__CRL_APB__PL0_REF_CTRL__FREQMHZ {150.000000} \
+    CONFIG.PSU__CRL_APB__PL0_REF_CTRL__FREQMHZ {200.000000} \
     CONFIG.PSU__USE__IRQ0 {1} \
 ] [get_bd_cells zynq_ps]
 

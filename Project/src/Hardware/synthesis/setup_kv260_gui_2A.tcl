@@ -1,14 +1,25 @@
 # ==============================================================================
 # Script:      setup_kv260_gui_2A.tcl
-# Description: Vivado GUI Helper Script for Variant 2A MHA Accelerator
-#              Creates project, builds & arranges Block Design, and keeps
-#              Vivado GUI open for screenshots, inspection & bitstream generation.
-# Target:      AMD Kria KV260 (xck26-sfvc784-2LV-c)
+# Description: Vivado GUI Automated Block Design, Synthesis & Bitstream Generator
+#              for Variant 2A MHA Accelerator on AMD Kria KV260.
+#              Constructs Block Design, links 128-bit AXI DMA & SmartConnect,
+#              launches Synthesis/Implementation/Bitstream with 4 threads,
+#              exports PYNQ overlay artifacts, and opens the Implemented Design
+#              and Block Design tabs directly in Vivado GUI for inspection.
+# Target:      AMD Kria KV260 Vision AI Starter Kit (xck26-sfvc784-2LV-c)
 # Vivado Tool: AMD Vivado 2026.1 / 2024.x / 2022.2+ (GUI Mode)
 # ==============================================================================
 
-# Use 2 threads to prevent laptop thermal throttling or freezing
-set_param general.maxThreads 2
+# Control parameter: 
+#   0 = Stop after Block Design generation for visual inspection & manual flow (Default)
+#   1 = Run complete flow automatically (Block Design + Synthesis + Implementation + Bitstream)
+if {![info exists AUTO_BUILD_BITSTREAM]} {
+    set AUTO_BUILD_BITSTREAM 0
+}
+
+# Use 4 parallel threads/jobs for high performance while staying thermally safe
+set_param general.maxThreads 4
+set NUM_JOBS 4
 
 set PROJ_NAME   "mha_kv260_deploy"
 set PROJ_DIR    "./vivado_prj_2A"
@@ -27,9 +38,11 @@ proc get_latest_ip_vlnv {ip_name default_vlnv} {
 }
 
 puts "================================================================="
-puts "  ==> STEP 1/6: INITIALIZING PROJECT FOR VIVADO GUI"
+puts "  ==> STEP 1/8: INITIALIZING PROJECT FOR VIVADO GUI"
 puts "================================================================="
 file mkdir $OUT_DIR
+file mkdir "$OUT_DIR/03_ivit_hw_accelerated/overlay"
+file mkdir "$OUT_DIR/04_all_9_transformers_hw/overlay"
 
 # Close any currently opened project to prevent 'Project already open' error
 catch { close_project }
@@ -37,7 +50,7 @@ catch { close_project }
 create_project -force $PROJ_NAME $PROJ_DIR -part $PART_NAME
 
 puts "================================================================="
-puts "  ==> STEP 2/6: ADDING RTL SOURCES & EXP ROM INITIALIZATION HEX"
+puts "  ==> STEP 2/8: IMPORTING RTL SOURCES, EXP ROM & XDC CONSTRAINTS"
 puts "================================================================="
 # Separate synthesizable design RTL and simulation testbenches
 set all_sv   [glob -nocomplain "$RTL_DIR/*.sv"]
@@ -76,10 +89,16 @@ if {[file exists "$RTL_DIR/exp_rom_all_stages.hex"]} {
     puts "*** WARNING: exp_rom_all_stages.hex not found in $RTL_DIR!"
 }
 
+# System-level Timing Constraints (Quasi-Static False Path Exceptions)
+if {[file exists "$SYNTH_DIR/timing_kv260_system.xdc"]} {
+    add_files -fileset constrs_1 "$SYNTH_DIR/timing_kv260_system.xdc"
+    puts "  -> Added system timing constraints: timing_kv260_system.xdc"
+}
+
 update_compile_order -fileset sources_1
 
 puts "================================================================="
-puts "  ==> STEP 3/6: CONSTRUCTING BLOCK DESIGN: mha_system"
+puts "  ==> STEP 3/8: CONSTRUCTING BLOCK DESIGN: mha_system"
 puts "================================================================="
 create_bd_design "mha_system"
 
@@ -88,17 +107,16 @@ set vlnv_zynq   [get_latest_ip_vlnv "zynq_ultra_ps_e"   "xilinx.com:ip:zynq_ultr
 set vlnv_reset  [get_latest_ip_vlnv "proc_sys_reset"    "xilinx.com:ip:proc_sys_reset:5.0"]
 set vlnv_dma    [get_latest_ip_vlnv "axi_dma"            "xilinx.com:ip:axi_dma:7.1"]
 set vlnv_smc    [get_latest_ip_vlnv "smartconnect"       "xilinx.com:ip:smartconnect:1.0"]
-set vlnv_ic     [get_latest_ip_vlnv "axi_interconnect"   "xilinx.com:ip:axi_interconnect:2.1"]
 set vlnv_concat [get_latest_ip_vlnv "xlconcat"          "xilinx.com:ip:xlconcat:2.1"]
 
-# 1. Zynq UltraScale+ MPSoC IP (150 MHz pl_clk0, HPM0 AXI-Lite, HP0 128-bit)
+# 1. Zynq UltraScale+ MPSoC IP (200 MHz pl_clk0, HPM0 AXI-Lite, HP0 128-bit)
 create_bd_cell -type ip -vlnv $vlnv_zynq zynq_ps
 set_property -dict [list \
     CONFIG.PSU__USE__M_AXI_GP0 {1} \
     CONFIG.PSU__USE__M_AXI_GP2 {0} \
     CONFIG.PSU__USE__S_AXI_GP2 {1} \
     CONFIG.PSU__HIGH_PERF_PORT__ENABLE {1} \
-    CONFIG.PSU__CRL_APB__PL0_REF_CTRL__FREQMHZ {150.000000} \
+    CONFIG.PSU__CRL_APB__PL0_REF_CTRL__FREQMHZ {200.000000} \
     CONFIG.PSU__USE__IRQ0 {1} \
 ] [get_bd_cells zynq_ps]
 
@@ -135,9 +153,9 @@ set_property -dict [list CONFIG.NUM_PORTS {2}] [get_bd_cells irq_concat]
 create_bd_cell -type module -reference attention_core_top_2A mha_core_0
 
 puts "================================================================="
-puts "  ==> STEP 4/6: WIRING BUSES, CLOCKS & INTERRUPTS"
+puts "  ==> STEP 4/8: WIRING BUSES, CLOCKS & INTERRUPTS"
 puts "================================================================="
-# Clock connections (150 MHz pl_clk0)
+# Clock connections (200 MHz pl_clk0)
 set clk_pin [get_bd_pins zynq_ps/pl_clk0]
 connect_bd_net $clk_pin [get_bd_pins proc_sys_reset_0/slowest_sync_clk]
 connect_bd_net $clk_pin [get_bd_pins zynq_ps/maxihpm0_fpd_aclk]
@@ -202,7 +220,7 @@ validate_bd_design
 save_bd_design
 
 puts "================================================================="
-puts "  ==> STEP 5/6: CREATING TOP-LEVEL HDL WRAPPER"
+puts "  ==> STEP 5/8: CREATING TOP-LEVEL HDL WRAPPER"
 puts "================================================================="
 set bd_file [get_files [get_property FILE_NAME [current_bd_design]]]
 set wrapper_path [make_wrapper -files $bd_file -top]
@@ -226,13 +244,108 @@ if {[file exists $wrapper_path]} {
 set_property top mha_system_wrapper [current_fileset]
 update_compile_order -fileset sources_1
 
-# Ensure Block Design canvas is focused in GUI
+# Focus Block Design in GUI canvas
 catch { open_bd_design [get_files mha_system.bd] }
 
-puts "================================================================="
-puts "  ==> STEP 6/6: GUI SETUP COMPLETE!"
-puts "  - Block Design 'mha_system' is now open in your GUI canvas."
-puts "  - Layout has been auto-arranged for clean screenshot capture."
-puts "  - You can now inspect IP settings, Address Editor, or click"
-puts "    'Generate Bitstream' directly from the GUI Flow Navigator."
-puts "================================================================="
+# Procedure to manually run/re-run Bitstream generation
+proc run_generate_bitstream {} {
+    global NUM_JOBS PROJ_DIR PROJ_NAME OUT_DIR
+    puts "================================================================="
+    puts "  ==> LAUNCHING SYNTHESIS & IMPLEMENTATION (WRITE BITSTREAM)"
+    puts "================================================================="
+    reset_run synth_1
+    reset_run impl_1
+    launch_runs impl_1 -to_step write_bitstream -jobs $NUM_JOBS
+    wait_on_run impl_1
+    
+    set impl_prog [get_property PROGRESS [get_runs impl_1]]
+    if {$impl_prog != "100%"} {
+        puts "*** ERROR: Implementation run failed! Check Messages/Log tab."
+        return 0
+    }
+    
+    puts "  ==> Implementation completed successfully! Exporting artifacts..."
+    run_export_artifacts
+    run_open_impl
+    return 1
+}
+
+# Procedure to export Bitstream, HWH, and XSA
+proc run_export_artifacts {} {
+    global PROJ_DIR PROJ_NAME OUT_DIR
+    file copy -force "$PROJ_DIR/$PROJ_NAME.runs/impl_1/mha_system_wrapper.bit" "$OUT_DIR/attention_core_top_2A.bit"
+    file copy -force "$PROJ_DIR/$PROJ_NAME.runs/impl_1/mha_system_wrapper.bit" "$OUT_DIR/03_ivit_hw_accelerated/overlay/attention_core_top_2A.bit"
+    file copy -force "$PROJ_DIR/$PROJ_NAME.runs/impl_1/mha_system_wrapper.bit" "$OUT_DIR/04_all_9_transformers_hw/overlay/attention_core_top_2A.bit"
+    puts "  -> Exported Bitstream: $OUT_DIR/attention_core_top_2A.bit"
+
+    set hwh_source [glob -nocomplain "$PROJ_DIR/$PROJ_NAME.gen/sources_1/bd/mha_system/hw_handoff/*.hwh"]
+    if {[llength $hwh_source] > 0} {
+        file copy -force [lindex $hwh_source 0] "$OUT_DIR/attention_core_top_2A.hwh"
+        file copy -force [lindex $hwh_source 0] "$OUT_DIR/03_ivit_hw_accelerated/overlay/attention_core_top_2A.hwh"
+        file copy -force [lindex $hwh_source 0] "$OUT_DIR/04_all_9_transformers_hw/overlay/attention_core_top_2A.hwh"
+        puts "  -> Exported HWH: $OUT_DIR/attention_core_top_2A.hwh"
+    }
+
+    write_hw_platform -fixed -include_bit -force -file "$OUT_DIR/attention_core_top_2A.xsa"
+    puts "  -> Exported Hardware Platform XSA: $OUT_DIR/attention_core_top_2A.xsa"
+}
+
+# Procedure to open Block Design in GUI canvas
+proc run_open_bd {} {
+    catch { open_bd_design [get_files mha_system.bd] }
+}
+
+# Procedure to open Implemented Design in GUI canvas with Timing & Utilization views
+proc run_open_impl {} {
+    catch { open_run impl_1 }
+    catch { report_timing_summary -delay_type min_max -report_unconstrained -check_timing_verbose -max_paths 10 -name timing_1 }
+    catch { report_utilization -name utilization_1 }
+}
+
+# Check if automated build should proceed
+if {$AUTO_BUILD_BITSTREAM == 1} {
+    puts "================================================================="
+    puts "  ==> STEP 6/8: LAUNCHING SYNTHESIS & IMPLEMENTATION (WRITE BITSTREAM)"
+    puts "================================================================="
+    reset_run synth_1
+    reset_run impl_1
+    launch_runs impl_1 -to_step write_bitstream -jobs $NUM_JOBS
+    puts "  -> Launched run 'impl_1' with $NUM_JOBS parallel jobs."
+    puts "  -> Running Synthesis, Implementation, and Bitstream generation..."
+    wait_on_run impl_1
+
+    set impl_prog [get_property PROGRESS [get_runs impl_1]]
+    if {$impl_prog != "100%"} {
+        puts "*** ERROR: Implementation run failed! Status: [get_property STATUS [get_runs impl_1]]"
+        puts "    Check the 'Design Runs' or 'Log' tab in Vivado GUI for details."
+    } else {
+        puts "================================================================="
+        puts "  ==> STEP 7/8: EXPORTING BITSTREAM, HWH & XSA PLATFORM"
+        puts "================================================================="
+        run_export_artifacts
+
+        puts "================================================================="
+        puts "  ==> STEP 8/8: OPENING IMPLEMENTED DESIGN IN VIVADO GUI"
+        puts "================================================================="
+        run_open_impl
+        run_open_bd
+
+        puts "================================================================="
+        puts "  VIVADO GUI WORKFLOW COMPLETED SUCCESSFULLY!"
+        puts "  - Block Design 'mha_system' is OPEN in GUI canvas."
+        puts "  - Implemented Design is OPEN in GUI (Device Floorplan ready)."
+        puts "  - Timing and Utilization reports are loaded into GUI tabs."
+        puts "  - Bitstream, HWH, and XSA are exported to $OUT_DIR."
+        puts "  - GUI remains active for your inspection and screenshots!"
+        puts "================================================================="
+    }
+} else {
+    puts "================================================================="
+    puts "  ==> STEP 6/6: BLOCK DESIGN SETUP COMPLETE (GUI READY)!"
+    puts "  - Block Design 'mha_system' is now OPEN in your GUI canvas."
+    puts "  - Auto-arranged layout is ready for clean screenshot capture."
+    puts "  - To generate Bitstream from GUI Tcl Console, simply run:"
+    puts "      run_generate_bitstream"
+    puts "    or click 'Generate Bitstream' in the Flow Navigator."
+    puts "================================================================="
+}
