@@ -20,8 +20,8 @@ Variant 1A targets environments where all DSP blocks are occupied by convolution
     \item \textbf{Characteristics:} Consumes 0 DSP48E2 slices, but requires $\approx 5,150$ CLB LUTs. It sustains an initiation interval of $II = 1$ score/cycle.
 \end{itemize}
 
-\section{Architectural Variant 2A: High-Throughput DSP-Packed Streaming Engine}
-The AMD UltraScale+ DSP48E2 hard slice features an asymmetric $18 \times 27$-bit signed multiplier. Standard 8-bit multiplication utilizes only a fraction of this capability. Variant 2A introduces the \texttt{pe\_slice\_dsp\_packing} microarchitecture, packing two independent INT8 multiplications into a single DSP slice.
+\section{Architectural Variant 2A: High-Throughput DSP-Packed Streaming Engine (Deployed Architecture)}
+The production RTL implementation in \texttt{Project/src/Hardware/rtl_ver02_2A} deploys Variant 2A (\texttt{attention\_core\_top\_2A.sv}), utilizing the \texttt{dsp\_packed\_adder\_tree.sv} module for Stage 1. The AMD UltraScale+ DSP48E2 hard slice features an asymmetric $18 \times 27$-bit signed multiplier. Standard 8-bit multiplication utilizes only a fraction of this capability. Variant 2A introduces the \texttt{pe\_slice\_dsp_packing} microarchitecture, packing two independent INT8 multiplications into a single DSP slice.
 
 \subsection{Mathematical Derivation of DSP Packing}
 Let $A = q_i[k]$ be the common Query element, and let $B = K[j, 2k]$ and $C = K[j, 2k+1]$ be two Key elements. We construct the inputs to Port A and Port B as:

@@ -87,3 +87,24 @@ Table~\ref{tab:latency_breakdown} details the cycle counts and wall-clock execut
 
 At 238.2 FPS, the accelerator outperforms the 30 FPS real-time threshold by 7.94$\times$, leaving substantial timing margin for pre- and post-processing networks.
 
+\section{End-to-End Evaluation Across All 9 Transformer Layers}
+In addition to isolated single-layer benchmarks, the software driver in \texttt{Project/src/Software/04\_all\_9\_transformers\_hw} offloads all 9 Transformer layers present in MobileViT-XXS during full-image classification ($224 \times 224$ ImageNet-1K input):
+\begin{table}[htbp]
+    \centering
+    \caption{Multi-Stage Execution Profile Across All 9 Transformer Blocks}
+    \label{tab:all_9_transformers}
+    \begin{tabular}{l c c c c c}
+        \toprule
+        \textbf{Network Stage} & \textbf{Blocks} & \textbf{Tokens ($N$)} & \textbf{Head Dim ($d_k$)} & \textbf{Time / Block} & \textbf{Total Stage Time} \\
+        \midrule
+        Stage 2 & 2 blocks & 256 & 16 & 4.198~ms & 8.396~ms \\
+        Stage 3 & 4 blocks & 64  & 20 & 1.120~ms & 4.480~ms \\
+        Stage 4 & 3 blocks & 16  & 24 & 0.310~ms & 0.930~ms \\
+        \midrule
+        \textbf{Total (9 Blocks)} & \textbf{9 blocks} & — & — & — & \textbf{13.806~ms} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Offloading all 9 Transformer layers requires only \textbf{13.81~ms} of total PL processing time per frame, allowing the complete hybrid MobileViT-XXS model to run comfortably at $> 50$ FPS end-to-end on the Kria KV260 board.
+

@@ -69,10 +69,35 @@ The top-level hardware entity \texttt{attention\_core\_top} encompasses the Cont
     \end{tabularx}
 \end{table}
 
-\section{Central Hardware Orchestration FSM}
-The operational lifecycle of the accelerator is governed by a synchronous finite state machine (FSM) implemented in \texttt{fsm\_controller.sv}. The machine cycles through sequential states:
+\section{Central Hardware Orchestration FSM (attention\_core\_top\_2A)}
+The operational lifecycle of the production accelerator (\texttt{attention\_core\_top\_2A.sv}) is governed by two tightly coupled synchronous finite state machines:
+
+\subsection{Ingress Loading FSM}
+The ingress FSM (\texttt{ing\_load\_state\_t}) unpacks incoming 128-bit streaming beats and writes them into on-chip distributed RAM (\texttt{q\_mem\_lo/hi}, \texttt{k\_mem\_lo/hi}, \texttt{v\_mem\_lo/hi}):
+\begin{itemize}
+    \item \texttt{ING\_Q} (\texttt{2'b00}): Ingress streaming of Query matrix $Q$.
+    \item \texttt{ING\_K} (\texttt{2'b01}): Ingress streaming of Key matrix $K$.
+    \item \texttt{ING\_V} (\texttt{2'b10}): Ingress streaming of Value matrix $V$.
+    \item \texttt{ING\_READY} (\texttt{2'b11}): Asserts \texttt{head\_data\_ready = 1} and triggers compute pipeline execution.
+\end{itemize}
+
+\subsection{Head Sequencing \& Compute FSM}
+The compute orchestrator operates through the states:
 \begin{equation}
-    \mathcal{S} = \{\text{IDLE}, \text{LOAD\_QKV}, \text{INIT\_HEAD}, \text{COMPUTE\_ROW}, \text{WAIT\_FLUSH}, \text{DONE}\}
+    \mathcal{S}_{\text{mha}} = \{\text{MHA\_IDLE}, \text{MHA\_WAIT\_DATA}, \text{MHA\_ROW\_START}, \text{MHA\_ROW\_PREP}, \text{MHA\_ROW\_GEMM\_K}, \text{MHA\_ROW\_WAIT}, \text{MHA\_ROW\_NEXT}, \text{MHA\_HEAD\_NEXT}, \text{MHA\_DONE}\}
 \end{equation}
-When the CPU driver asserts \texttt{START}, the FSM coordinates the ingress load of 768 beats ($Q, K, V$), fires row-by-row computation across $N$ query tokens, streams context outputs through the egress skid buffer, and repeats for $H$ heads before asserting \texttt{DONE} interrupt.
+Upon receiving \texttt{start\_pulse}, the FSM awaits \texttt{head\_data\_ready}, latches query row $\mathbf{q}_i$, streams all Key token pairs through the DSP-packed adder tree (\texttt{k\_pair\_idx} from $0$ to $(N/2 - 1)$), synchronizes with downstream Softmax and Context GEMM engines, advances through $N$ query rows, and sequences through all $H$ heads before asserting \texttt{DONE} interrupt.
+
+\section{Host Software Integration and Board Interconnect}
+The hardware accelerator is driven by host software developed under \texttt{Project/src/Software}:
+\begin{itemize}
+    \item \textbf{PYNQ Multi-Stage Attention Hook (\texttt{pynq\_multi\_stage\_attention\_hook.py}):} Intercepts the PyTorch forward pass of MobileViT-XXS and dynamically reconfigures hardware CSR parameters across \textbf{all 9 Transformer layers}:
+    \begin{itemize}
+        \item \textbf{Stage 2 (2 layers):} $N=256$, $d_k=16$, $M=27640$, $E=22$ (Ingress: 12,288~B, Egress: 4,096~B per head).
+        \item \textbf{Stage 3 (4 layers):} $N=64$, $d_k=20$, $M=21936$, $E=22$ (Ingress: 3,840~B, Egress: 1,280~B per head).
+        \item \textbf{Stage 4 (3 layers):} $N=16$, $d_k=24$, $M=18810$, $E=22$ (Ingress: 1,152~B, Egress: 384~B per head).
+    \end{itemize}
+    \item \textbf{Zero-Copy CMA Buffer Allocation:} A single contiguous DDR4 buffer of 12,288~bytes is allocated via \texttt{pynq.allocate(..., dtype=np.int8)} and reused across all layers and frames, eliminating runtime memory management overheads.
+    \item \textbf{Hardware Test Driver (\texttt{kv260\_axi4\_test\_driver.py}):} Loads the bitstream \texttt{attention\_core\_top\_2A.bit} and hardware handoff \texttt{.hwh}, driving full AXI4-Stream transactions and verifying bit-exactness against golden vectors directly on the AMD Kria KV260 board.
+\end{itemize}
 

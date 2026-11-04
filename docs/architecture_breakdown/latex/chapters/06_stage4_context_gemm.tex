@@ -1,8 +1,8 @@
 \chapter{Stage 4: Context $P \times V$ GEMM Engine and Egress Subsystem}
 \label{chap:stage4_context_gemm}
 
-\section{Parallel Vector Accumulation Datapath}
-Stage 4 computes the context output row $\mathbf{o}_i \in \text{INT8}^{1 \times d_k}$ by taking the dot product of the Softmax probability vector $\mathbf{P}_i \in \text{UINT16}^{1 \times N}$ with Value matrix $V \in \text{INT8}^{N \times d_k}$:
+\section{Parallel Vector Accumulation Datapath (score\_v\_gemm.sv)}
+Implemented in \texttt{score\_v\_gemm.sv}, Stage 4 computes the context output row $\mathbf{o}_i \in \text{INT8}^{1 \times d_k}$ by taking the dot product of the Softmax probability vector $\mathbf{P}_i \in \text{UINT16}^{1 \times N}$ with Value matrix $V \in \text{INT8}^{N \times d_k}$:
 \begin{equation}
     \mathbf{o}_i[j] = \text{Clamp}_{\text{INT8}} \left( \left[ \sum_{k=0}^{N-1} P_i[k] \cdot V[k, j] \right] \ggg 15 \right), \quad j \in [0, d_k-1]
 \end{equation}
