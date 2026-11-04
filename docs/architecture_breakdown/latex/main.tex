@@ -1,0 +1,151 @@
+\documentclass[12pt,a4paper]{report}
+
+% ----------------------------------------------------------------------
+% PACKAGES & LAYOUT CONFIGURATION
+% ----------------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[a4paper,top=25mm,bottom=25mm,left=30mm,right=20mm]{geometry}
+\usepackage{amsmath,amssymb,amsfonts,bm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,calc}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    citecolor=blue!70!black,
+    urlcolor=blue!70!black
+}
+
+\onehalfspacing
+
+% Code listing styling
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.97,0.97,0.97}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+% Header and Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small \textit{Computer Engineering Capstone Project (CO4041)}}
+\fancyhead[R]{\small \textit{Architecture Breakdown}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.5pt}
+
+% ----------------------------------------------------------------------
+% DOCUMENT BODY
+% ----------------------------------------------------------------------
+\begin{document}
+
+% ======================================================================
+% TITLE PAGE (MATCHING HCMUT CSE CAPSTONE COVER)
+% ======================================================================
+\begin{titlepage}
+\begin{center}
+    {\large \textbf{VIETNAM NATIONAL UNIVERSITY HO CHI MINH CITY (VNU-HCM)}}\\[3pt]
+    {\large \textbf{HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY}}\\[3pt]
+    {\large \textbf{FACULTY OF COMPUTER SCIENCE AND ENGINEERING}}\\[25pt]
+
+    % Logo Placeholder or TikZ Logo
+    \vspace{10pt}
+    \begin{tikzpicture}[scale=0.8]
+        \fill[blue!80!black] (0,1.2) -- (0.8,0.7) -- (0.8,-0.7) -- (0,-1.2) -- (-0.8,-0.7) -- (-0.8,0.7) -- cycle;
+        \node[white, font=\bfseries\Large] at (0,0.2) {BK};
+        \node[white, font=\bfseries\footnotesize] at (0,-0.3) {TP.HCM};
+    \end{tikzpicture}
+    \vspace{25pt}
+
+    {\Large \textbf{Computer Engineering Capstone Project (CO4041)}}\\[15pt]
+    \rule{\linewidth}{1.2pt}\\[18pt]
+
+    {\large \textbf{Architecture break down}}\\[12pt]
+    {\LARGE \textbf{Hardware-Accelerated Transformer Attention for Intelligent Edge Vision}}\\[18pt]
+    \rule{\linewidth}{1.2pt}\\[35pt]
+
+    \begin{minipage}{0.85\linewidth}
+        \textbf{Advisor(s):} Trần Ngọc Thịnh\\[8pt]
+        \textbf{Student(s):} 
+        \begin{tabular}[t]{ll}
+            Thái Hoàng Gia Thoại & Student ID: 2353146\\
+            Trần Duy Tuấn        & Student ID: 2353278
+        \end{tabular}
+    \end{minipage}
+
+    \vfill
+    {\large \textbf{HO CHI MINH CITY, NOVEMBER 2026}}
+\end{center}
+\end{titlepage}
+
+% ======================================================================
+% PRELIMINARY PAGES
+% ======================================================================
+\pagenumbering{roman}
+
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+This architectural breakdown report delivers the complete microarchitectural specification, hardware design space exploration, and implementation evaluation of a silicon-verified Multi-Head Attention (MHA) accelerator for quantized Vision Transformers (specifically Apple MobileViT-XXS). Designed for the AMD Kria KV260 Vision AI Starter Kit, the accelerator integrates a native 128-bit streaming datapath via AXI4-Stream skid buffers with an on-chip multi-bank BRAM memory hierarchy, achieving zero pipeline bubbles and complete decoupling from AXI DMA backpressure.
+
+We analyze three microarchitectural variants for Stage 1 ($QK^T$ GEMM): Variant 1A (Pure Logic Fabric using 0 DSPs), Variant 2A (DSP-Packed Streaming using 8 DSP48E2 primitives with hardware $+1$ borrow-bit sign correction), and Variant 3B (2D Spatial Systolic Array). Implemented on the AMD XCK26 MPSoC FPGA at a clock frequency of 200~MHz, Variant 2A successfully meets timing closure with a positive Worst Negative Slack (WNS) of $+0.051$~ns across 51,585 endpoints. It consumes only 8 DSP48E2 slices (0.64\%) and 2.3\% CLB LUTs, delivering an inference frame rate of 238.2 FPS (4.198~ms for 4 heads), well exceeding 30 FPS real-time edge vision requirements.
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\clearpage
+\pagenumbering{arabic}
+
+% ======================================================================
+% CHAPTERS
+% ======================================================================
+\include{chapters/01_system_overview}
+\include{chapters/02_ingress_memory}
+\include{chapters/03_stage1_qkt_gemm}
+\include{chapters/04_stage2_scaler}
+\include{chapters/05_stage3_softmax}
+\include{chapters/06_stage4_context_gemm}
+\include{chapters/07_synthesis_evaluation}
+\include{chapters/08_conclusion}
+
+% ======================================================================
+% BIBLIOGRAPHY
+% ======================================================================
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
+

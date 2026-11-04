@@ -1,0 +1,75 @@
+<mxfile host="app.diagrams.net" modified="2026-11-04T08:20:00.000Z" agent="Mozilla/5.0" version="21.0.0">
+  <diagram id="diag_stage2_scaler" name="Stage 2 Dyadic Scaler Unit">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title_box" value="STAGE 2: PIPELINED DYADIC RESCALER UNIT (scale_unit.sv)&#xa;Fixed-Point Integer Scaling: S_scaled = ((S_raw x M) &gt;&gt;&gt; E) with Asymmetric INT16 Clamping" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ff6a00;fontColor=#ffffff;fontStyle=1;fontSize=13;strokeColor=#b34700;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1120" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Datapath Stage 1: Multiplication -->
+        <mxCell id="pipe_stg1" value="PIPELINE STAGE 1: SIGNED MULTIPLIER" style="swimlane;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="90" width="260" height="360" as="geometry" />
+        </mxCell>
+
+        <mxCell id="in_score" value="raw_score [31:0] (INT32)&#xa;From Stage 1 GEMM Engine&#xa;Signed dot-product sum" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="pipe_stg1">
+          <mxGeometry x="15" y="40" width="230" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="in_scale_m" value="reg_scale_m [17:0] (INT18)&#xa;Dyadic Mantissa from CSR 0x20&#xa;Default: 27640 (MobileViT-XXS)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="pipe_stg1">
+          <mxGeometry x="15" y="110" width="230" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="mult_core" value="32-bit x 18-bit Signed Multiplier&#xa;Mapped to DSP48E2 Primitive&#xa;Intermediate Product: 50-bit Signed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;fontStyle=1;" vertex="1" parent="pipe_stg1">
+          <mxGeometry x="15" y="180" width="230" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="reg_pipe1" value="Pipeline Register Stage 1 (reg_p1)&#xa;Holds 48-bit intermediate product&#xa;Clock enable: valid_in" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="pipe_stg1">
+          <mxGeometry x="15" y="260" width="230" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Datapath Stage 2: Barrel Shifter -->
+        <mxCell id="pipe_stg2" value="PIPELINE STAGE 2: ARITHMETIC SHIFTER" style="swimlane;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="90" width="260" height="360" as="geometry" />
+        </mxCell>
+
+        <mxCell id="in_scale_e" value="reg_scale_e [4:0] (UINT5)&#xa;Dyadic Exponent from CSR 0x24&#xa;Default: 22 (MobileViT-XXS)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" vertex="1" parent="pipe_stg2">
+          <mxGeometry x="15" y="40" width="230" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="shift_core" value="Arithmetic Right Barrel Shifter&#xa;shifted_val = reg_p1 &gt;&gt;&gt; reg_scale_e&#xa;Sign-extended dynamic shifting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" vertex="1" parent="pipe_stg2">
+          <mxGeometry x="15" y="110" width="230" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="reg_pipe2" value="Pipeline Register Stage 2 (reg_p2)&#xa;Stores 32-bit shifted score&#xa;High bits [47:16] monitored for overflow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="pipe_stg2">
+          <mxGeometry x="15" y="190" width="230" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Datapath Stage 3: Clamping -->
+        <mxCell id="pipe_stg3" value="PIPELINE STAGE 3: SATURATION CLAMP" style="swimlane;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="640" y="90" width="260" height="360" as="geometry" />
+        </mxCell>
+
+        <mxCell id="clamp_logic" value="Asymmetric Saturation Clamp Logic&#xa;• If shifted_val &gt; +32767:&#xa;   scaled_score = +32767 (0x7FFF)&#xa;• Else if shifted_val &lt; -32768:&#xa;   scaled_score = -32768 (0x8000)&#xa;• Else:&#xa;   scaled_score = shifted_val[15:0]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=15;" vertex="1" parent="pipe_stg3">
+          <mxGeometry x="15" y="40" width="230" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="reg_pipe3" value="Pipeline Output Register (Stage 3)&#xa;scaled_score [15:0] (INT16 Signed)&#xa;valid_out asserted after 3 clock cycles" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;fontStyle=1;" vertex="1" parent="pipe_stg3">
+          <mxGeometry x="15" y="180" width="230" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Output Specs -->
+        <mxCell id="pipe_specs" value="SCALER SPECIFICATIONS" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="930" y="90" width="230" height="360" as="geometry" />
+        </mxCell>
+
+        <mxCell id="spec_text" value="• Latency: 3 clock cycles&#xa;• Initiation Interval: II = 1&#xa;• Max Frequency: &gt; 350 MHz&#xa;• Resource Cost: 1x DSP48E2&#xa;• Precision: 100% Bit-Exact with&#xa;  PyTorch I-ViT DyadicQuant&#xa;• Supports all token lengths&#xa;  (N = 16, 64, 256)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=10;align=left;spacingLeft=15;" vertex="1" parent="pipe_specs">
+          <mxGeometry x="15" y="40" width="200" height="150" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

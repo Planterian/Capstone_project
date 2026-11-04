@@ -1,0 +1,78 @@
+\chapter{Overall System Architecture and Platform Integration}
+\label{chap:system_overview}
+
+\section{Introduction and Heterogeneous Platform Overview}
+Vision Transformers (ViTs) demonstrate high modeling capability across visual recognition tasks. However, deploying them onto edge computing devices requires solving computational complexity and high energy consumption constraints. In this project, we target the \textbf{AMD Kria KV260 Vision AI Starter Kit}, built around the AMD Zynq UltraScale+ MPSoC device (\texttt{xck26-sfvc784-2LV-c}).
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        box/.style={draw, rectangle, rounded corners, align=center, fill=blue!10, text width=4.5cm, minimum height=1cm},
+        arr/.style={-latex, thick}
+    ]
+        \node[box, fill=blue!20] (ps) {\textbf{ARM Processing System (PS)}\\Quad Cortex-A53 @ 1.2 GHz\\Linux OS / PYNQ 3.0 Driver};
+        \node[box, fill=yellow!20, right=2.5cm of ps] (pl) {\textbf{Programmable Logic (PL)}\\Attention Core Top (200 MHz)\\XCK26 FPGA Fabric};
+        
+        \draw[arr, double, <->] (ps) -- node[above]{\small AXI4-Lite (32-bit MMIO)} node[below]{\small Control \& Config} (pl);
+        
+        \node[box, fill=orange!20, below=1.2cm of ps] (ddr) {\textbf{DDR4 SDRAM (4GB)}\\CMA Contiguous Memory\\Matrices $Q, K, V, O$};
+        \node[box, fill=green!20, below=1.2cm of pl] (dma) {\textbf{AXI DMA Engine (PG021)}\\Simple DMA MM2S \& S2MM\\128-bit Native Streaming};
+        
+        \draw[arr, double, <->] (ddr) -- (dma);
+        \draw[arr, thick] (dma) -- node[right]{\small 128-bit Stream} (pl);
+        \draw[arr, thick] (ps) -- (ddr);
+    \end{tikzpicture}
+    \caption{Heterogeneous System Block Diagram on AMD Kria KV260 Platform.}
+    \label{fig:sys_block_diagram}
+\end{figure}
+
+The system partitions the inference workload between:
+\begin{enumerate}
+    \item \textbf{Processing System (PS):} Handles high-level video ingestion (Sony IMX219 camera over MIPI CSI-2), preprocessing, convolutional feature extraction, memory buffer allocation via Linux Contiguous Memory Allocator (CMA), and DMA orchestration.
+    \item \textbf{Programmable Logic (PL):} Implements the customized Multi-Head Attention hardware core (\texttt{attention\_core\_top}), operating synchronously at 200~MHz with zero timing violations.
+\end{enumerate}
+
+\section{Interconnect Protocols and Memory Mapping}
+The core interfaces with the host system using two standard AMBA protocols:
+\begin{itemize}
+    \item \textbf{AXI4-Lite Control Bus:} Dedicated to Memory-Mapped I/O (MMIO) register configuration. Operating over a 32-bit address and data bus, it configures sequence length ($N$), head dimensions ($d_k$), scaling parameters ($M, E$), and Softmax lookup table entries.
+    \item \textbf{AXI4-Stream High-Throughput Data Bus:} Connects the core directly to the AXI DMA engine via 128-bit streaming channels. At 200~MHz, the 128-bit bus delivers a peak throughput of:
+    \begin{equation}
+        \text{Bandwidth}_{\text{peak}} = 200 \times 10^6 \times 16\text{ bytes} = 3.2\text{ GB/s}
+    \end{equation}
+\end{itemize}
+
+\section{Top-Level MHA Core Hierarchy and Register Map}
+The top-level hardware entity \texttt{attention\_core\_top} encompasses the Control Plane register file (\texttt{axi\_lite\_regs.sv}), AXI4-Stream Ingress and Egress skid buffers, and the 4-stage pipelined compute engine.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{AXI4-Lite Control and Status Register (CSR) Map}
+    \label{tab:csr_map}
+    \begin{tabularx}{\textwidth}{c l c c X}
+        \toprule
+        \textbf{Offset} & \textbf{Name} & \textbf{Access} & \textbf{Reset} & \textbf{Functional Description} \\
+        \midrule
+        \texttt{0x00} & \textbf{CONTROL} & R/W & \texttt{0x00000000} & Bit [0]: START (auto-clears); Bit [1]: CLEAR\_BUF; Bit [2]: SOFT\_RESET. \\
+        \texttt{0x04} & \textbf{STATUS}  & RO  & \texttt{0x00000000} & Bit [0]: BUSY; Bit [1]: DONE; Bit [2]: ERROR; Bit [3]: ACTIVE\_BANK. \\
+        \texttt{0x08} & \textbf{NBYTES}  & R/W & \texttt{0x00001000} & Total transaction length in bytes (Default: 4096B). \\
+        \texttt{0x0C} & \textbf{CORE\_ID} & RO  & \texttt{0x56495432} & Hardware identifier (\texttt{"VIT2"}). \\
+        \texttt{0x10} & \textbf{SEQ\_LEN} & R/W & \texttt{0x00000100} & Dynamic sequence length $N \in \{16, 64, 256\}$. \\
+        \texttt{0x14} & \textbf{HEAD\_DIM}& R/W & \texttt{0x00000010} & Head dimension $d_k \in \{16, 20, 24\}$. \\
+        \texttt{0x18} & \textbf{NUM\_HEADS}& R/W& \texttt{0x00000004} & Number of sequential heads ($H=4$). \\
+        \texttt{0x20} & \textbf{SCALE\_M} & R/W & \texttt{0x00006BF8} & Dyadic mantissa $M$ (Default: 27,640). \\
+        \texttt{0x24} & \textbf{SCALE\_E} & R/W & \texttt{0x00000016} & Dyadic right-shift exponent $E$ (Default: 22). \\
+        \texttt{0x40} & \textbf{LUT\_ADDR}& R/W & \texttt{0x00000000} & 10-bit address for writing into Exp-ROM BRAM. \\
+        \texttt{0x44} & \textbf{LUT\_DATA}& R/W & \texttt{0x00000000} & 20-bit fixed-point coefficient data for Exp-ROM. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Central Hardware Orchestration FSM}
+The operational lifecycle of the accelerator is governed by a synchronous finite state machine (FSM) implemented in \texttt{fsm\_controller.sv}. The machine cycles through sequential states:
+\begin{equation}
+    \mathcal{S} = \{\text{IDLE}, \text{LOAD\_QKV}, \text{INIT\_HEAD}, \text{COMPUTE\_ROW}, \text{WAIT\_FLUSH}, \text{DONE}\}
+\end{equation}
+When the CPU driver asserts \texttt{START}, the FSM coordinates the ingress load of 768 beats ($Q, K, V$), fires row-by-row computation across $N$ query tokens, streams context outputs through the egress skid buffer, and repeats for $H$ heads before asserting \texttt{DONE} interrupt.
+

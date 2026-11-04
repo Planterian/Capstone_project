@@ -1,0 +1,96 @@
+<mxfile host="app.diagrams.net" modified="2026-11-04T08:25:00.000Z" agent="Mozilla/5.0" version="21.0.0">
+  <diagram id="diag_stage3_softmax" name="Stage 3 Hardware IntSoftmax Engine">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title_box" value="STAGE 3: RECONFIGURABLE HARDWARE INTSOFTMAX ENGINE (softmax_lut.sv)&#xa;Three-Pass Streaming Microarchitecture with Dual-Port BRAM Exp-ROM &amp; 32-Cycle Restoring Divider" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;fontStyle=1;fontSize=13;strokeColor=#A50040;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1120" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Pass 1 -->
+        <mxCell id="box_pass1" value="PASS 1: MAXIMUM SEARCH ENGINE" style="swimlane;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="85" width="260" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p1_input" value="Streaming Scaled Scores (INT16)&#xa;256 tokens per query row&#xa;1 score / clock cycle from Stage 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="box_pass1">
+          <mxGeometry x="15" y="40" width="230" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p1_comp" value="Signed INT16 Magnitude Comparator&#xa;Compares s_j against current max&#xa;comp_gt = (s_j &gt; max_reg)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="box_pass1">
+          <mxGeometry x="15" y="110" width="230" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p1_maxreg" value="Row Maximum Register (x_max)&#xa;Initial value: -32768 (0x8000)&#xa;Updated dynamically when comp_gt is 1&#xa;Latched at token index = N - 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="box_pass1">
+          <mxGeometry x="15" y="190" width="230" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p1_row_bram" value="Row Intermediate Ping-Pong BRAM&#xa;Stores 256 scaled scores (Pass 1)&#xa;Read Port playback for Pass 2 subtraction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="box_pass1">
+          <mxGeometry x="15" y="280" width="230" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- Pass 2 -->
+        <mxCell id="box_pass2" value="PASS 2: EXP-LUT &amp; EXPONENT SUMMATION" style="swimlane;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="325" y="85" width="280" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2_sub" value="Zero-Centered Subtraction Unit&#xa;diff = s_j - x_max (&lt;= 0)&#xa;Guaranteed non-positive for numerical stability" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" vertex="1" parent="box_pass2">
+          <mxGeometry x="15" y="40" width="250" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2_bram_lut" value="True Dual-Port 1024-word BRAM Exp-ROM&#xa;• Port A (Read): Address = diff[9:0] -> 20-bit exp_val&#xa;• Port B (Write): AXI4-Lite MMIO Reload (0x40/0x44)&#xa;Enables runtime re-quantization without resynthesis!" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" vertex="1" parent="box_pass2">
+          <mxGeometry x="15" y="115" width="250" height="85" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2_sum" value="32-bit Exponent Accumulator&#xa;sum_exp &lt;= sum_exp + exp_val&#xa;Accumulates sum of all N exp terms for row" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="box_pass2">
+          <mxGeometry x="15" y="220" width="250" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2_exp_bram" value="Exp Value Intermediate Buffer (256w)&#xa;Stores 256 exp_vals while divider computes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="box_pass2">
+          <mxGeometry x="15" y="300" width="250" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Pass 3 -->
+        <mxCell id="box_pass3" value="PASS 3: RECIPROCAL DIVIDER &amp; NORMALIZER" style="swimlane;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="630" y="85" width="280" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3_div" value="32-Cycle Non-Restoring / Restoring Divider&#xa;Numerator: Constant 2^31 (Fixed-Point Scale)&#xa;Denominator: sum_exp (32-bit unsigned)&#xa;Result: recip_scale [31:0] = 2^31 / sum_exp&#xa;Latency = 32 clock cycles (calculated ONCE per row!)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;fontStyle=1;" vertex="1" parent="box_pass3">
+          <mxGeometry x="15" y="40" width="250" height="85" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3_mult" value="Probability Normalizer Multiplier&#xa;prod_prob = exp_val [19:0] x recip_scale [31:0]&#xa;52-bit intermediate product" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;" vertex="1" parent="box_pass3">
+          <mxGeometry x="15" y="145" width="250" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3_scale" value="Fixed-Point Normalization Shifter&#xa;P_ij = prod_prob &gt;&gt;&gt; 16&#xa;Saturation Clamp: [0, +32767] (UINT16)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;fontStyle=1;" vertex="1" parent="box_pass3">
+          <mxGeometry x="15" y="225" width="250" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3_out" value="Output Attention Probabilities&#xa;Stream of 256 UINT16 probabilities&#xa;Forwarded directly to Stage 4 Context GEMM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;fontStyle=1;" vertex="1" parent="box_pass3">
+          <mxGeometry x="15" y="305" width="250" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Specifications & Timing -->
+        <mxCell id="box_specs" value="TIMING &amp; RESOURCE SUMMARY" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="935" y="85" width="225" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="spec_content" value="• Pass 1 Latency: 256 cycles&#xa;• Pass 2 Latency: 256 cycles&#xa;• Divider Latency: 32 cycles&#xa;• Pass 3 Stream: 256 cycles&#xa;• Divider executed only 1 time per row&#xa;  (Amortized: 32 / 256 = 0.125 cyc/tok)&#xa;• Total Row Latency: ~548 cycles&#xa;• Memory Cost: 1x RAMB36E2 (Exp LUT)&#xa;• Bit-Exact Precision with I-ViT Software" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=10;align=left;spacingLeft=15;" vertex="1" parent="box_specs">
+          <mxGeometry x="15" y="40" width="195" height="190" as="geometry" />
+        </mxCell>
+
+        <!-- Connecting Flows -->
+        <mxCell id="flow_p1_p2" value="Playback s_j" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#d6b656;" edge="1" parent="1" source="p1_row_bram" target="p2_sub">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_p2_p3" value="sum_exp" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" parent="1" source="p2_sum" target="p3_div">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

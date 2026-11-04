@@ -1,0 +1,66 @@
+<mxfile host="app.diagrams.net" modified="2026-11-04T08:30:00.000Z" agent="Mozilla/5.0" version="21.0.0">
+  <diagram id="diag_stage4_egress" name="Stage 4 Context GEMM and Egress">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title_box" value="STAGE 4: CONTEXT GEMM (P x V) &amp; AXI4-STREAM EGRESS ADAPTER (axis_adapter_tx.sv)&#xa;16-Channel Parallel Accumulation, &gt;&gt;&gt; 15 Normalization, INT8 Saturation Clamping &amp; 128-bit Native Vector Streaming" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6a00ff;fontColor=#ffffff;fontStyle=1;fontSize=13;strokeColor=#3700b3;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1120" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Stage 4 GEMM Box -->
+        <mxCell id="box_stg4" value="STAGE 4 CONTEXT GEMM (P x V) COMPUTATION ENGINE" style="swimlane;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="85" width="550" height="380" as="geometry" />
+        </mxCell>
+
+        <mxCell id="in_prob" value="Softmax Attention Probability P_ik [15:0] (UINT16)&#xa;Streamed row-wise (k = 0..N-1, Range [0, 32767])" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=10;fontStyle=1;" vertex="1" parent="box_stg4">
+          <mxGeometry x="20" y="40" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="in_v" value="Value Vector V_MEM[k, 0:15] [127:0]&#xa;16 Parallel INT8 Channels Read from V_MEM&#xa;Read Port: Native 128-bit BRAM Bus" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=10;fontStyle=1;" vertex="1" parent="box_stg4">
+          <mxGeometry x="280" y="40" width="240" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="mac_bank" value="16-Channel Parallel Signed MAC Multipliers (UINT16 x INT8)&#xa;Calculates: P_ik x V_kj for j = 0..15 in parallel&#xa;Intermediate Product: 24-bit Signed per channel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;fontStyle=1;" vertex="1" parent="box_stg4">
+          <mxGeometry x="20" y="115" width="500" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="acc_bank" value="16x 32-bit Vector Accumulators (acc_context [15:0])&#xa;For k = 0..N-1: acc_context[j] &lt;= acc_context[j] + (P_ik x V_kj)&#xa;Tích lũy đầy đủ 256 tokens cho toàn bộ 16 chiều không gian" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="box_stg4">
+          <mxGeometry x="20" y="195" width="500" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="norm_clamp" value="16x Pipelined Scaler &amp; Saturation Clamping Unit&#xa;• Fixed-point shift: norm_val[j] = acc_context[j] &gt;&gt;&gt; 15&#xa;• Clamping: if norm_val[j] &gt; 127 -> 127; if norm_val[j] &lt; -128 -> -128&#xa;• Output: 16x INT8 context elements [-128, +127]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;fontStyle=1;" vertex="1" parent="box_stg4">
+          <mxGeometry x="20" y="275" width="500" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- Egress Subsystem -->
+        <mxCell id="box_egress" value="AXI4-STREAM EGRESS ADAPTER (axis_adapter_tx.sv)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="615" y="85" width="545" height="380" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pack_128" value="128-bit Vector Assembly Register&#xa;Packs 16x INT8 context channels into single 128-bit vector:&#xa;vector_beat [127:0] = {ctx[15], ctx[14], ..., ctx[1], ctx[0]}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" vertex="1" parent="box_egress">
+          <mxGeometry x="20" y="40" width="505" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="egress_skid" value="Two-Stage Ping-Pong Egress Skid Buffer&#xa;Maintains zero bubbles and decouples core datapath from AXI DMA backpressure&#xa;• Capacity: 2 beats of 128-bit data&#xa;• M_AXIS_TVALID asserted when buffer non-empty&#xa;• Absorbs TREADY deassertions without stalling Stage 4 pipeline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="box_egress">
+          <mxGeometry x="20" y="120" width="505" height="85" as="geometry" />
+        </mxCell>
+
+        <mxCell id="tlast_gen" value="Dynamic TLAST Packet Framing Generator&#xa;Tracks output beat counter (0..N-1, N=256)&#xa;Asserts M_AXIS_TLAST exactly at beat N-1 to terminate DMA S2MM packet transfer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" vertex="1" parent="box_egress">
+          <mxGeometry x="20" y="225" width="505" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="axi_stream_tx" value="AXI4-Stream Master Physical Port: M_AXIS_TDATA [127:0]&#xa;Connected directly to AXI DMA S2MM Channel -> Writes to DDR4 Memory" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;fontStyle=1;" vertex="1" parent="box_egress">
+          <mxGeometry x="20" y="305" width="505" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Connecting Flow -->
+        <mxCell id="flow_stg4_egress" value="16x INT8 Context" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#6a00ff;" edge="1" parent="1" source="norm_clamp" target="pack_128">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

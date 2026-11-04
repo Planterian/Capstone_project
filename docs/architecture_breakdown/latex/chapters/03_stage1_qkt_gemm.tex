@@ -1,0 +1,93 @@
+\chapter{Stage 1: $QK^T$ GEMM Engine and Design Space Exploration}
+\label{chap:stage1_gemm}
+
+\section{Mathematical Formulation of Quantized Dot-Product}
+Stage 1 computes the dot-product attention score between Query token $\mathbf{q}_i \in \text{INT8}^{1 \times d_k}$ and Key matrix $K \in \text{INT8}^{N \times d_k}$:
+\begin{equation}
+    s_{\text{raw}}[i, j] = \sum_{k=0}^{d_k-1} q_i[k] \cdot K[j, k]
+\end{equation}
+Where $q_i[k], K[j, k] \in [-128, 127]$. Each partial product requires 16 bits of dynamic range. Summing across $d_k = 16$ elements yields a maximum magnitude of:
+\begin{equation}
+    |s_{\text{raw}}| \le 16 \times (128 \times 128) = 262,144 < 2^{19}
+\end{equation}
+An internal 32-bit signed accumulator (\texttt{INT32}) is used to ensure absolute headroom against overflow across all token lengths.
+
+\section{Architectural Variant 1A: Pure Logic Fabric Streaming Engine}
+Variant 1A targets environments where all DSP blocks are occupied by convolutional backbones.
+\begin{itemize}
+    \item \textbf{Multiplier Implementation:} Uses 16 independent combinational multiplier macros synthesized entirely into CLB LUT6 logic fabric (\texttt{lut\_multiplier\_8x8.sv}).
+    \item \textbf{Reduction Tree:} A 4-stage pipelined binary adder tree reduces 16 partial products to one INT32 sum.
+    \item \textbf{Characteristics:} Consumes 0 DSP48E2 slices, but requires $\approx 5,150$ CLB LUTs. It sustains an initiation interval of $II = 1$ score/cycle.
+\end{itemize}
+
+\section{Architectural Variant 2A: High-Throughput DSP-Packed Streaming Engine}
+The AMD UltraScale+ DSP48E2 hard slice features an asymmetric $18 \times 27$-bit signed multiplier. Standard 8-bit multiplication utilizes only a fraction of this capability. Variant 2A introduces the \texttt{pe\_slice\_dsp\_packing} microarchitecture, packing two independent INT8 multiplications into a single DSP slice.
+
+\subsection{Mathematical Derivation of DSP Packing}
+Let $A = q_i[k]$ be the common Query element, and let $B = K[j, 2k]$ and $C = K[j, 2k+1]$ be two Key elements. We construct the inputs to Port A and Port B as:
+\begin{equation}
+    \text{Port A} = A, \quad \text{Port B} = (B \ll 18) + C
+\end{equation}
+When multiplied inside the DSP48E2 core:
+\begin{equation}
+    \text{DSP\_Product} = A \times (B \cdot 2^{18} + C) = (A \times B) \cdot 2^{18} + (A \times C)
+\end{equation}
+
+\subsection{Borrow-Bit Phenomenon and Hardware $+1$ Sign Correction}
+Because operand $C$ is a signed two's complement integer, when $C < 0$, its sign extension propagates high ones across the upper 18 bits of Port B. This behaves as an arithmetic borrow bit from the upper product:
+\begin{equation}
+    \text{If } A \times C < 0 \implies (\text{DSP\_Product} \ggg 18) = (A \times B) - 1
+\end{equation}
+To restore bit-exact fidelity, a hardware sign correction circuit inspects bit 15 of the lower product:
+\begin{lstlisting}[language=Verilog, caption={Hardware Sign Correction in SystemVerilog}]
+assign result_ac = dsp_product[15:0];
+assign result_ab = (dsp_product >>> 18) + (dsp_product[15] ? 16'sd1 : 16'sd0);
+\end{lstlisting}
+
+\subsection{Numerical Demonstration}
+Consider $A = 10$, $B = 20$, $C = -15$:
+\begin{itemize}
+    \item Expected: $A \times B = +200$, $A \times C = -150$.
+    \item Port B: $(20 \ll 18) + (-15) = 20 \times 262,144 - 15 = 5,242,865$.
+    \item DSP Product: $10 \times 5,242,865 = 52,428,650 = 199 \times 262,144 + 65,386$.
+    \item Lower 16 bits: $65,386 \equiv -150 \pmod{65,536}$ (Bit-exact for $A \times C$).
+    \item Bit 15 is 1 (negative result).
+    \item Shifted upper part: $52,428,650 \gg 18 = 199$.
+    \item Sign correction: $199 + 1 = \mathbf{200}$ (Bit-exact for $A \times B$).
+\end{itemize}
+
+Using this method, only \textbf{8 DSP48E2 slices} are required to compute the entire 16-element dot product, cutting LUT logic consumption by $47.6\%$.
+
+\section{Architectural Variant 3B: 2D Spatial Systolic Array}
+Variant 3B evaluates a $4 \times 4$ PE Output-Stationary Systolic Array (16 DSPs).
+\begin{itemize}
+    \item \textbf{Drain Overhead:} For small edge dimensions ($d_k = 16$), the computation phase requires 24 cycles, while draining partial sums requires 32 cycles. The array is idle for:
+    \begin{equation}
+        \text{Idle Stall Ratio} = \frac{32}{24 + 32} = 57.1\%
+    \end{equation}
+    Throughput drops to $32 / 56 = 0.57\text{ score/cycle}$.
+    \item \textbf{Matrix Reordering Buffer:} Because systolic arrays output data in $4 \times 8$ matrix tiles, an auxiliary reordering buffer is required to convert tile data to sequential rows for Softmax.
+\end{itemize}
+
+\section{Comparative Evaluation of the Three Variants}
+\begin{table}[htbp]
+    \centering
+    \caption{Synthesis and Performance Comparison Across the 3 Hardware Variants}
+    \label{tab:gemm_variants_comparison}
+    \begin{tabularx}{\textwidth}{l c c c c}
+        \toprule
+        \textbf{Metric} & \textbf{Variant 1A} & \textbf{Variant 2A} & \textbf{Variant 3B} & \textbf{Available (KV260)} \\
+        \midrule
+        DSP48E2 Slices          & 0 (0.0\%)      & \textbf{8 (0.64\%)}  & 16 (1.28\%)  & 1,248 \\
+        CLB LUT6 Fabric         & 5,150 (4.4\%)  & \textbf{2,700 (2.3\%)}& 4,200 (3.6\%)& 117,120 \\
+        Max Frequency ($F_{\max}$) & $\approx 330$~MHz & \textbf{$\approx 408$~MHz} & $\approx 250$~MHz & Target: 200~MHz \\
+        Timing WNS (@ 200~MHz)  & $+1.98$~ns     & \textbf{$+0.051$~ns} & $+1.02$~ns   & $> 0$~ns \\
+        Sustained Throughput    & 1.0 score/cyc  & \textbf{1.0 score/cyc} & 0.57 score/cyc & — \\
+        Full Head Latency       & 1.048~ms       & \textbf{1.050~ms}    & 1.686~ms     & — \\
+        Frame Rate (4 Heads)    & 238.5 FPS      & \textbf{238.2 FPS}   & 148.3 FPS    & Real-time (> 30) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+Variant 2A achieves the ideal balance of minimal resource footprint, timing closure, and maximum real-time frame rate.
+

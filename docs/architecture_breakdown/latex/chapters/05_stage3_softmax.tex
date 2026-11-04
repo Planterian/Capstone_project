@@ -1,0 +1,64 @@
+\chapter{Stage 3: Reconfigurable Hardware IntSoftmax Engine}
+\label{chap:stage3_softmax}
+
+\section{Three-Pass Streaming Microarchitecture}
+The Softmax function normalizes a vector of unbounded attention scores $\mathbf{s} \in \text{INT16}^N$ into attention probabilities:
+\begin{equation}
+    P_j = \frac{\exp(s_j - x_{\max})}{\sum_{k=0}^{N-1} \exp(s_k - x_{\max})}
+\end{equation}
+To execute this operation without floating-point units or exponential overflow, the hardware engine (\texttt{softmax\_lut.sv}) processes each query row in **three streaming passes**:
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        box/.style={draw, rectangle, rounded corners, align=center, fill=blue!10, text width=7cm, minimum height=0.9cm},
+        arr/.style={-latex, thick}
+    ]
+        \node[box, fill=yellow!20] (p1) {\textbf{Pass 1: Maximum Search (256 cycles)}\\Streams $s_0..s_{255}$, updates $x_{\max}$, stores in Row BRAM};
+        \node[box, fill=orange!20, below=0.7cm of p1] (p2) {\textbf{Pass 2: Exp-ROM \& Summation (256 cycles)}\\$\Delta_j = s_j - x_{\max} \le 0 \to \text{1024w BRAM Exp-ROM}$\\$\text{sum\_exp} = \sum \exp(\Delta_j)$};
+        \node[box, fill=red!20, below=0.7cm of p2] (div) {\textbf{Intermediate: 32-Cycle Divider (32 cycles)}\\Reciprocal scale factor: $\text{recip\_scale} = \lfloor 2^{31} / \text{sum\_exp} \rfloor$};
+        \node[box, fill=green!20, below=0.7cm of div] (p3) {\textbf{Pass 3: Probability Normalization (256 cycles)}\\$P_j = (\exp(\Delta_j) \times \text{recip\_scale}) \ggg 16 \to \text{UINT16}$};
+        
+        \draw[arr] (p1) -- node[right]{\small $x_{\max}$ Latched} (p2);
+        \draw[arr] (p2) -- node[right]{\small sum\_exp Latched} (div);
+        \draw[arr] (div) -- node[right]{\small recip\_scale Ready} (p3);
+    \end{tikzpicture}
+    \caption{Three-Pass Hardware IntSoftmax Pipeline Flow.}
+    \label{fig:softmax_pipeline}
+\end{figure}
+
+\section{Pass 1: Streaming Row Maximum Search}
+As each scaled score $s_j$ streams in from Stage 2:
+\begin{equation}
+    \text{If } s_j > x_{\max} \implies x_{\max} \leftarrow s_j
+\end{equation}
+Simultaneously, $s_j$ is written into the on-chip Row BRAM. At cycle $j = N-1$, the exact maximum $x_{\max}$ is registered.
+
+\section{Pass 2: Zero-Centered Subtraction and Exp-ROM BRAM}
+Scores are played back from Row BRAM and subtracted from $x_{\max}$:
+\begin{equation}
+    \Delta_j = s_j - x_{\max} \le 0
+\end{equation}
+Because $\Delta_j \le 0$, the exponential term $\exp(\Delta_j) \in (0, 1]$, preventing exponential overflow.
+\begin{itemize}
+    \item \textbf{Dual-Port 1024-Word Exp-ROM:} Port A reads the 20-bit fixed-point coefficient addressed by $\Delta_j[9:0]$. Port B connects to AXI4-Lite registers \texttt{0x40} and \texttt{0x44}, allowing runtime reloading of quantizer tables.
+    \item \textbf{Accumulator:} A 32-bit unsigned accumulator sums the $N$ exponential values:
+    \begin{equation}
+        \text{sum\_exp} = \sum_{j=0}^{N-1} \exp(\Delta_j)
+    \end{equation}
+\end{itemize}
+
+\section{Intermediate Phase: 32-Step Restoring Integer Divider}
+Computing a division for every token is cost-prohibitive. Instead, the engine computes **one single reciprocal scale factor** per row:
+\begin{equation}
+    \text{recip\_scale} = \left\lfloor \frac{2^{31}}{\text{sum\_exp}} \right\rfloor
+\end{equation}
+Using a 32-cycle hardware restoring divider, the reciprocal is calculated in exactly 32 clock cycles. Amortized over $N=256$ tokens, this contributes only $32 / 256 = 0.125\text{ cycles/token}$ of pipeline overhead.
+
+\section{Pass 3: Probability Normalization and Output Scaling}
+Using the registered reciprocal scale factor, probabilities are generated as:
+\begin{equation}
+    P_j = \left( \exp(\Delta_j) \times \text{recip\_scale} \right) \ggg 16
+\end{equation}
+Clamped to the unsigned 16-bit range $[0, 32,767]$ (\texttt{UINT16}), the normalized attention distribution streams directly to Stage 4.
+

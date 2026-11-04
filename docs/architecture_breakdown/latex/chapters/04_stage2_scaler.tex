@@ -1,0 +1,46 @@
+\chapter{Stage 2: Pipelined Dyadic Rescaling Unit}
+\label{chap:stage2_scaler}
+
+\section{Dyadic Scaling Formulation}
+In integer-quantized neural networks, scaling attention scores by $1/\sqrt{d_k}$ and quantization scales is performed through integer dyadic arithmetic:
+\begin{equation}
+    s_{\text{scaled}}[i, j] = \left\lfloor \frac{s_{\text{raw}}[i, j] \cdot M}{2^E} \right\rfloor
+\end{equation}
+Where $M \in [-2^{17}, 2^{17}-1]$ is an 18-bit signed integer mantissa (stored in CSR register \texttt{0x20}, default: $27,640$) and $E \in [0, 31]$ is a 5-bit shift exponent (stored in CSR register \texttt{0x24}, default: $22$).
+
+\section{Three-Stage Pipelined Datapath}
+To prevent the scaling arithmetic from becoming a timing critical path at 200~MHz, the module \texttt{scale\_unit.sv} is organized into three balanced pipeline stages:
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        box/.style={draw, rectangle, rounded corners, align=center, fill=blue!10, text width=3.4cm, minimum height=1cm},
+        arr/.style={-latex, thick}
+    ]
+        \node[box, fill=yellow!20] (m) {\textbf{Stage 1: Multiplier}\\INT32 Score $\times$ INT18 $M$\\$\to$ 50-bit Product};
+        \node[box, fill=orange!20, right=1.2cm of m] (s) {\textbf{Stage 2: Shifter}\\Arithmetic Shift\\$\ggg E$ ($E=22$)};
+        \node[box, fill=green!20, right=1.2cm of s] (c) {\textbf{Stage 3: Clamping}\\Asymmetric Saturation\\$[-32768, +32767]$};
+        
+        \draw[arr] (m) -- node[above]{\small Reg P1} (s);
+        \draw[arr] (s) -- node[above]{\small Reg P2} (c);
+    \end{tikzpicture}
+    \caption{Three-Stage Pipelined Dyadic Scaler Architecture.}
+    \label{fig:scaler_pipeline}
+\end{figure}
+
+\begin{enumerate}
+    \item \textbf{Stage 1 (Multiplier):} Multiplies the incoming 32-bit raw score by the 18-bit mantissa $M$ using an internal DSP48E2 primitive.
+    \item \textbf{Stage 2 (Barrel Shifter):} Implements a dynamic arithmetic right shift ($\ggg E$), maintaining sign integrity.
+    \item \textbf{Stage 3 (Asymmetric Clamping):} Clamps intermediate values to the signed 16-bit range $[-32,768, +32,767]$ to guarantee overflow-free operation in subsequent Softmax computations:
+    \begin{equation}
+        s_{\text{scaled}} = 
+        \begin{cases}
+            +32767, & \text{if } v_{\text{shift}} > +32767 \\
+            -32768, & \text{if } v_{\text{shift}} < -32768 \\
+            v_{\text{shift}}[15:0], & \text{otherwise}
+        \end{cases}
+    \end{equation}
+\end{enumerate}
+
+The scaler maintains an initiation interval of $II = 1$ score/cycle with a latency of 3 clock cycles.
+

@@ -1,0 +1,50 @@
+\chapter{Stage 4: Context $P \times V$ GEMM Engine and Egress Subsystem}
+\label{chap:stage4_context_gemm}
+
+\section{Parallel Vector Accumulation Datapath}
+Stage 4 computes the context output row $\mathbf{o}_i \in \text{INT8}^{1 \times d_k}$ by taking the dot product of the Softmax probability vector $\mathbf{P}_i \in \text{UINT16}^{1 \times N}$ with Value matrix $V \in \text{INT8}^{N \times d_k}$:
+\begin{equation}
+    \mathbf{o}_i[j] = \text{Clamp}_{\text{INT8}} \left( \left[ \sum_{k=0}^{N-1} P_i[k] \cdot V[k, j] \right] \ggg 15 \right), \quad j \in [0, d_k-1]
+\end{equation}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        box/.style={draw, rectangle, rounded corners, align=center, fill=blue!10, text width=3.4cm, minimum height=0.9cm},
+        arr/.style={-latex, thick}
+    ]
+        \node[box, fill=purple!20] (mac) {\textbf{16-Channel MAC}\\$P_{ik} \times V_{kj}$\\32-bit Accumulators};
+        \node[box, fill=yellow!20, right=1.2cm of mac] (norm) {\textbf{Normalization}\\$\ggg 15$ Shifter\\INT8 Saturation Clamp};
+        \node[box, fill=green!20, right=1.2cm of norm] (egr) {\textbf{Egress Skid Buffer}\\128-bit Vector Beat\\TLAST Generation};
+        
+        \draw[arr] (mac) -- (norm);
+        \draw[arr] (norm) -- (egr);
+    \end{tikzpicture}
+    \caption{Stage 4 Context GEMM and Egress Datapath.}
+    \label{fig:stage4_datapath}
+\end{figure}
+
+The architecture allocates 16 parallel MAC channels. In each cycle, probability $P_i[k]$ is broadcast to all 16 channels, while a 128-bit vector corresponding to row $k$ of $V_{\text{MEM}}$ is loaded in parallel. The 16 products are accumulated across all $k = 0 \dots N-1$ tokens.
+
+\section{Output Scaling, Clamping, and Vector Assembly}
+Upon completing the token loop:
+\begin{enumerate}
+    \item The 32-bit accumulated sum in each channel is shifted right by 15 bits ($\ggg 15$).
+    \item Each value is clamped to signed 8-bit range $[-128, +127]$:
+    \begin{equation}
+        \mathbf{o}_i[j] = 
+        \begin{cases}
+            +127, & \text{if } v_{\text{norm}}[j] > +127 \\
+            -128, & \text{if } v_{\text{norm}}[j] < -128 \\
+            v_{\text{norm}}[j][7:0], & \text{otherwise}
+        \end{cases}
+    \end{equation}
+    \item The 16 INT8 values are packed into a 128-bit egress beat:
+    \begin{equation}
+        \text{vector\_beat}[127:0] = \{\mathbf{o}_i[15], \mathbf{o}_i[14], \dots, \mathbf{o}_i[0]\}
+    \end{equation}
+\end{enumerate}
+
+\section{AXI4-Stream Egress Skid Buffer and Packet Framing}
+The Egress Subsystem (\texttt{axis\_adapter\_tx.sv}) buffers output beats into a 2-stage skid register, decoupling the pipeline from downstream AXI DMA backpressure. An internal beat counter generates the \texttt{M\_AXIS\_TLAST} packet boundary flag on beat $N-1$ ($255$), notifying the DMA S2MM engine that the transfer for the current attention head is complete.
+

@@ -1,0 +1,128 @@
+<mxfile host="app.diagrams.net" modified="2026-11-04T08:35:00.000Z" agent="Mozilla/5.0" version="21.0.0">
+  <diagram id="diag_fsm_control" name="Central FSM Control Flow">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title_box" value="CENTRAL HARDWARE FSM CONTROLLER &amp; PIPELINE SYNCHRONIZATION FLOW" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0050ef;fontColor=#ffffff;fontStyle=1;fontSize=13;strokeColor=#0027b4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1120" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- States -->
+        <mxCell id="s_idle" value="S_IDLE&#xa;• Core status: BUSY=0, DONE=0&#xa;• Clear internal accumulators&#xa;• Wait for start_pulse (Reg 0x00[0])" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="90" width="220" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s_load" value="S_LOAD_QKV&#xa;• AXI-Stream RX active (TREADY=1)&#xa;• Stream 768 beats (Q:256, K:256, V:256)&#xa;• Store into Q_MEM, K_MEM, V_MEM&#xa;• Advance when rx_count == 3*N" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="340" y="90" width="240" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s_init_head" value="S_INIT_HEAD&#xa;• Current Head: h in 0..H-1&#xa;• Reset row counter i &lt;= 0&#xa;• Switch ping-pong BRAM bank" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="640" y="90" width="220" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s_stg1" value="S_STAGE1_QKT&#xa;• Fetch query row q_i from Q_MEM&#xa;• Stream K_MEM tokens j = 0..N-1&#xa;• 1 score/cycle through GEMM Engine&#xa;• Store 256 INT32 raw scores" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="920" y="90" width="220" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s_stg2" value="S_STAGE2_SCALE&#xa;• Dyadic multiplication: (score x M)&#xa;• Arithmetic shift: &gt;&gt;&gt; E&#xa;• Saturation clamp to INT16&#xa;• Pipelined with Stage 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="920" y="210" width="220" height="75" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s_stg3_p1" value="S_SOFTMAX_PASS1&#xa;• Streaming row maximum search&#xa;• Compare s_j with current x_max&#xa;• Save scaled scores in row BRAM&#xa;• Latency: N cycles" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="920" y="325" width="220" height="75" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s_stg3_p2" value="S_SOFTMAX_PASS2&#xa;• Zero-center: diff = s_j - x_max&#xa;• BRAM Exp-ROM lookup&#xa;• Accumulate sum_exp = sum(exp)&#xa;• Latency: N cycles" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="640" y="325" width="220" height="75" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s_stg3_div" value="S_SOFTMAX_DIV&#xa;• 32-step restoring division&#xa;• Computes recip = 2^31 / sum_exp&#xa;• Latency: exactly 32 clock cycles&#xa;• Done once per row" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="360" y="325" width="220" height="75" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s_stg4" value="S_SOFTMAX_P3_AND_STAGE4&#xa;• Normalize prob: P_ik = (exp x recip)&#xa;• Parallel 16-channel Context GEMM&#xa;• Accumulate P_ik x V_kj across N tokens&#xa;• Normalization &gt;&gt;&gt; 15 &amp; INT8 clamp" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="325" width="240" height="85" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s_tx_beat" value="S_TX_BEAT&#xa;• Pack 16x INT8 context elements&#xa;• Push 128-bit vector into TX skid buffer&#xa;• Check row counter: i &lt; N-1 ? i++ : next" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="460" width="240" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s_wait_flush" value="S_WAIT_FLUSH&#xa;• Wait until TX Skid Buffer fully drained&#xa;• Assert M_AXIS_TLAST on final beat (beat 255)&#xa;• Check head counter: h &lt; H-1 ? h++ : next" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="360" y="460" width="240" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s_done" value="S_DONE&#xa;• Assert STATUS Reg 0x04[1] = 1 (DONE)&#xa;• Deassert BUSY Reg 0x04[0] = 0&#xa;• Trigger core_done interrupt to ARM PS&#xa;• Return to S_IDLE upon CLEAR_BUF / START" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#60a917;fontColor=#ffffff;strokeColor=#2D7600;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="660" y="460" width="250" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Edges -->
+        <mxCell id="e1" value="start_pulse = 1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_idle" target="s_load">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e2" value="rx_count == 3*N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_load" target="s_init_head">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e3" value="Begin Row i" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_init_head" target="s_stg1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e4" value="Continuous Pipeline" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_stg1" target="s_stg2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e5" value="Stream s_j" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_stg2" target="s_stg3_p1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e6" value="x_max Latched" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_stg3_p1" target="s_stg3_p2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e7" value="sum_exp Latched" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_stg3_p2" target="s_stg3_div">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e8" value="div_done = 1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_stg3_div" target="s_stg4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e9" value="Row Accumulation Complete" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_stg4" target="s_tx_beat">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e10" value="i &lt; N-1 (Next Row)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_tx_beat" target="s_stg1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="10" y="500" />
+              <mxPoint x="10" y="60" />
+              <mxPoint x="1030" y="60" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e11" value="i == N-1 (Row Done)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_tx_beat" target="s_wait_flush">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e12" value="h &lt; H-1 (Next Head)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_wait_flush" target="s_init_head">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="480" y="240" />
+              <mxPoint x="750" y="240" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e13" value="h == H-1 (All Heads Done)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="s_wait_flush" target="s_done">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

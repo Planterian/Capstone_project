@@ -1,0 +1,50 @@
+\chapter{Ingress Subsystem and Memory Hierarchy}
+\label{chap:ingress_memory}
+
+\section{AXI4-Stream Ingress Skid Buffer}
+High-throughput streaming hardware cores often experience backpressure deassertions from internal pipeline stages or memory stalls. A direct combinational path between incoming \texttt{TVALID} and \texttt{TREADY} can create critical timing paths or cause dropped data beats. 
+
+To eliminate this vulnerability, the Ingress Subsystem utilizes an AXI4-Stream Skid Buffer (\texttt{axis\_adapter\_rx.sv}). 
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        box/.style={draw, rectangle, rounded corners, align=center, fill=blue!10, text width=3.5cm, minimum height=0.8cm},
+        arr/.style={-latex, thick}
+    ]
+        \node[box] (bus) {\textbf{AXI4-Stream Bus}\\TDATA [127:0]\\TVALID / TREADY};
+        \node[box, fill=orange!20, right=1.5cm of bus] (skid) {\textbf{Skid Buffer Register}\\128-bit Shadow Reg\\Captures Stalled Beats};
+        \node[box, fill=green!20, right=1.5cm of skid] (core) {\textbf{Ingress Storage FSM}\\Unpacks 16x INT8\\Routes to Q/K/V MEM};
+        
+        \draw[arr] (bus) -- (skid);
+        \draw[arr] (skid) -- (core);
+    \end{tikzpicture}
+    \caption{Skid Buffer Decoupling Architecture.}
+    \label{fig:skid_buffer}
+\end{figure}
+
+The skid buffer operates as follows:
+\begin{itemize}
+    \item When downstream logic is ready (\texttt{ready\_in == 1}), data passes directly with zero added pipeline latency.
+    \item If downstream logic stalls (\texttt{ready\_in == 0}), incoming stream beats are latched into an internal 128-bit shadow register while simultaneously deasserting \texttt{S\_AXIS\_TREADY}.
+    \item Upon release of the stall, the shadow register data is delivered first, ensuring no data loss and preserving back-to-back zero-bubble streaming throughput.
+\end{itemize}
+
+\section{Multi-Bank On-Chip BRAM Architecture}
+The memory subsystem allocates dedicated true dual-port Block RAMs (BRAM36K primitives) for matrices $Q, K,$ and $V$:
+\begin{equation}
+    \text{Storage Requirement per Head} = 3 \times (N \times d_k) = 3 \times (256 \times 16) = 12,288\text{ bytes}
+\end{equation}
+
+Each token row consists of $d_k = 16$ INT8 signed values, precisely matching the 128-bit native bus width:
+\begin{equation}
+    \mathbf{v}_{\text{beat}}[127:0] = \{e_{15}, e_{14}, e_{13}, \dots, e_1, e_0\}, \quad e_k \in [-128, 127]
+\end{equation}
+Consequently, reading or writing a full token row is completed in exactly \textbf{one clock cycle}.
+
+\section{Ping-Pong Buffering Scheme for Overlapped DMA Transfers}
+To achieve high throughput, the BRAM memory is arranged in a ping-pong double-buffering configuration (Bank 0 and Bank 1):
+\begin{itemize}
+    \item While the arithmetic compute pipeline processes Head $h$ using Bank 0, the AXI DMA engine pre-loads Head $h+1$ into Bank 1.
+    \item Because the DMA transfer latency for 768 beats ($3 \times 256$) is $3.84\ \mu\text{s}$ ($768\text{ cycles}$ at 200~MHz), while full-head computation takes $\approx 1.050\text{ ms}$ ($> 209,000\text{ cycles}$), the DMA transfer is completely hidden behind computation, achieving $100\%$ compute unit utilization.
+\end{itemize}
+

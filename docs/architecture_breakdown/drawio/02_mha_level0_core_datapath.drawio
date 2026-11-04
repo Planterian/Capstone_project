@@ -1,0 +1,158 @@
+<mxfile host="app.diagrams.net" modified="2026-11-04T08:05:00.000Z" agent="Mozilla/5.0" version="21.0.0">
+  <diagram id="diag_mha_core_level0" name="MHA Core Level 0 Datapath">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="box_top" value="attention_core_top (v2.0 Native 128-bit Bus Datapath &amp; Control Plane)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;fontColor=#333333;startSize=30;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="30" width="1140" height="740" as="geometry" />
+        </mxCell>
+
+        <!-- Ingress Skid & Buffers -->
+        <mxCell id="grp_ingress" value="INGRESS SUBSYSTEM &amp; MULTI-BANK BRAM" style="swimlane;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="box_top">
+          <mxGeometry x="20" y="45" width="230" height="420" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rx_skid" value="axis_adapter_rx (Skid Buffer)&#xa;128-bit S_AXIS_TDATA&#xa;Holds data during downstream stall" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="grp_ingress">
+          <mxGeometry x="15" y="35" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fsm_ingress" value="Ingress Load FSM&#xa;Unpacks 128-bit beats (16x INT8)&#xa;Loads Q -> K -> V (768 beats/head)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="grp_ingress">
+          <mxGeometry x="15" y="100" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="q_mem" value="Q_MEM (Query BRAM)&#xa;256 tokens x 16 dims (INT8)&#xa;Read Port: 128-bit Native Vector" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="grp_ingress">
+          <mxGeometry x="15" y="170" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="k_mem" value="K_MEM (Key Ping-Pong BRAM)&#xa;256 tokens x 16 dims (INT8)&#xa;Read Port: 128-bit Streamed Token" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="grp_ingress">
+          <mxGeometry x="15" y="245" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="v_mem" value="V_MEM (Value Ping-Pong BRAM)&#xa;256 tokens x 16 dims (INT8)&#xa;Read Port: 128-bit for Context GEMM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="grp_ingress">
+          <mxGeometry x="15" y="320" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Stage 1 -->
+        <mxCell id="grp_stg1" value="STAGE 1: QK^T GEMM ENGINE" style="swimlane;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="box_top">
+          <mxGeometry x="270" y="45" width="200" height="420" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg1_engine" value="Streaming Dot Product&#xa;16 Parallel INT8 Multipliers&#xa;• Variant 1A: Pure LUT Fabric&#xa;• Variant 2A: 8x DSP Packing&#xa;• Variant 3B: 2D Systolic 4x4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=10;fontStyle=1;" vertex="1" parent="grp_stg1">
+          <mxGeometry x="15" y="40" width="170" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg1_adder" value="Pipelined Reduction Tree&#xa;4-stage Adder Tree&#xa;Sum of 16 partial products" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="grp_stg1">
+          <mxGeometry x="15" y="140" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg1_out" value="Raw Attention Scores&#xa;INT32 signed score&#xa;1 score / clock cycle (II=1)&#xa;256 scores / query row" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d79b00;fontSize=10;fontStyle=1;" vertex="1" parent="grp_stg1">
+          <mxGeometry x="15" y="225" width="170" height="65" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg1_perf" value="Timing &amp; Latency:&#xa;• Latency: 5 cycles&#xa;• II = 1 score/cycle&#xa;• 261 cycles/row (1A/2A)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=9;" vertex="1" parent="grp_stg1">
+          <mxGeometry x="15" y="315" width="170" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- Stage 2 -->
+        <mxCell id="grp_stg2" value="STAGE 2: DYADIC SCALER" style="swimlane;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="box_top">
+          <mxGeometry x="490" y="45" width="180" height="420" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg2_mult" value="Signed Multiplier Stage&#xa;INT32 Score x INT18 Mantissa M&#xa;-> 48-bit intermediate product" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="grp_stg2">
+          <mxGeometry x="15" y="40" width="150" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg2_shift" value="Arithmetic Barrel Shifter&#xa;ASR >>> Exponent E (E=22)&#xa;Fixed-point normalizer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="grp_stg2">
+          <mxGeometry x="15" y="130" width="150" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg2_clamp" value="Saturation Clamping&#xa;Clamp to INT16 range:&#xa;[-32768, +32767]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="grp_stg2">
+          <mxGeometry x="15" y="210" width="150" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg2_out" value="Scaled Scores Output&#xa;INT16 stream&#xa;Latency = 3 cycles&#xa;II = 1 score/cycle" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="grp_stg2">
+          <mxGeometry x="15" y="295" width="150" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- Stage 3 -->
+        <mxCell id="grp_stg3" value="STAGE 3: HARDWARE INTSOFTMAX" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="box_top">
+          <mxGeometry x="690" y="45" width="220" height="420" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg3_p1" value="Pass 1: Max-Search Engine&#xa;Streams 256 scaled scores&#xa;Registers x_max for row" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;" vertex="1" parent="grp_stg3">
+          <mxGeometry x="15" y="35" width="190" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg3_p2" value="Pass 2: Exp-LUT &amp; Accumulator&#xa;Sub: diff = s_j - x_max (&lt;= 0)&#xa;1024w True Dual-Port BRAM ROM&#xa;Acc: sum_exp = sum(exp(diff))" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;" vertex="1" parent="grp_stg3">
+          <mxGeometry x="15" y="95" width="190" height="75" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg3_p3" value="Pass 3: 32-Step Restoring Divider&#xa;Computes reciprocal: 2^31 / sum_exp&#xa;Latency = 32 cycles" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="grp_stg3">
+          <mxGeometry x="15" y="180" width="190" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg3_norm" value="Normalizer Multiplier&#xa;P_ij = (exp_val x recip) >>> 16&#xa;Range: UINT16 [0, 32767]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=10;" vertex="1" parent="grp_stg3">
+          <mxGeometry x="15" y="250" width="190" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg3_bram_buf" value="Row Intermediate Ping-Pong Buffer&#xa;Stores 256 scaled scores &amp; exp vals&#xa;during divider computation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#b85450;fontSize=9;" vertex="1" parent="grp_stg3">
+          <mxGeometry x="15" y="315" width="190" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Stage 4 & Egress -->
+        <mxCell id="grp_stg4" value="STAGE 4 &amp; EGRESS" style="swimlane;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="box_top">
+          <mxGeometry x="930" y="45" width="190" height="420" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg4_gemm" value="Context GEMM (P x V)&#xa;Parallel 16 channels MAC&#xa;INT16 Prob x INT8 V&#xa;32-bit accumulators" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=10;fontStyle=1;" vertex="1" parent="grp_stg4">
+          <mxGeometry x="15" y="35" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stg4_scale" value="Context Normalizer&#xa;>>> 15 scaling&#xa;Saturation Clamp INT8&#xa;Range: [-128, +127]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="grp_stg4">
+          <mxGeometry x="15" y="120" width="160" height="65" as="geometry" />
+        </mxCell>
+
+        <mxCell id="tx_packer" value="128-bit Vector Packing&#xa;Packs 16x INT8 into 1 beat&#xa;Generates 256 beats/head" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="grp_stg4">
+          <mxGeometry x="15" y="200" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="tx_skid" value="axis_adapter_tx (Skid Buffer)&#xa;128-bit M_AXIS_TDATA&#xa;TVALID / TREADY / TLAST&#xa;TLAST at beat 255" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" vertex="1" parent="grp_stg4">
+          <mxGeometry x="15" y="280" width="160" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- Bottom CSR & Control -->
+        <mxCell id="grp_control" value="CENTRAL CONTROL PLANE &amp; AXI4-LITE CSR (axi_lite_regs.sv)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=11;startSize=25;rounded=1;" vertex="1" parent="box_top">
+          <mxGeometry x="20" y="480" width="1100" height="230" as="geometry" />
+        </mxCell>
+
+        <mxCell id="tbl_regs" value="REGISTER MAP TABLE (Offset | Name | Access | Reset | Description)&#xa;• 0x00: CONTROL [0: START (auto-clear), 1: CLEAR_BUF, 2: SOFT_RESET]&#xa;• 0x04: STATUS [0: BUSY, 1: DONE, 2: ERROR, 3: PP_BANK_ACTIVE]&#xa;• 0x08: NBYTES (Total DMA transaction bytes: default 0x1000 = 4096B)&#xa;• 0x0C: CORE_ID (Hardware Signature: 0x5649_5432 = &quot;VIT2&quot;)&#xa;• 0x10: SEQ_LEN (Dynamic sequence length: N in {16, 64, 256} tokens)&#xa;• 0x14: HEAD_DIM (Head dimension: dk in {16, 20, 24})&#xa;• 0x18: NUM_HEADS (Sequential attention heads: default H = 4)&#xa;• 0x20: SCALE_M (Dyadic scaling signed mantissa: default 27640)&#xa;• 0x24: SCALE_E (Dyadic scaling shift exponent: default 22)&#xa;• 0x40: LUT_WR_ADDR (10-bit Exp-LUT BRAM configuration address)&#xa;• 0x44: LUT_WR_DATA (20-bit Exp-LUT coefficient write data port)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=10;align=left;spacingLeft=15;" vertex="1" parent="grp_control">
+          <mxGeometry x="20" y="35" width="680" height="180" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fsm_central" value="CENTRAL FSM ENGINE&#xa;• S_IDLE: Wait START pulse&#xa;• S_LOAD_QKV: Monitor RX beats (768)&#xa;• S_COMPUTE_ROW: Loop i = 0..N-1&#xa;• S_STAGE_PIPELINE: Synchronize S1..S4&#xa;• S_WAIT_TX: Ensure TX skid flushed&#xa;• S_NEXT_HEAD: Loop h = 0..H-1&#xa;• S_DONE: Assert DONE flag &amp; IRQ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;fontStyle=1;align=left;spacingLeft=15;" vertex="1" parent="grp_control">
+          <mxGeometry x="720" y="35" width="360" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- Connecting Pipelines -->
+        <mxCell id="flow_stg1" value="Q/K 128-bit Vectors" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#d79b00;" edge="1" parent="box_top" source="q_mem" target="stg1_engine">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_stg2" value="INT32 Score" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#d6b656;" edge="1" parent="box_top" source="stg1_out" target="stg2_mult">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_stg3" value="INT16 Scaled" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#b85450;" edge="1" parent="box_top" source="stg2_out" target="stg3_p1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow_stg4" value="UINT16 Prob" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#9673a6;" edge="1" parent="box_top" source="stg3_norm" target="stg4_gemm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

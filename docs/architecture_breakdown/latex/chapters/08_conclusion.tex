@@ -1,0 +1,20 @@
+\chapter{Conclusion and Future Extensions}
+\label{chap:conclusion}
+
+\section{Summary of Technical Contributions}
+This capstone project successfully investigated, designed, and physically implemented an end-to-end hardware-accelerated Multi-Head Attention core for quantized edge Vision Transformers on the AMD Kria KV260 platform. Key engineering contributions include:
+
+\begin{enumerate}
+    \item \textbf{High-Efficiency DSP Packing Microarchitecture:} Developed the \texttt{pe\_slice\_dsp\_packing} unit with a hardware $+1$ borrow-bit sign correction circuit. This innovation reduced the Stage 1 DSP48E2 footprint to only 8 slices (a $50\%$ reduction) while cutting CLB LUT usage by $47.6\%$.
+    \item \textbf{Timing Closure at 200 MHz:} Resolved all timing violations across 51,585 synchronous endpoints, achieving a positive setup slack of $\text{WNS} = +0.051$~ns at 200~MHz on the AMD XCK26 FPGA.
+    \item \textbf{Non-Linear Fixed-Point Pipeline:} Realized a reconfigurable three-pass IntSoftmax engine using a true dual-port 1024-word BRAM Exp-ROM and an amortized 32-cycle restoring divider ($2^{31}/\sum$).
+    \item \textbf{High Real-Time Frame Rate:} Delivered a sustained frame rate of \textbf{238.2 FPS} (4.198~ms for 4 heads), exceeding the 30 FPS video baseline by $7.94\times$.
+\end{enumerate}
+
+\section{Future Architectural Directions}
+\begin{itemize}
+    \item \textbf{Sparse Attention and Dynamic Token Pruning:} Incorporating online thresholding to discard uninformative background tokens, potentially reducing compute complexity by $30\% - 50\%$.
+    \item \textbf{FlashAttention On-Chip Tiling:} Scaling the on-chip BRAM buffers to tile $Q$ and $K$ concurrently, eliminating memory round-trips for long sequences ($N \ge 1024$).
+    \item \textbf{Sub-Byte INT4 Quantization:} Exploring mixed-precision 4-bit weights with 8-bit activations on the existing DSP48E2 datapath to double effective compute density.
+\end{itemize}
+
